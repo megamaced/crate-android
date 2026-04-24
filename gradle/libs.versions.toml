@@ -4,17 +4,17 @@ kotlin = "2.1.10"
 ksp = "2.1.10-1.0.31"
 
 # AndroidX / Jetpack
-coreKtx = "1.15.0"
-lifecycle = "2.8.7"
-activityCompose = "1.9.3"
-composeBom = "2025.01.00"
-navigationCompose = "2.8.5"
-hiltNavigationCompose = "1.2.0"
-browser = "1.8.0"
-workManager = "2.10.0"
-dataStore = "1.1.1"
-room = "2.6.1"
-securityCrypto = "1.1.0-alpha06"
+coreKtx = "1.18.0"
+lifecycle = "2.10.0"
+activityCompose = "1.13.0"
+composeBom = "2025.12.01"
+navigationCompose = "2.9.8"
+hiltNavigationCompose = "1.3.0"
+browser = "1.10.0"
+workManager = "2.11.2"
+dataStore = "1.2.1"
+room = "2.8.4"
+securityCrypto = "1.1.0"
 
 # DI
 hilt = "2.53.1"
@@ -39,8 +39,8 @@ junit = "4.13.2"
 mockwebserver = "4.12.0"
 turbine = "1.2.0"
 coroutinesTest = "1.9.0"
-androidxJunit = "1.2.1"
-espressoCore = "3.6.1"
+androidxJunit = "1.3.0"
+espressoCore = "3.7.0"
 
 # Tooling
 ktlintPlugin = "12.1.2"
@@ -73,8 +73,8 @@ androidx-browser = { group = "androidx.browser", name = "browser", version.ref =
 
 # WorkManager
 androidx-work-runtime-ktx = { group = "androidx.work", name = "work-runtime-ktx", version.ref = "workManager" }
-androidx-hilt-work = { group = "androidx.hilt", name = "hilt-work", version = "1.2.0" }
-androidx-hilt-compiler = { group = "androidx.hilt", name = "hilt-compiler", version = "1.2.0" }
+androidx-hilt-work = { group = "androidx.hilt", name = "hilt-work", version = "1.3.0" }
+androidx-hilt-compiler = { group = "androidx.hilt", name = "hilt-compiler", version = "1.3.0" }
 
 # DataStore
 androidx-datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "dataStore" }
