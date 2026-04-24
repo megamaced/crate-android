@@ -1,14 +1,39 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Placeholder foreground — replaced with real brand artwork in Phase A3 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
+
+    <!-- Vinyl disc body -->
     <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M54,30a24,24 0 1,0 0.001,0z" />
+        android:fillColor="#1C1B1F"
+        android:pathData="M22,54a32,32 0 1,0 64,0a32,32 0 1,0 -64,0z" />
+
+    <!-- Groove rings -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#2E2B30"
+        android:strokeWidth="0.6"
+        android:pathData="M26,54a28,28 0 1,0 56,0a28,28 0 1,0 -56,0z" />
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#2E2B30"
+        android:strokeWidth="0.6"
+        android:pathData="M30,54a24,24 0 1,0 48,0a24,24 0 1,0 -48,0z" />
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#2E2B30"
+        android:strokeWidth="0.6"
+        android:pathData="M34,54a20,20 0 1,0 40,0a20,20 0 1,0 -40,0z" />
+
+    <!-- Copper label -->
+    <path
+        android:fillColor="#B8763F"
+        android:pathData="M40,54a14,14 0 1,0 28,0a14,14 0 1,0 -28,0z" />
+
+    <!-- Spindle hole -->
     <path
         android:fillColor="#1B1F2A"
-        android:pathData="M54,46a8,8 0 1,0 0.001,0z" />
+        android:pathData="M52.5,54a1.5,1.5 0 1,0 3,0a1.5,1.5 0 1,0 -3,0z" />
 </vector>

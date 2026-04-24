@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Single-colour silhouette used by Android 13+ themed icons. The system
+  re-colours this layer based on the user's dynamic theme; the fill colour
+  here is irrelevant beyond "fully opaque". `evenOdd` cuts the spindle hole.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="M22,54a32,32 0 1,0 64,0a32,32 0 1,0 -64,0zM52.5,54a1.5,1.5 0 1,0 3,0a1.5,1.5 0 1,0 -3,0z" />
+</vector>
