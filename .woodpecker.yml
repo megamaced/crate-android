@@ -1,0 +1,36 @@
+steps:
+  - name: lint
+    image: cimg/android:2024.10.1
+    when:
+      - event: [push, pull_request]
+    commands:
+      - ./gradlew --no-daemon ktlintCheck lintDebug
+
+  - name: test
+    image: cimg/android:2024.10.1
+    when:
+      - event: [push, pull_request]
+    commands:
+      - ./gradlew --no-daemon testDebugUnitTest
+
+  - name: assemble-debug
+    image: cimg/android:2024.10.1
+    when:
+      - event: [push, pull_request]
+    commands:
+      - ./gradlew --no-daemon assembleDebug
+      - mkdir -p artifacts
+      - cp app/build/outputs/apk/debug/*.apk artifacts/
+
+  - name: publish-artifact
+    image: plugins/gitea-release
+    when:
+      - event: push
+        branch: main
+    settings:
+      api_key:
+        from_secret: gitea_token
+      base_url: https://gitea.macecloud.co.uk
+      files: artifacts/*.apk
+      title: "crate-android ${CI_COMMIT_SHA:0:8}"
+      prerelease: true

@@ -1,0 +1,27 @@
+Crate is the native Android companion for the Crate Nextcloud app — a personal
+catalogue for your physical media collection.
+
+Browse and manage your music, films, books, games and comics on the go.
+Everything is stored on your own Nextcloud server, so you own your data.
+
+Features:
+
+* Browse your collection by category, format and artist
+* Full album / film / book / game / comic detail view with tracklist,
+  cast, author bio, and more
+* Wishlist — track what you want next
+* Barcode scanning to add new items quickly
+* Enrich items automatically from Discogs, TMDB, Open Library, RAWG or
+  ComicVine (you provide your own API keys)
+* Market values (Discogs for music, PriceCharting for games & comics)
+* Share albums or playlists with other users of your Nextcloud instance
+* Full offline mode — your collection is cached locally and syncs when
+  you have a connection
+* Follows the Material 3 design system, with Material You dynamic colour
+  on Android 12+
+
+Requires a Nextcloud instance running the Crate server app:
+https://gitea.macecloud.co.uk/macebox/crate
+
+This build contains no proprietary Google services and is fully open source
+under the AGPL-3.0 licence.
