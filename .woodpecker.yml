@@ -24,18 +24,20 @@ steps:
       - yes | sdkmanager --licenses >/dev/null 2>&1 || true
       - sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
       - ./gradlew --no-daemon ktlintCheck lintDebug testDebugUnitTest assembleDebug
-      - mkdir -p artifacts
-      - cp app/build/outputs/apk/debug/*.apk artifacts/
 
-  - name: publish-artifact
-    image: plugins/gitea-release
-    when:
-      - event: push
-        branch: main
-    settings:
-      api_key:
-        from_secret: gitea_token
-      base_url: https://gitea.macecloud.co.uk
-      files: artifacts/*.apk
-      title: "crate-android ${CI_COMMIT_SHA:0:8}"
-      prerelease: true
+# To publish a Gitea release with the debug APK on every push to main,
+# add a Woodpecker secret named `gitea_token` (a Gitea PAT with
+# write:repository scope) and uncomment the step below.
+#
+#  - name: publish-artifact
+#    image: plugins/gitea-release
+#    when:
+#      - event: push
+#        branch: main
+#    settings:
+#      api_key:
+#        from_secret: gitea_token
+#      base_url: https://gitea.macecloud.co.uk
+#      files: app/build/outputs/apk/debug/*.apk
+#      title: "crate-android ${CI_COMMIT_SHA:0:8}"
+#      prerelease: true
