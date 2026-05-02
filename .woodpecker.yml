@@ -1,23 +1,29 @@
+when:
+  - event: [push, pull_request]
+
+# Workspace is mounted as root-owned, but cimg/android runs as the
+# `circleci` user. Without ownership fix-up the pipeline aborts before
+# Gradle can even read the project, so each step opens with `sudo
+# chown` to take ownership. The cimg images ship NOPASSWD sudo for
+# circleci.
+
 steps:
   - name: lint
     image: cimg/android:2026.03.1
-    when:
-      - event: [push, pull_request]
     commands:
+      - sudo chown -R circleci:circleci "$CI_WORKSPACE"
       - ./gradlew --no-daemon ktlintCheck lintDebug
 
   - name: test
     image: cimg/android:2026.03.1
-    when:
-      - event: [push, pull_request]
     commands:
+      - sudo chown -R circleci:circleci "$CI_WORKSPACE"
       - ./gradlew --no-daemon testDebugUnitTest
 
   - name: assemble-debug
     image: cimg/android:2026.03.1
-    when:
-      - event: [push, pull_request]
     commands:
+      - sudo chown -R circleci:circleci "$CI_WORKSPACE"
       - ./gradlew --no-daemon assembleDebug
       - mkdir -p artifacts
       - cp app/build/outputs/apk/debug/*.apk artifacts/
