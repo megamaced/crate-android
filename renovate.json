@@ -1,36 +1,36 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
-    "config:recommended"
+    "config:recommended",
+    ":dependencyDashboard",
+    ":semanticCommits",
+    ":enableVulnerabilityAlertsWithLabel(security)",
+    "schedule:weekly"
   ],
+  "timezone": "Europe/London",
   "labels": ["dependencies"],
+  "prHourlyLimit": 4,
+  "prConcurrentLimit": 8,
+  "rangeStrategy": "bump",
+  "rebaseWhen": "behind-base-branch",
+  "minimumReleaseAge": "5 days",
+  "osvVulnerabilityAlerts": true,
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": ["before 6am on monday"]
+  },
   "packageRules": [
     {
+      "description": "Patch-level Gradle bumps may auto-merge — minors in the JVM/Android world routinely require coordinated changes (e.g. Hilt 2.59 hard-required AGP 9, Kotlin 2.x retired the kotlinOptions DSL). Reviewer eyes only on minors and majors.",
       "matchManagers": ["gradle", "gradle-wrapper"],
-      "matchUpdateTypes": ["minor", "patch"],
-      "groupName": "gradle minor/patch",
-      "automerge": true
+      "matchUpdateTypes": ["patch"],
+      "groupName": "gradle patch updates",
+      "automerge": true,
+      "automergeType": "branch"
     },
     {
-      "matchPackagePatterns": ["^androidx\\."],
-      "groupName": "androidx"
-    },
-    {
-      "matchPackagePatterns": ["^org\\.jetbrains\\.kotlin"],
-      "groupName": "kotlin"
-    },
-    {
-      "matchPackagePatterns": ["^com\\.google\\.dagger"],
-      "groupName": "hilt"
-    },
-    {
-      "description": "Hilt 2.59+ requires AGP 9; pin under 2.59 until we move AGP and Kotlin to 9.x in lockstep.",
-      "matchPackagePatterns": ["^com\\.google\\.dagger"],
-      "allowedVersions": "<2.59",
-      "automerge": false
-    },
-    {
-      "description": "AGP, Kotlin, KSP and Compose compiler must move together; never auto-merge any of them — review the matrix manually.",
+      "description": "AGP / Kotlin / KSP / Compose plugin must move together — never auto-merge any of them, and group them so we always review the matrix as one PR.",
+      "groupName": "android toolchain",
       "matchPackageNames": [
         "com.android.application",
         "com.android.library",
@@ -38,9 +38,74 @@
         "org.jetbrains.kotlin.android",
         "org.jetbrains.kotlin.plugin.compose",
         "org.jetbrains.kotlin.plugin.serialization",
-        "com.google.devtools.ksp"
+        "com.google.devtools.ksp",
+        "/^org\\.jetbrains\\.kotlin:/",
+        "/^org\\.jetbrains\\.kotlinx:kotlinx-serialization/"
       ],
-      "matchUpdateTypes": ["major", "minor"],
+      "automerge": false,
+      "labels": ["dependencies", "toolchain"],
+      "schedule": ["before 6am on monday"]
+    },
+    {
+      "description": "Hilt 2.59+ requires AGP 9 — pin under 2.59 until we move the toolchain. Bumps are reviewed manually.",
+      "matchPackageNames": ["/^com\\.google\\.dagger/"],
+      "groupName": "hilt",
+      "allowedVersions": "<2.59",
+      "automerge": false
+    },
+    {
+      "description": "Cap Gradle wrapper under 9 until AGP 9 lands (AGP 8.x doesn't run on Gradle 9).",
+      "matchManagers": ["gradle-wrapper"],
+      "allowedVersions": "<9",
+      "automerge": false
+    },
+    {
+      "description": "Compose BOM and any directly-pinned Compose libraries.",
+      "matchPackageNames": [
+        "androidx.compose:compose-bom",
+        "/^androidx\\.compose\\./"
+      ],
+      "groupName": "compose"
+    },
+    {
+      "description": "All other AndroidX libraries — group them so the AndroidX surface stays coherent across releases. Compose libraries (incl. the BOM) are handled separately above.",
+      "matchPackageNames": [
+        "/^androidx\\./",
+        "!/^androidx\\.compose/"
+      ],
+      "groupName": "androidx",
+      "automerge": false
+    },
+    {
+      "description": "Networking stack (Retrofit, OkHttp, kotlinx.serialization runtime).",
+      "matchPackageNames": [
+        "/^com\\.squareup\\.retrofit2:/",
+        "/^com\\.squareup\\.okhttp3:/",
+        "org.jetbrains.kotlinx:kotlinx-serialization-json"
+      ],
+      "groupName": "networking"
+    },
+    {
+      "description": "Testing libraries — group together; never auto-merge so we can run a full test pass.",
+      "matchPackageNames": [
+        "junit:junit",
+        "app.cash.turbine:turbine",
+        "/^com\\.squareup\\.okhttp3:mockwebserver/",
+        "/^org\\.jetbrains\\.kotlinx:kotlinx-coroutines-test/",
+        "/^androidx\\.test\\./"
+      ],
+      "groupName": "testing",
+      "automerge": false
+    },
+    {
+      "description": "CI / Docker images. Surface bumps but never auto-merge — image tags can hide breaking changes (SDK availability, user model, etc).",
+      "matchManagers": ["dockerfile", "woodpecker"],
+      "automerge": false,
+      "labels": ["ci"]
+    },
+    {
+      "description": "Never auto-merge any major bump anywhere in the project.",
+      "matchUpdateTypes": ["major"],
       "automerge": false
     }
   ]
