@@ -1,30 +1,29 @@
 when:
   - event: [push, pull_request]
 
-# Workspace is mounted as root-owned, but cimg/android runs as the
-# `circleci` user. Without ownership fix-up the pipeline aborts before
-# Gradle can even read the project, so each step opens with `sudo
-# chown` to take ownership. The cimg images ship NOPASSWD sudo for
-# circleci.
+# We previously used cimg/android, but its ~7 GB compressed size kept
+# timing out the Woodpecker runner's image pull (status `Exception`,
+# pipeline never started). eclipse-temurin:21-jdk weighs ~400 MB and
+# we install just the SDK pieces we need on demand. The SDK lives at
+# /opt/android-sdk so it's root-readable regardless of the UID
+# Woodpecker uses for subsequent stages.
 
 steps:
-  - name: lint
-    image: cimg/android:2026.03.1
+  - name: build
+    image: eclipse-temurin:21-jdk
+    environment:
+      ANDROID_HOME: /opt/android-sdk
+      ANDROID_SDK_ROOT: /opt/android-sdk
     commands:
-      - sudo chown -R circleci:circleci "$CI_WORKSPACE"
-      - ./gradlew --no-daemon ktlintCheck lintDebug
-
-  - name: test
-    image: cimg/android:2026.03.1
-    commands:
-      - sudo chown -R circleci:circleci "$CI_WORKSPACE"
-      - ./gradlew --no-daemon testDebugUnitTest
-
-  - name: assemble-debug
-    image: cimg/android:2026.03.1
-    commands:
-      - sudo chown -R circleci:circleci "$CI_WORKSPACE"
-      - ./gradlew --no-daemon assembleDebug
+      - apt-get update -qq && apt-get install -y -qq curl unzip git >/dev/null
+      - mkdir -p /opt/android-sdk/cmdline-tools
+      - curl -fsSL -o /tmp/cmdline.zip "https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip"
+      - unzip -q /tmp/cmdline.zip -d /tmp/cmdline-extract
+      - mv /tmp/cmdline-extract/cmdline-tools /opt/android-sdk/cmdline-tools/latest
+      - export PATH=/opt/android-sdk/cmdline-tools/latest/bin:$PATH
+      - yes | sdkmanager --licenses >/dev/null 2>&1 || true
+      - sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+      - ./gradlew --no-daemon ktlintCheck lintDebug testDebugUnitTest assembleDebug
       - mkdir -p artifacts
       - cp app/build/outputs/apk/debug/*.apk artifacts/
 
