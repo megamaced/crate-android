@@ -22,6 +22,26 @@
     {
       "matchPackagePatterns": ["^com\\.google\\.dagger"],
       "groupName": "hilt"
+    },
+    {
+      "description": "Hilt 2.59+ requires AGP 9; pin under 2.59 until we move AGP and Kotlin to 9.x in lockstep.",
+      "matchPackagePatterns": ["^com\\.google\\.dagger"],
+      "allowedVersions": "<2.59",
+      "automerge": false
+    },
+    {
+      "description": "AGP, Kotlin, KSP and Compose compiler must move together; never auto-merge any of them — review the matrix manually.",
+      "matchPackageNames": [
+        "com.android.application",
+        "com.android.library",
+        "com.android.tools.build:gradle",
+        "org.jetbrains.kotlin.android",
+        "org.jetbrains.kotlin.plugin.compose",
+        "org.jetbrains.kotlin.plugin.serialization",
+        "com.google.devtools.ksp"
+      ],
+      "matchUpdateTypes": ["major", "minor"],
+      "automerge": false
     }
   ]
 }
