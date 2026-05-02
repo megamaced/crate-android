@@ -1,20 +1,20 @@
 steps:
   - name: lint
-    image: cimg/android:2024.10.1
+    image: cimg/android:2026.03.1
     when:
       - event: [push, pull_request]
     commands:
       - ./gradlew --no-daemon ktlintCheck lintDebug
 
   - name: test
-    image: cimg/android:2024.10.1
+    image: cimg/android:2026.03.1
     when:
       - event: [push, pull_request]
     commands:
       - ./gradlew --no-daemon testDebugUnitTest
 
   - name: assemble-debug
-    image: cimg/android:2024.10.1
+    image: cimg/android:2026.03.1
     when:
       - event: [push, pull_request]
     commands:
