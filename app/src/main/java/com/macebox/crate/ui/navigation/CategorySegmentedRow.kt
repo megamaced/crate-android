@@ -11,7 +11,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
-enum class Category(val label: String) {
+enum class Category(
+    val label: String,
+) {
     Music("Music"),
     Films("Films"),
     Books("Books"),
