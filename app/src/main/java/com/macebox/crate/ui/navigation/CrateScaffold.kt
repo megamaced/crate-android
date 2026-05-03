@@ -6,12 +6,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Album
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.QueueMusic
+import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.Album
 import androidx.compose.material.icons.outlined.Home
-import androidx.compose.material.icons.outlined.QueueMusic
+import androidx.compose.material.icons.automirrored.outlined.QueueMusic
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Icon
@@ -43,7 +43,7 @@ data class TopLevelRoute(
 val topLevelRoutes = listOf(
     TopLevelRoute("Home", Destination.Home, Icons.Filled.Home, Icons.Outlined.Home),
     TopLevelRoute("Collection", Destination.Collection, Icons.Filled.Album, Icons.Outlined.Album),
-    TopLevelRoute("Playlists", Destination.Playlists, Icons.Filled.QueueMusic, Icons.Outlined.QueueMusic),
+    TopLevelRoute("Playlists", Destination.Playlists, Icons.AutoMirrored.Filled.QueueMusic, Icons.AutoMirrored.Outlined.QueueMusic),
     TopLevelRoute("Search", Destination.Search, Icons.Filled.Search, Icons.Outlined.Search),
     TopLevelRoute("Settings", Destination.Settings, Icons.Filled.Settings, Icons.Outlined.Settings),
 )
