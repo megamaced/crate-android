@@ -23,6 +23,8 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -32,6 +34,8 @@ import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.macebox.crate.data.auth.AuthState
+import com.macebox.crate.data.auth.SessionManager
 
 data class TopLevelRoute(
     val label: String,
@@ -49,14 +53,32 @@ val topLevelRoutes = listOf(
 )
 
 @Composable
-fun CrateScaffold(widthSizeClass: WindowWidthSizeClass) {
+fun CrateScaffold(
+    widthSizeClass: WindowWidthSizeClass,
+    sessionManager: SessionManager,
+) {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
+    val authState by sessionManager.authState.collectAsState()
 
+    LaunchedEffect(authState) {
+        when (authState) {
+            AuthState.Unauthenticated -> {
+                navController.navigate(Destination.Login) {
+                    popUpTo(0) { inclusive = true }
+                }
+            }
+            AuthState.Authenticated, AuthState.Unknown -> { /* no-op */ }
+        }
+    }
+
+    val isOnLogin = currentDestination?.hasRoute(Destination.Login::class) == true
     val useNavRail = widthSizeClass != WindowWidthSizeClass.Compact
 
-    if (useNavRail) {
+    if (isOnLogin) {
+        CrateNavHost(navController = navController)
+    } else if (useNavRail) {
         Row(modifier = Modifier.fillMaxSize()) {
             NavigationRail {
                 topLevelRoutes.forEach { route ->

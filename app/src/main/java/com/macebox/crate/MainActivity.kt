@@ -6,12 +6,17 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
 import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
+import com.macebox.crate.data.auth.SessionManager
 import com.macebox.crate.ui.navigation.CrateScaffold
 import com.macebox.crate.ui.theme.CrateTheme
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+    @Inject
+    lateinit var sessionManager: SessionManager
+
     @OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
@@ -19,7 +24,10 @@ class MainActivity : ComponentActivity() {
         setContent {
             CrateTheme {
                 val windowSizeClass = calculateWindowSizeClass(this)
-                CrateScaffold(widthSizeClass = windowSizeClass.widthSizeClass)
+                CrateScaffold(
+                    widthSizeClass = windowSizeClass.widthSizeClass,
+                    sessionManager = sessionManager,
+                )
             }
         }
     }

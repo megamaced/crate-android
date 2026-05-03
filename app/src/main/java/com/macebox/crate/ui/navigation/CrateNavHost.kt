@@ -10,6 +10,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.toRoute
+import com.macebox.crate.ui.screen.login.LoginScreen
 
 @Composable
 fun CrateNavHost(
@@ -37,7 +38,13 @@ fun CrateNavHost(
             PlaceholderScreen("Settings")
         }
         composable<Destination.Login> {
-            PlaceholderScreen("Login")
+            LoginScreen(
+                onLoginSuccess = {
+                    navController.navigate(Destination.Home) {
+                        popUpTo(Destination.Login) { inclusive = true }
+                    }
+                },
+            )
         }
         composable<Destination.Detail> { backStackEntry ->
             val detail = backStackEntry.toRoute<Destination.Detail>()
