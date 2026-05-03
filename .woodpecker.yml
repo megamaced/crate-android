@@ -14,6 +14,15 @@ steps:
     environment:
       ANDROID_HOME: /opt/android-sdk
       ANDROID_SDK_ROOT: /opt/android-sdk
+      # Override gradle.properties' 4GB heap — server only has 16GB total
+      GRADLE_OPTS: "-Xmx1536m -Dfile.encoding=UTF-8 -XX:+UseParallelGC"
+    backend_options:
+      kubernetes:
+        resources:
+          limits:
+            memory: 2500Mi
+          requests:
+            memory: 1500Mi
     commands:
       - apt-get update -qq && apt-get install -y -qq curl unzip git >/dev/null
       - mkdir -p /opt/android-sdk/cmdline-tools
@@ -23,6 +32,10 @@ steps:
       - export PATH=/opt/android-sdk/cmdline-tools/latest/bin:$PATH
       - yes | sdkmanager --licenses >/dev/null 2>&1 || true
       - sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+      # Override gradle.properties JVM args for CI (server is memory-constrained)
+      - echo "org.gradle.jvmargs=-Xmx1536m -XX:+UseParallelGC" >> gradle.properties
+      - echo "org.gradle.parallel=false" >> gradle.properties
+      - echo "org.gradle.workers.max=2" >> gradle.properties
       - ./gradlew --no-daemon ktlintCheck lintDebug testDebugUnitTest assembleDebug
 
 # To publish a Gitea release with the debug APK on every push to main,
