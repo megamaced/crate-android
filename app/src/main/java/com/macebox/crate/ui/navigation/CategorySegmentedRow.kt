@@ -10,16 +10,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-
-enum class Category(
-    val label: String,
-) {
-    Music("Music"),
-    Films("Films"),
-    Books("Books"),
-    Games("Games"),
-    Comics("Comics"),
-}
+import com.macebox.crate.domain.model.Category
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
