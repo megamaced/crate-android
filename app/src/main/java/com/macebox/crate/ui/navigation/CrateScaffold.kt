@@ -77,7 +77,10 @@ fun CrateScaffold(
     val useNavRail = widthSizeClass != WindowWidthSizeClass.Compact
 
     if (isOnLogin) {
-        CrateNavHost(navController = navController)
+        CrateNavHost(
+            navController = navController,
+            widthSizeClass = widthSizeClass,
+        )
     } else if (useNavRail) {
         Row(modifier = Modifier.fillMaxSize()) {
             NavigationRail {
@@ -100,6 +103,7 @@ fun CrateScaffold(
             }
             CrateNavHost(
                 navController = navController,
+                widthSizeClass = widthSizeClass,
                 modifier = Modifier.weight(1f),
             )
         }
@@ -128,6 +132,7 @@ fun CrateScaffold(
         ) { innerPadding ->
             CrateNavHost(
                 navController = navController,
+                widthSizeClass = widthSizeClass,
                 modifier = Modifier.padding(innerPadding),
             )
         }

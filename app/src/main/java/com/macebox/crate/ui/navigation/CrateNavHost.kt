@@ -3,18 +3,21 @@ package com.macebox.crate.ui.navigation
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Text
+import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
-import androidx.navigation.toRoute
+import com.macebox.crate.ui.screen.collection.CollectionScreen
+import com.macebox.crate.ui.screen.detail.ItemDetailScreen
 import com.macebox.crate.ui.screen.login.LoginScreen
 
 @Composable
 fun CrateNavHost(
     navController: NavHostController,
+    widthSizeClass: WindowWidthSizeClass,
     modifier: Modifier = Modifier,
 ) {
     NavHost(
@@ -26,7 +29,10 @@ fun CrateNavHost(
             PlaceholderScreen("Home")
         }
         composable<Destination.Collection> {
-            PlaceholderScreen("Collection")
+            CollectionScreen(
+                onItemClick = { id -> navController.navigate(Destination.Detail(id)) },
+                widthSizeClass = widthSizeClass,
+            )
         }
         composable<Destination.Playlists> {
             PlaceholderScreen("Playlists")
@@ -46,21 +52,19 @@ fun CrateNavHost(
                 },
             )
         }
-        composable<Destination.Detail> { backStackEntry ->
-            val detail = backStackEntry.toRoute<Destination.Detail>()
-            PlaceholderScreen("Detail — item ${detail.itemId}")
+        composable<Destination.Detail> {
+            ItemDetailScreen(
+                onBack = { navController.popBackStack() },
+            )
         }
-        composable<Destination.AddEdit> { backStackEntry ->
-            val addEdit = backStackEntry.toRoute<Destination.AddEdit>()
-            val label = if (addEdit.itemId != null) "Edit ${addEdit.itemId}" else "Add"
-            PlaceholderScreen(label)
+        composable<Destination.AddEdit> {
+            PlaceholderScreen("Add / Edit")
         }
         composable<Destination.Scan> {
             PlaceholderScreen("Barcode Scan")
         }
-        composable<Destination.PlaylistDetail> { backStackEntry ->
-            val detail = backStackEntry.toRoute<Destination.PlaylistDetail>()
-            PlaceholderScreen("Playlist ${detail.playlistId}")
+        composable<Destination.PlaylistDetail> {
+            PlaceholderScreen("Playlist")
         }
         composable<Destination.SharedWithMe> {
             PlaceholderScreen("Shared With Me")

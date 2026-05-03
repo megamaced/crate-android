@@ -6,7 +6,7 @@ Native Android companion for [Crate](https://github.com/megamaced/crate), a pers
 
 ## Status
 
-Early scaffolding — Phases A1–A8 complete (CI, project setup, theming, navigation, auth, API layer, Room persistence, repositories). Screens still to follow.
+Early development — auth, networking, and offline storage are in place; the UI is being built screen-by-screen.
 
 ## Requirements
 
