@@ -21,7 +21,7 @@ Features:
   on Android 12+
 
 Requires a Nextcloud instance running the Crate server app:
-https://gitea.macecloud.co.uk/macebox/crate
+https://github.com/megamaced/crate
 
 This build contains no proprietary Google services and is fully open source
 under the AGPL-3.0 licence.

@@ -1,19 +1,21 @@
 # Crate — Android
 
-Native Android companion for [Crate](https://gitea.macecloud.co.uk/macebox/crate), a personal physical media cataloguing app for Nextcloud.
+Native Android companion for [Crate](https://github.com/megamaced/crate), a personal physical media cataloguing app for Nextcloud.
+
+> **100 % AI-written.** Every line of source, every test, every CI workflow, this README, and almost every commit message in this repository was written by [Claude Code](https://www.anthropic.com/claude-code) under direction from a human reviewer. No code in this repository was hand-typed.
 
 ## Status
 
-Early scaffolding — see the [Android Task List](https://outline.macecloud.co.uk/doc/crate-android-task-list-8rxf6egO2E) and [Building Blocks](https://outline.macecloud.co.uk/doc/crate-android-app-building-blocks-VWiiOfrwGy) for the roadmap.
+Early scaffolding — Phases A1–A8 complete (CI, project setup, theming, navigation, auth, API layer, Room persistence, repositories). Screens still to follow.
 
 ## Requirements
 
 - Android 10 (API 29) or newer
-- A Nextcloud instance running the [Crate app](https://gitea.macecloud.co.uk/macebox/crate)
+- A Nextcloud instance running the [Crate server app](https://github.com/megamaced/crate)
 
 ## Tech stack
 
-- Kotlin 2.x + Jetpack Compose + Material 3
+- Kotlin 2.x + Jetpack Compose + Material 3 (with Material You dynamic colour on Android 12+)
 - Hilt for dependency injection
 - Retrofit 2 + OkHttp 5 + kotlinx.serialization
 - Room 2.7 for offline cache
@@ -35,4 +37,4 @@ F-Droid + sideload. The build intentionally avoids any Google Play Services depe
 
 ## License
 
-AGPL-3.0-or-later — same as the Crate server app.
+[AGPL-3.0-or-later](LICENSE) — same as the Crate server app and Nextcloud itself.
