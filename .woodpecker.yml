@@ -1,6 +1,10 @@
 when:
   - event: [push, pull_request]
 
+# Only one pipeline at a time — Gradle is too heavy to run concurrently
+concurrency:
+  limit: 1
+
 # We previously used cimg/android, but its ~7 GB compressed size kept
 # timing out the Woodpecker runner's image pull (status `Exception`,
 # pipeline never started). eclipse-temurin:21-jdk weighs ~400 MB and
