@@ -123,6 +123,12 @@ private class FakeMediaRepository : MediaRepository {
     }
 
     override suspend fun deleteAll(): ApiResult<Unit> = ApiResult.Success(Unit)
+
+    override suspend fun uploadArtwork(
+        id: Long,
+        bytes: ByteArray,
+        mimeType: String,
+    ): ApiResult<Unit> = ApiResult.Success(Unit)
 }
 
 private class FakeEnrichmentRepository : EnrichmentRepository {

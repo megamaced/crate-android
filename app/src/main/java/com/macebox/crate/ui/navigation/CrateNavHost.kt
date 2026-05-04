@@ -10,6 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import com.macebox.crate.ui.screen.addedit.AddEditItemScreen
 import com.macebox.crate.ui.screen.collection.CollectionScreen
 import com.macebox.crate.ui.screen.detail.ItemDetailScreen
 import com.macebox.crate.ui.screen.home.HomeScreen
@@ -34,6 +35,9 @@ fun CrateNavHost(
         composable<Destination.Collection> {
             CollectionScreen(
                 onItemClick = { id -> navController.navigate(Destination.Detail(id)) },
+                onAddItem = { category ->
+                    navController.navigate(Destination.AddEdit(category = category.apiValue))
+                },
                 widthSizeClass = widthSizeClass,
             )
         }
@@ -58,10 +62,15 @@ fun CrateNavHost(
         composable<Destination.Detail> {
             ItemDetailScreen(
                 onBack = { navController.popBackStack() },
+                onEdit = { id, categoryApiValue ->
+                    navController.navigate(Destination.AddEdit(itemId = id, category = categoryApiValue))
+                },
             )
         }
         composable<Destination.AddEdit> {
-            PlaceholderScreen("Add / Edit")
+            AddEditItemScreen(
+                onBack = { navController.popBackStack() },
+            )
         }
         composable<Destination.Scan> {
             PlaceholderScreen("Barcode Scan")

@@ -2,6 +2,7 @@ package com.macebox.crate.data.repository
 
 import com.macebox.crate.data.api.ApiResult
 import com.macebox.crate.data.api.CrateApiService
+import com.macebox.crate.data.api.CrateBinaryService
 import com.macebox.crate.data.api.apiCall
 import com.macebox.crate.data.db.dao.MediaItemDao
 import com.macebox.crate.data.mapper.MediaItemJsonCodec
@@ -16,6 +17,9 @@ import com.macebox.crate.domain.repository.MediaRepository
 import com.macebox.crate.domain.repository.MediaRepository.RefreshResult
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.MultipartBody
+import okhttp3.RequestBody.Companion.toRequestBody
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -24,6 +28,7 @@ class MediaRepositoryImpl
     @Inject
     constructor(
         private val api: CrateApiService,
+        private val binary: CrateBinaryService,
         private val dao: MediaItemDao,
         private val codec: MediaItemJsonCodec,
     ) : MediaRepository {
@@ -96,5 +101,19 @@ class MediaRepositoryImpl
             apiCall {
                 api.deleteAllMedia()
                 dao.deleteAll()
+            }
+
+        override suspend fun uploadArtwork(
+            id: Long,
+            bytes: ByteArray,
+            mimeType: String,
+        ): ApiResult<Unit> =
+            apiCall {
+                val body = bytes.toRequestBody(mimeType.toMediaType())
+                val part = MultipartBody.Part.createFormData("file", "artwork", body)
+                binary.uploadArtwork(id, part).close()
+                // Refresh so updatedAt advances and Coil cache key changes.
+                val dto = api.getMediaItem(id)
+                dao.upsert(dto.toEntity(codec))
             }
     }

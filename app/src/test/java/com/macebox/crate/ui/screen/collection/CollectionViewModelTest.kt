@@ -189,6 +189,12 @@ private class FakeMediaRepository : MediaRepository {
         items.value = emptyList()
         return ApiResult.Success(Unit)
     }
+
+    override suspend fun uploadArtwork(
+        id: Long,
+        bytes: ByteArray,
+        mimeType: String,
+    ): ApiResult<Unit> = ApiResult.Success(Unit)
 }
 
 private fun item(

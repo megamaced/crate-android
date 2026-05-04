@@ -38,6 +38,12 @@ interface MediaRepository {
 
     suspend fun deleteAll(): ApiResult<Unit>
 
+    suspend fun uploadArtwork(
+        id: Long,
+        bytes: ByteArray,
+        mimeType: String,
+    ): ApiResult<Unit>
+
     data class RefreshResult(
         val total: Int,
         val limit: Int,

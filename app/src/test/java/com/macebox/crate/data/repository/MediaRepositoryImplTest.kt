@@ -2,6 +2,7 @@ package com.macebox.crate.data.repository
 
 import app.cash.turbine.test
 import com.macebox.crate.data.api.ApiResult
+import com.macebox.crate.data.api.CrateBinaryService
 import com.macebox.crate.data.api.dto.MediaItemDto
 import com.macebox.crate.data.api.dto.PaginatedMediaDto
 import com.macebox.crate.data.db.dao.MediaItemDao
@@ -23,7 +24,8 @@ class MediaRepositoryImplTest {
     private val codec = MediaItemJsonCodec(Json)
     private val dao = FakeMediaItemDao()
     private val api = FakeCrateApiService()
-    private val repo = MediaRepositoryImpl(api, dao, codec)
+    private val binary = NoopBinaryService()
+    private val repo = MediaRepositoryImpl(api, binary, dao, codec)
 
     @Test
     fun `refresh writes API page into DAO and surfaces total`() =
@@ -160,4 +162,26 @@ private class FakeMediaItemDao : MediaItemDao {
     override suspend fun deleteAll() {
         rows.value = emptyList()
     }
+}
+
+private class NoopBinaryService : CrateBinaryService {
+    override suspend fun getArtwork(
+        itemId: Long,
+        size: String?,
+    ) = error("not used")
+
+    override suspend fun uploadArtwork(
+        itemId: Long,
+        file: okhttp3.MultipartBody.Part,
+    ) = error("not used")
+
+    override suspend fun deleteArtwork(itemId: Long) = error("not used")
+
+    override suspend fun export(
+        format: String,
+        scope: String,
+        category: String,
+        includeEnriched: Int,
+        includeMarket: Int,
+    ) = error("not used")
 }

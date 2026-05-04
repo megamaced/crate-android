@@ -60,6 +60,7 @@ import com.macebox.crate.ui.components.LoadingState
 @Composable
 fun ItemDetailScreen(
     onBack: () -> Unit,
+    onEdit: (Long, String) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: ItemDetailViewModel = hiltViewModel(),
 ) {
@@ -106,6 +107,10 @@ fun ItemDetailScreen(
                             item = item,
                             expanded = menuExpanded,
                             onDismiss = { menuExpanded = false },
+                            onEdit = {
+                                menuExpanded = false
+                                onEdit(item.id, item.category.apiValue)
+                            },
                             onEnrich = {
                                 menuExpanded = false
                                 viewModel.enrich()
@@ -176,6 +181,7 @@ private fun DetailMenu(
     item: MediaItem,
     expanded: Boolean,
     onDismiss: () -> Unit,
+    onEdit: () -> Unit,
     onEnrich: () -> Unit,
     onStrip: () -> Unit,
     onFetchMarketValue: () -> Unit,
@@ -187,6 +193,10 @@ private fun DetailMenu(
         item.category == Category.Comics
 
     DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
+        DropdownMenuItem(
+            text = { Text("Edit") },
+            onClick = onEdit,
+        )
         DropdownMenuItem(
             text = { Text(if (isEnriched) "Re-enrich" else "Enrich") },
             onClick = onEnrich,
