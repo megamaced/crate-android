@@ -1,6 +1,17 @@
 package com.macebox.crate.data.api.dto
 
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.descriptors.buildClassSerialDescriptor
+import kotlinx.serialization.descriptors.element
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.json.JsonDecoder
+import kotlinx.serialization.json.JsonEncoder
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
 
 @Serializable
 data class MediaItemDto(
@@ -40,11 +51,57 @@ data class TrackDto(
     val duration: String? = null,
 )
 
-@Serializable
+/**
+ * Server returns artist members in either of two shapes:
+ *   - a bare string `"Emma Bunton"` (current Crate backend), or
+ *   - a structured object `{"name": "Emma Bunton", "active": true}`.
+ * The custom serializer normalises both into [ArtistMemberDto].
+ */
+@Serializable(with = ArtistMemberDtoSerializer::class)
 data class ArtistMemberDto(
     val name: String,
     val active: Boolean? = null,
 )
+
+private object ArtistMemberDtoSerializer : KSerializer<ArtistMemberDto> {
+    override val descriptor: SerialDescriptor =
+        buildClassSerialDescriptor("ArtistMemberDto") {
+            element<String>("name")
+            element<Boolean?>("active", isOptional = true)
+        }
+
+    override fun deserialize(decoder: Decoder): ArtistMemberDto {
+        val input = decoder as? JsonDecoder ?: error("ArtistMemberDto only supports JSON")
+        return when (val element = input.decodeJsonElement()) {
+            is JsonPrimitive -> ArtistMemberDto(name = element.content)
+            is JsonObject -> {
+                val name = (element["name"] as? JsonPrimitive)?.content
+                    ?: error("Artist member object missing 'name'")
+                val active = (element["active"] as? JsonPrimitive)
+                    ?.takeIf { !it.isString }
+                    ?.content
+                    ?.toBooleanStrictOrNull()
+                ArtistMemberDto(name = name, active = active)
+            }
+            else -> error("Unexpected artist member JSON: $element")
+        }
+    }
+
+    override fun serialize(
+        encoder: Encoder,
+        value: ArtistMemberDto,
+    ) {
+        val output = encoder as? JsonEncoder ?: error("ArtistMemberDto only supports JSON")
+        val obj =
+            buildJsonObject {
+                put("name", JsonPrimitive(value.name))
+                if (value.active != null) {
+                    put("active", JsonPrimitive(value.active))
+                }
+            }
+        output.encodeJsonElement(obj)
+    }
+}
 
 @Serializable
 data class PaginatedMediaDto(
