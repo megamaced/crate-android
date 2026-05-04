@@ -11,10 +11,14 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.macebox.crate.ui.screen.addedit.AddEditItemScreen
+import com.macebox.crate.ui.screen.addedit.ExternalSearchResult
+import com.macebox.crate.ui.screen.addedit.SCAN_RESULT_KEY
 import com.macebox.crate.ui.screen.collection.CollectionScreen
 import com.macebox.crate.ui.screen.detail.ItemDetailScreen
 import com.macebox.crate.ui.screen.home.HomeScreen
 import com.macebox.crate.ui.screen.login.LoginScreen
+import com.macebox.crate.ui.screen.scan.BarcodeScanScreen
+import kotlinx.serialization.json.Json
 
 @Composable
 fun CrateNavHost(
@@ -70,10 +74,21 @@ fun CrateNavHost(
         composable<Destination.AddEdit> {
             AddEditItemScreen(
                 onBack = { navController.popBackStack() },
+                onScan = { categoryApiValue ->
+                    navController.navigate(Destination.Scan(category = categoryApiValue))
+                },
             )
         }
         composable<Destination.Scan> {
-            PlaceholderScreen("Barcode Scan")
+            BarcodeScanScreen(
+                onBack = { navController.popBackStack() },
+                onResultPicked = { result ->
+                    val handle = navController.previousBackStackEntry?.savedStateHandle
+                    val json = Json.encodeToString(ExternalSearchResult.serializer(), result)
+                    handle?.set(SCAN_RESULT_KEY, json)
+                    navController.popBackStack()
+                },
+            )
         }
         composable<Destination.PlaylistDetail> {
             PlaceholderScreen("Playlist")

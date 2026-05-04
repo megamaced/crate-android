@@ -35,7 +35,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.macebox.crate.domain.model.Category
+import kotlinx.serialization.Serializable
 
+@Serializable
 data class ExternalSearchResult(
     val title: String,
     val artist: String? = null,

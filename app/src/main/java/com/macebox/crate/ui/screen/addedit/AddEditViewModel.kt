@@ -16,8 +16,10 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.Json
 import javax.inject.Inject
 
 data class AddEditUiState(
@@ -52,11 +54,13 @@ data class PendingArtwork(
     val mimeType: String,
 )
 
+const val SCAN_RESULT_KEY = "scan_result"
+
 @HiltViewModel
 class AddEditViewModel
     @Inject
     constructor(
-        savedStateHandle: SavedStateHandle,
+        private val savedStateHandle: SavedStateHandle,
         private val mediaRepository: MediaRepository,
         private val settingsRepository: SettingsRepository,
         private val enrichmentRepository: EnrichmentRepository,
@@ -82,6 +86,21 @@ class AddEditViewModel
         init {
             loadProfileDefaults()
             if (itemId != null) loadExisting(itemId)
+            observeScanResults()
+        }
+
+        private fun observeScanResults() {
+            viewModelScope.launch {
+                savedStateHandle
+                    .getStateFlow<String?>(SCAN_RESULT_KEY, null)
+                    .filterNotNull()
+                    .collect { json ->
+                        runCatching { Json.decodeFromString<ExternalSearchResult>(json) }
+                            .getOrNull()
+                            ?.let(::applyExternalResult)
+                        savedStateHandle[SCAN_RESULT_KEY] = null
+                    }
+            }
         }
 
         private fun loadProfileDefaults() {

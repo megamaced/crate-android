@@ -66,6 +66,7 @@ import com.macebox.crate.ui.components.LoadingState
 @Composable
 fun AddEditItemScreen(
     onBack: () -> Unit,
+    onScan: (String) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: AddEditViewModel = hiltViewModel(),
 ) {
@@ -121,6 +122,7 @@ fun AddEditItemScreen(
                 viewModel = viewModel,
                 onPickArtwork = { artworkPicker.launch("image/*") },
                 onOpenSearch = { searchSheetOpen = true },
+                onScan = { onScan(state.category.apiValue) },
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding)
@@ -146,6 +148,7 @@ private fun FormContent(
     viewModel: AddEditViewModel,
     onPickArtwork: () -> Unit,
     onOpenSearch: () -> Unit,
+    onScan: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val labels = remember(state.category) { CategoryLabels.forCategory(state.category) }
@@ -176,6 +179,11 @@ private fun FormContent(
                     Text(
                         text = "  Search ${labels.providerName}",
                     )
+                }
+                if (state.category == Category.Music || state.category == Category.Books) {
+                    OutlinedButton(onClick = onScan, modifier = Modifier.fillMaxWidth()) {
+                        Text("Scan barcode")
+                    }
                 }
                 OutlinedButton(onClick = onPickArtwork, modifier = Modifier.fillMaxWidth()) {
                     Text(if (state.pendingArtwork != null) "Replace artwork" else "Pick artwork")

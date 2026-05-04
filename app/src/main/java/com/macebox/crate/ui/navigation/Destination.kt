@@ -35,7 +35,9 @@ sealed interface Destination {
     ) : Destination
 
     @Serializable
-    data object Scan : Destination
+    data class Scan(
+        val category: String? = null,
+    ) : Destination
 
     @Serializable
     data class PlaylistDetail(
