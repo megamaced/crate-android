@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.macebox.crate.domain.model.Playlist
 import com.macebox.crate.ui.components.EmptyState
+import com.macebox.crate.ui.network.LocalIsOnline
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -53,6 +54,7 @@ fun PlaylistListScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
+    val isOnline = LocalIsOnline.current
     var createOpen by remember { mutableStateOf(false) }
     var renameTarget by remember { mutableStateOf<Playlist?>(null) }
     var deleteTarget by remember { mutableStateOf<Playlist?>(null) }
@@ -78,8 +80,10 @@ fun PlaylistListScreen(
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
-            FloatingActionButton(onClick = { createOpen = true }) {
-                Icon(Icons.Filled.Add, contentDescription = "New playlist")
+            if (isOnline) {
+                FloatingActionButton(onClick = { createOpen = true }) {
+                    Icon(Icons.Filled.Add, contentDescription = "New playlist")
+                }
             }
         },
     ) { innerPadding ->

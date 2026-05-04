@@ -44,6 +44,13 @@ interface MediaRepository {
         mimeType: String,
     ): ApiResult<Unit>
 
+    /**
+     * Pages through `GET /api/v1/media?updatedSince={cursor}` writing every
+     * row into Room, and returns the new high-water `updatedAt` to persist
+     * as the next cursor (or `null` when nothing has changed).
+     */
+    suspend fun syncDelta(updatedSince: String?): ApiResult<String?>
+
     data class RefreshResult(
         val total: Int,
         val limit: Int,

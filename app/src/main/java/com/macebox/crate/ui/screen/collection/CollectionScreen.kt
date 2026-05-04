@@ -35,6 +35,7 @@ import com.macebox.crate.ui.components.FormatFilterChips
 import com.macebox.crate.ui.components.MediaCard
 import com.macebox.crate.ui.components.SortMenuButton
 import com.macebox.crate.ui.navigation.CategorySegmentedRow
+import com.macebox.crate.ui.network.LocalIsOnline
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -47,6 +48,7 @@ fun CollectionScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
+    val isOnline = LocalIsOnline.current
 
     LaunchedEffect(uiState.errorMessage) {
         uiState.errorMessage?.let { msg ->
@@ -70,8 +72,10 @@ fun CollectionScreen(
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
-            FloatingActionButton(onClick = { onAddItem(uiState.category) }) {
-                Icon(Icons.Filled.Add, contentDescription = "Add item")
+            if (isOnline) {
+                FloatingActionButton(onClick = { onAddItem(uiState.category) }) {
+                    Icon(Icons.Filled.Add, contentDescription = "Add item")
+                }
             }
         },
     ) { innerPadding ->

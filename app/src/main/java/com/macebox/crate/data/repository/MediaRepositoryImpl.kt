@@ -116,4 +116,28 @@ class MediaRepositoryImpl
                 val dto = api.getMediaItem(id)
                 dao.upsert(dto.toEntity(codec))
             }
+
+        override suspend fun syncDelta(updatedSince: String?): ApiResult<String?> =
+            apiCall {
+                var offset = 0
+                var maxUpdatedAt: String? = updatedSince
+                while (true) {
+                    val page = api.getMedia(updatedSince = updatedSince, limit = SYNC_PAGE_SIZE, offset = offset)
+                    if (page.items.isEmpty()) break
+                    dao.upsertAll(page.items.map { it.toEntity(codec) })
+                    page.items.forEach { dto ->
+                        val candidate = dto.updatedAt
+                        if (candidate != null && (maxUpdatedAt == null || candidate > maxUpdatedAt!!)) {
+                            maxUpdatedAt = candidate
+                        }
+                    }
+                    if (page.items.size < SYNC_PAGE_SIZE) break
+                    offset += SYNC_PAGE_SIZE
+                }
+                maxUpdatedAt
+            }
+
+        companion object {
+            private const val SYNC_PAGE_SIZE = 200
+        }
     }

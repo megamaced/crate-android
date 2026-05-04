@@ -14,6 +14,7 @@ import com.macebox.crate.data.prefs.ThemeMode
 import com.macebox.crate.data.prefs.UserPreferences
 import com.macebox.crate.ui.navigation.CrateScaffold
 import com.macebox.crate.ui.theme.CrateTheme
+import com.macebox.crate.util.NetworkMonitor
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 
@@ -24,6 +25,9 @@ class MainActivity : ComponentActivity() {
 
     @Inject
     lateinit var userPreferences: UserPreferences
+
+    @Inject
+    lateinit var networkMonitor: NetworkMonitor
 
     @OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -43,6 +47,7 @@ class MainActivity : ComponentActivity() {
                 CrateScaffold(
                     widthSizeClass = windowSizeClass.widthSizeClass,
                     sessionManager = sessionManager,
+                    networkMonitor = networkMonitor,
                 )
             }
         }

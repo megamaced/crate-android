@@ -1,5 +1,6 @@
 package com.macebox.crate.ui.navigation
 
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -23,6 +24,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -36,6 +38,9 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.macebox.crate.data.auth.AuthState
 import com.macebox.crate.data.auth.SessionManager
+import com.macebox.crate.ui.components.OfflineBanner
+import com.macebox.crate.ui.network.LocalIsOnline
+import com.macebox.crate.util.NetworkMonitor
 
 data class TopLevelRoute(
     val label: String,
@@ -56,11 +61,13 @@ val topLevelRoutes = listOf(
 fun CrateScaffold(
     widthSizeClass: WindowWidthSizeClass,
     sessionManager: SessionManager,
+    networkMonitor: NetworkMonitor,
 ) {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
     val authState by sessionManager.authState.collectAsState()
+    val isOnline by networkMonitor.isOnline.collectAsState(initial = true)
 
     LaunchedEffect(authState) {
         when (authState) {
@@ -76,46 +83,20 @@ fun CrateScaffold(
     val isOnLogin = currentDestination?.hasRoute(Destination.Login::class) == true
     val useNavRail = widthSizeClass != WindowWidthSizeClass.Compact
 
-    if (isOnLogin) {
-        CrateNavHost(
-            navController = navController,
-            widthSizeClass = widthSizeClass,
-        )
-    } else if (useNavRail) {
-        Row(modifier = Modifier.fillMaxSize()) {
-            NavigationRail {
-                topLevelRoutes.forEach { route ->
-                    val selected = currentDestination?.hierarchy?.any {
-                        it.hasRoute(route.destination::class)
-                    } == true
-                    NavigationRailItem(
-                        selected = selected,
-                        onClick = { navController.navigateTopLevel(route.destination) },
-                        icon = {
-                            Icon(
-                                imageVector = if (selected) route.selectedIcon else route.unselectedIcon,
-                                contentDescription = route.label,
-                            )
-                        },
-                        label = { Text(route.label) },
-                    )
-                }
-            }
+    CompositionLocalProvider(LocalIsOnline provides isOnline) {
+        if (isOnLogin) {
             CrateNavHost(
                 navController = navController,
                 widthSizeClass = widthSizeClass,
-                modifier = Modifier.weight(1f),
             )
-        }
-    } else {
-        Scaffold(
-            bottomBar = {
-                NavigationBar {
+        } else if (useNavRail) {
+            Row(modifier = Modifier.fillMaxSize()) {
+                NavigationRail {
                     topLevelRoutes.forEach { route ->
                         val selected = currentDestination?.hierarchy?.any {
                             it.hasRoute(route.destination::class)
                         } == true
-                        NavigationBarItem(
+                        NavigationRailItem(
                             selected = selected,
                             onClick = { navController.navigateTopLevel(route.destination) },
                             icon = {
@@ -128,13 +109,47 @@ fun CrateScaffold(
                         )
                     }
                 }
-            },
-        ) { innerPadding ->
-            CrateNavHost(
-                navController = navController,
-                widthSizeClass = widthSizeClass,
-                modifier = Modifier.padding(innerPadding),
-            )
+                Column(modifier = Modifier.weight(1f)) {
+                    OfflineBanner(isOnline = isOnline)
+                    CrateNavHost(
+                        navController = navController,
+                        widthSizeClass = widthSizeClass,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
+        } else {
+            Scaffold(
+                bottomBar = {
+                    NavigationBar {
+                        topLevelRoutes.forEach { route ->
+                            val selected = currentDestination?.hierarchy?.any {
+                                it.hasRoute(route.destination::class)
+                            } == true
+                            NavigationBarItem(
+                                selected = selected,
+                                onClick = { navController.navigateTopLevel(route.destination) },
+                                icon = {
+                                    Icon(
+                                        imageVector = if (selected) route.selectedIcon else route.unselectedIcon,
+                                        contentDescription = route.label,
+                                    )
+                                },
+                                label = { Text(route.label) },
+                            )
+                        }
+                    }
+                },
+            ) { innerPadding ->
+                Column(modifier = Modifier.padding(innerPadding)) {
+                    OfflineBanner(isOnline = isOnline)
+                    CrateNavHost(
+                        navController = navController,
+                        widthSizeClass = widthSizeClass,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
         }
     }
 }

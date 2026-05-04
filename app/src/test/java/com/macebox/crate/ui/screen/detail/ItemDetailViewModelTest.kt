@@ -129,6 +129,8 @@ private class FakeMediaRepository : MediaRepository {
         bytes: ByteArray,
         mimeType: String,
     ): ApiResult<Unit> = ApiResult.Success(Unit)
+
+    override suspend fun syncDelta(updatedSince: String?): ApiResult<String?> = ApiResult.Success(updatedSince)
 }
 
 private class FakeEnrichmentRepository : EnrichmentRepository {
