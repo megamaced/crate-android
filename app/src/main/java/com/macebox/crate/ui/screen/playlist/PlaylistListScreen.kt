@@ -13,6 +13,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.PeopleOutline
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
@@ -46,6 +47,7 @@ import com.macebox.crate.ui.components.EmptyState
 @Composable
 fun PlaylistListScreen(
     onPlaylistClick: (Long) -> Unit,
+    onOpenSharedWithMe: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: PlaylistListViewModel = hiltViewModel(),
 ) {
@@ -64,7 +66,16 @@ fun PlaylistListScreen(
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
-        topBar = { TopAppBar(title = { Text("Playlists") }) },
+        topBar = {
+            TopAppBar(
+                title = { Text("Playlists") },
+                actions = {
+                    IconButton(onClick = onOpenSharedWithMe) {
+                        Icon(Icons.Filled.PeopleOutline, contentDescription = "Shared with me")
+                    }
+                },
+            )
+        },
         snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
             FloatingActionButton(onClick = { createOpen = true }) {

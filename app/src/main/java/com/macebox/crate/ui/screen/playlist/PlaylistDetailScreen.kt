@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
@@ -54,6 +55,8 @@ import com.macebox.crate.ui.components.ArtworkImage
 import com.macebox.crate.ui.components.CategoryBadge
 import com.macebox.crate.ui.components.EmptyState
 import com.macebox.crate.ui.components.LoadingState
+import com.macebox.crate.ui.screen.share.ShareSheet
+import com.macebox.crate.ui.screen.share.ShareTarget
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -68,6 +71,7 @@ fun PlaylistDetailScreen(
     var renameOpen by remember { mutableStateOf(false) }
     var deleteOpen by remember { mutableStateOf(false) }
     var addOpen by remember { mutableStateOf(false) }
+    var shareOpen by remember { mutableStateOf(false) }
 
     LaunchedEffect(state.errorMessage) {
         state.errorMessage?.let { msg ->
@@ -90,6 +94,9 @@ fun PlaylistDetailScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = { shareOpen = true }, enabled = state.playlist != null) {
+                        Icon(Icons.Filled.Share, contentDescription = "Share")
+                    }
                     IconButton(onClick = { renameOpen = true }) {
                         Icon(Icons.Filled.Edit, contentDescription = "Rename")
                     }
@@ -176,6 +183,14 @@ fun PlaylistDetailScreen(
             onPick = { mediaItemId ->
                 viewModel.addItem(mediaItemId)
             },
+        )
+    }
+
+    if (shareOpen && state.playlist != null) {
+        ShareSheet(
+            target = ShareTarget.Playlist,
+            resourceId = state.playlist!!.id,
+            onDismiss = { shareOpen = false },
         )
     }
 }

@@ -20,6 +20,7 @@ import com.macebox.crate.ui.screen.login.LoginScreen
 import com.macebox.crate.ui.screen.playlist.PlaylistDetailScreen
 import com.macebox.crate.ui.screen.playlist.PlaylistListScreen
 import com.macebox.crate.ui.screen.scan.BarcodeScanScreen
+import com.macebox.crate.ui.screen.shared.SharedWithMeScreen
 import kotlinx.serialization.json.Json
 
 @Composable
@@ -50,6 +51,7 @@ fun CrateNavHost(
         composable<Destination.Playlists> {
             PlaylistListScreen(
                 onPlaylistClick = { id -> navController.navigate(Destination.PlaylistDetail(id)) },
+                onOpenSharedWithMe = { navController.navigate(Destination.SharedWithMe) },
             )
         }
         composable<Destination.Search> {
@@ -101,7 +103,11 @@ fun CrateNavHost(
             )
         }
         composable<Destination.SharedWithMe> {
-            PlaceholderScreen("Shared With Me")
+            SharedWithMeScreen(
+                onBack = { navController.popBackStack() },
+                onItemClick = { id -> navController.navigate(Destination.Detail(id)) },
+                onPlaylistClick = { id -> navController.navigate(Destination.PlaylistDetail(id)) },
+            )
         }
     }
 }

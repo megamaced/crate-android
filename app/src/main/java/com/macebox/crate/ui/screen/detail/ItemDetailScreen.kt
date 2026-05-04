@@ -55,6 +55,8 @@ import com.macebox.crate.domain.model.MediaItem
 import com.macebox.crate.ui.components.ArtworkImage
 import com.macebox.crate.ui.components.ArtworkSize
 import com.macebox.crate.ui.components.LoadingState
+import com.macebox.crate.ui.screen.share.ShareSheet
+import com.macebox.crate.ui.screen.share.ShareTarget
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -80,6 +82,7 @@ fun ItemDetailScreen(
 
     var menuExpanded by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
+    var shareOpen by remember { mutableStateOf(false) }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -110,6 +113,10 @@ fun ItemDetailScreen(
                             onEdit = {
                                 menuExpanded = false
                                 onEdit(item.id, item.category.apiValue)
+                            },
+                            onShare = {
+                                menuExpanded = false
+                                shareOpen = true
                             },
                             onEnrich = {
                                 menuExpanded = false
@@ -157,6 +164,14 @@ fun ItemDetailScreen(
         }
     }
 
+    if (shareOpen && uiState.item != null) {
+        ShareSheet(
+            target = ShareTarget.Album,
+            resourceId = uiState.item!!.id,
+            onDismiss = { shareOpen = false },
+        )
+    }
+
     if (confirmDelete) {
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
@@ -182,6 +197,7 @@ private fun DetailMenu(
     expanded: Boolean,
     onDismiss: () -> Unit,
     onEdit: () -> Unit,
+    onShare: () -> Unit,
     onEnrich: () -> Unit,
     onStrip: () -> Unit,
     onFetchMarketValue: () -> Unit,
@@ -196,6 +212,10 @@ private fun DetailMenu(
         DropdownMenuItem(
             text = { Text("Edit") },
             onClick = onEdit,
+        )
+        DropdownMenuItem(
+            text = { Text("Share") },
+            onClick = onShare,
         )
         DropdownMenuItem(
             text = { Text(if (isEnriched) "Re-enrich" else "Enrich") },
