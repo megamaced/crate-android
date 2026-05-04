@@ -21,6 +21,7 @@ import com.macebox.crate.ui.screen.playlist.PlaylistDetailScreen
 import com.macebox.crate.ui.screen.playlist.PlaylistListScreen
 import com.macebox.crate.ui.screen.scan.BarcodeScanScreen
 import com.macebox.crate.ui.screen.search.SearchScreen
+import com.macebox.crate.ui.screen.settings.SettingsScreen
 import com.macebox.crate.ui.screen.shared.SharedWithMeScreen
 import kotlinx.serialization.json.Json
 
@@ -67,7 +68,9 @@ fun CrateNavHost(
             )
         }
         composable<Destination.Settings> {
-            PlaceholderScreen("Settings")
+            SettingsScreen(
+                onOpenSharedWithMe = { navController.navigate(Destination.SharedWithMe) },
+            )
         }
         composable<Destination.Login> {
             LoginScreen(
