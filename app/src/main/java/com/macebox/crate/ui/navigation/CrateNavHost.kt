@@ -20,6 +20,7 @@ import com.macebox.crate.ui.screen.login.LoginScreen
 import com.macebox.crate.ui.screen.playlist.PlaylistDetailScreen
 import com.macebox.crate.ui.screen.playlist.PlaylistListScreen
 import com.macebox.crate.ui.screen.scan.BarcodeScanScreen
+import com.macebox.crate.ui.screen.search.SearchScreen
 import com.macebox.crate.ui.screen.shared.SharedWithMeScreen
 import kotlinx.serialization.json.Json
 
@@ -55,7 +56,15 @@ fun CrateNavHost(
             )
         }
         composable<Destination.Search> {
-            PlaceholderScreen("Search")
+            SearchScreen(
+                onItemClick = { id -> navController.navigate(Destination.Detail(id)) },
+                onAddFromExternal = { category, result ->
+                    val prefill = Json.encodeToString(ExternalSearchResult.serializer(), result)
+                    navController.navigate(
+                        Destination.AddEdit(category = category.apiValue, prefillJson = prefill),
+                    )
+                },
+            )
         }
         composable<Destination.Settings> {
             PlaceholderScreen("Settings")

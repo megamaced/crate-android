@@ -86,7 +86,15 @@ class AddEditViewModel
         init {
             loadProfileDefaults()
             if (itemId != null) loadExisting(itemId)
+            applyInitialPrefill(savedStateHandle.get<String>("prefillJson"))
             observeScanResults()
+        }
+
+        private fun applyInitialPrefill(prefillJson: String?) {
+            if (prefillJson.isNullOrBlank()) return
+            runCatching { Json.decodeFromString<ExternalSearchResult>(prefillJson) }
+                .getOrNull()
+                ?.let(::applyExternalResult)
         }
 
         private fun observeScanResults() {

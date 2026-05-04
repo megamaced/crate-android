@@ -32,6 +32,7 @@ sealed interface Destination {
     data class AddEdit(
         val itemId: Long? = null,
         val category: String? = null,
+        val prefillJson: String? = null,
     ) : Destination
 
     @Serializable
