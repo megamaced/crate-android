@@ -12,6 +12,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.macebox.crate.ui.screen.collection.CollectionScreen
 import com.macebox.crate.ui.screen.detail.ItemDetailScreen
+import com.macebox.crate.ui.screen.home.HomeScreen
 import com.macebox.crate.ui.screen.login.LoginScreen
 
 @Composable
@@ -26,7 +27,9 @@ fun CrateNavHost(
         modifier = modifier,
     ) {
         composable<Destination.Home> {
-            PlaceholderScreen("Home")
+            HomeScreen(
+                onItemClick = { id -> navController.navigate(Destination.Detail(id)) },
+            )
         }
         composable<Destination.Collection> {
             CollectionScreen(
