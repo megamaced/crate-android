@@ -115,7 +115,8 @@ data class PaginatedMediaDto(
 data class CreateMediaItemRequest(
     val title: String,
     val artist: String,
-    val format: String,
+    // Nextcloud OCS reserves `format` for response-format selection; send as `mediaFormat`.
+    val mediaFormat: String,
     val year: Int? = null,
     val barcode: String? = null,
     val notes: String? = null,

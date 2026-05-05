@@ -146,7 +146,7 @@ fun MediaItemDraft.toRequest(): CreateMediaItemRequest =
     CreateMediaItemRequest(
         title = title,
         artist = artist,
-        format = format,
+        mediaFormat = format,
         year = year,
         barcode = barcode,
         notes = notes,
