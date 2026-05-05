@@ -25,8 +25,7 @@ class PlaylistRepositoryImpl
         private val dao: PlaylistDao,
         private val codec: MediaItemJsonCodec,
     ) : PlaylistRepository {
-        override fun observeAll(): Flow<List<Playlist>> =
-            dao.observeAll().map { rows -> rows.map { it.toDomain(codec) } }
+        override fun observeAll(): Flow<List<Playlist>> = dao.observeAll().map { rows -> rows.map { it.toDomain(codec) } }
 
         override fun observe(id: Long): Flow<Playlist?> = dao.observeWithItems(id).map { row -> row?.toDomain(codec) }
 

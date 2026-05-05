@@ -134,6 +134,8 @@ private class FakeMediaRepository : MediaRepository {
     ): ApiResult<Unit> = ApiResult.Success(Unit)
 
     override suspend fun syncDelta(updatedSince: String?): ApiResult<String?> = ApiResult.Success(updatedSince)
+
+    override suspend fun wipeCollection(scopes: List<String>): ApiResult<Unit> = ApiResult.Success(Unit)
 }
 
 private class FakeEnrichmentRepository : EnrichmentRepository {
@@ -200,21 +202,35 @@ private class FakeSettingsRepository : SettingsRepository {
                 autoFetchMarketRates = false,
                 autoEnrichOnClick = false,
                 autoEnrichOnImport = false,
+                crateVersion = "0.4.2",
             ),
         )
 
     override suspend fun hasDiscogsToken() = ApiResult.Success(false)
+
     override suspend fun setDiscogsToken(token: String) = ApiResult.Success(Unit)
+
     override suspend fun hasTmdbToken() = ApiResult.Success(false)
+
     override suspend fun setTmdbToken(token: String) = ApiResult.Success(Unit)
+
     override suspend fun hasRawgKey() = ApiResult.Success(false)
+
     override suspend fun setRawgKey(key: String) = ApiResult.Success(Unit)
+
     override suspend fun hasComicVineKey() = ApiResult.Success(false)
+
     override suspend fun setComicVineKey(key: String) = ApiResult.Success(Unit)
+
     override suspend fun hasPriceChartingToken() = ApiResult.Success(false)
+
     override suspend fun setPriceChartingToken(token: String) = ApiResult.Success(Unit)
+
     override suspend fun getMarketSettings() = ApiResult.Success(MarketSettings(false, "GBP"))
+
     override suspend fun setMarketSettings(settings: MarketSettings) = ApiResult.Success(Unit)
+
     override suspend fun setCurrency(currency: String) = ApiResult.Success(currency)
+
     override suspend fun getCurrencies() = ApiResult.Success(listOf("GBP", "USD", "EUR"))
 }

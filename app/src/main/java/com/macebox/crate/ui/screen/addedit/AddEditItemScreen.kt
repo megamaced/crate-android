@@ -61,6 +61,7 @@ import com.macebox.crate.domain.model.Status
 import com.macebox.crate.ui.components.ArtworkImage
 import com.macebox.crate.ui.components.ArtworkSize
 import com.macebox.crate.ui.components.LoadingState
+import kotlinx.serialization.json.Json
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -79,9 +80,10 @@ fun AddEditItemScreen(
 
     LaunchedEffect(scanResultJson) {
         scanResultJson?.let { json ->
-            runCatching { kotlinx.serialization.json.Json.decodeFromString<ExternalSearchResult>(json) }
-                .getOrNull()
-                ?.let(viewModel::applyExternalResult)
+            val result = runCatching {
+                Json.decodeFromString<ExternalSearchResult>(json)
+            }
+            result.getOrNull()?.let(viewModel::applyExternalResult)
             onScanResultConsumed()
         }
     }

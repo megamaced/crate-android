@@ -323,8 +323,7 @@ class SettingsViewModel
                 else -> TokenState(isLoading = false)
             }
 
-        private fun presenceToState(value: String): TokenState =
-            TokenState(isLoading = false, hasValue = value.isNotBlank())
+        private fun presenceToState(value: String): TokenState = TokenState(isLoading = false, hasValue = value.isNotBlank())
 
         private data class ProfileState(
             val profile: UserProfile? = null,
@@ -344,5 +343,4 @@ class SettingsViewModel
             val currencies: List<String> = emptyList(),
             val isLoading: Boolean = true,
         )
-
     }

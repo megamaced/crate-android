@@ -159,7 +159,9 @@ interface CrateApiService {
 
     @OcsResponse
     @DELETE(API_BASE + "media")
-    suspend fun deleteAllMedia(@Query("scopes") scopes: String? = null)
+    suspend fun deleteAllMedia(
+        @Query("scopes") scopes: String? = null,
+    )
 
     // -- Enrichment & Market --------------------------------------------------
 

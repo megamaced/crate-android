@@ -48,6 +48,7 @@ class FakeCrateApiService : CrateApiService {
         updatedSince: String?,
         limit: Int,
         offset: Int,
+        paginated: Boolean,
     ): PaginatedMediaDto = requireNotNull(nextPage) { "FakeCrateApiService.nextPage was not set" }
 
     override suspend fun createMedia(body: CreateMediaItemRequest): MediaItemDto =
@@ -64,7 +65,7 @@ class FakeCrateApiService : CrateApiService {
         deletedIds += id
     }
 
-    override suspend fun deleteAllMedia() = unsupported()
+    override suspend fun deleteAllMedia(scopes: String?) = unsupported()
 
     // -- Everything else: not exercised by current tests ----------------------
 
