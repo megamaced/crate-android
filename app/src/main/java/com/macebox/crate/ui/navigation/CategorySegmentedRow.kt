@@ -1,7 +1,8 @@
 package com.macebox.crate.ui.navigation
 
-import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -21,7 +22,7 @@ fun CategorySegmentedRow(
 ) {
     SingleChoiceSegmentedButtonRow(
         modifier = modifier
-            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
             .padding(horizontal = 16.dp, vertical = 8.dp),
     ) {
         Category.entries.forEachIndexed { index, category ->

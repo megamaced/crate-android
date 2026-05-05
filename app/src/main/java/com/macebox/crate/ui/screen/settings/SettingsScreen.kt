@@ -126,11 +126,11 @@ fun SettingsScreen(
                 onSave = viewModel::setPriceChartingToken,
             )
 
-            SectionHeader("Market")
-            MarketSection(state = state, viewModel = viewModel)
-
             SectionHeader("Enrichment")
             EnrichmentSection(state = state, viewModel = viewModel)
+
+            SectionHeader("Market")
+            MarketSection(state = state, viewModel = viewModel)
 
             SectionHeader("Appearance")
             ThemeSection(
@@ -436,24 +436,6 @@ private fun EnrichmentSection(
                 Switch(
                     checked = state.market?.autoEnrichOnClick == true,
                     onCheckedChange = viewModel::setAutoEnrichOnClick,
-                )
-            }
-
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Auto-enrich on import",
-                        style = MaterialTheme.typography.titleSmall,
-                    )
-                    Text(
-                        text = "Automatically enrich items added via CSV import.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                Switch(
-                    checked = state.market?.autoEnrichOnImport == true,
-                    onCheckedChange = viewModel::setAutoEnrichOnImport,
                 )
             }
 

@@ -6,6 +6,7 @@ import com.macebox.crate.data.api.apiCall
 import com.macebox.crate.data.api.dto.AddPlaylistItemRequest
 import com.macebox.crate.data.api.dto.CreatePlaylistRequest
 import com.macebox.crate.data.api.dto.PlaylistDto
+import com.macebox.crate.data.db.dao.MediaItemDao
 import com.macebox.crate.data.db.dao.PlaylistDao
 import com.macebox.crate.data.mapper.MediaItemJsonCodec
 import com.macebox.crate.data.mapper.toDomain
@@ -23,6 +24,7 @@ class PlaylistRepositoryImpl
     constructor(
         private val api: CrateApiService,
         private val dao: PlaylistDao,
+        private val mediaItemDao: MediaItemDao,
         private val codec: MediaItemJsonCodec,
     ) : PlaylistRepository {
         override fun observeAll(): Flow<List<Playlist>> = dao.observeAll().map { rows -> rows.map { it.toDomain(codec) } }
@@ -35,6 +37,7 @@ class PlaylistRepositoryImpl
                 dao.upsertAll(playlists.map { it.toEntity() })
                 playlists.forEach { playlist ->
                     playlist.items?.let { items ->
+                        mediaItemDao.upsertAll(items.map { it.toEntity(codec) })
                         dao.replacePlaylistItems(
                             playlistId = playlist.id,
                             mediaItemIds = items.map { it.id },
@@ -94,10 +97,12 @@ class PlaylistRepositoryImpl
             }
 
         private suspend fun persistWithItems(playlist: PlaylistDto) {
+            val items = playlist.items.orEmpty()
+            mediaItemDao.upsertAll(items.map { it.toEntity(codec) })
             dao.upsert(playlist.toEntity())
             dao.replacePlaylistItems(
                 playlistId = playlist.id,
-                mediaItemIds = playlist.items.orEmpty().map { it.id },
+                mediaItemIds = items.map { it.id },
             )
         }
     }
