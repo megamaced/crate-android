@@ -5,6 +5,7 @@ data class Playlist(
     val name: String,
     val userId: String?,
     val items: List<MediaItem>,
+    val itemCount: Int = 0,
     val createdAt: String?,
     val updatedAt: String?,
 )

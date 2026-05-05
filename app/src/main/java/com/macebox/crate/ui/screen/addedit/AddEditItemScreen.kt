@@ -60,6 +60,7 @@ import com.macebox.crate.domain.model.Status
 import com.macebox.crate.ui.components.ArtworkImage
 import com.macebox.crate.ui.components.ArtworkSize
 import com.macebox.crate.ui.components.LoadingState
+import com.macebox.crate.ui.navigation.CategorySegmentedRow
 import kotlinx.serialization.json.Json
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -173,9 +174,9 @@ private fun FormContent(
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         if (!state.isEditing) {
-            CategoryPicker(
+            CategorySegmentedRow(
                 selected = state.category,
-                onSelected = viewModel::onCategoryChange,
+                onCategorySelected = viewModel::onCategoryChange,
             )
         }
 
@@ -317,26 +318,6 @@ private fun FormContent(
             minLines = 3,
             maxLines = 8,
         )
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun CategoryPicker(
-    selected: Category,
-    onSelected: (Category) -> Unit,
-) {
-    val categories = remember { Category.entries }
-    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-        categories.forEachIndexed { index, category ->
-            SegmentedButton(
-                selected = category == selected,
-                onClick = { onSelected(category) },
-                shape = SegmentedButtonDefaults.itemShape(index = index, count = categories.size),
-            ) {
-                Text(category.label)
-            }
-        }
     }
 }
 

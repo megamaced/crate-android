@@ -259,7 +259,7 @@ private fun SharedPlaylistRow(
             )
             val sub =
                 listOfNotNull(
-                    "${playlist.items.size} item${if (playlist.items.size == 1) "" else "s"}",
+                    "${playlist.itemCount} item${if (playlist.itemCount == 1) "" else "s"}",
                     playlist.userId,
                 ).joinToString(" · ")
             Text(

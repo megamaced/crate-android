@@ -206,7 +206,7 @@ private fun PlaylistRow(
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                text = "${playlist.items.size} item${if (playlist.items.size == 1) "" else "s"}",
+                text = "${playlist.itemCount} item${if (playlist.itemCount == 1) "" else "s"}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

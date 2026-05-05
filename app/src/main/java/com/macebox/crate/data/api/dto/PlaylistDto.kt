@@ -8,6 +8,8 @@ data class PlaylistDto(
     val name: String,
     val userId: String? = null,
     val items: List<MediaItemDto>? = null,
+    val itemCount: Int? = null,
+    val coverId: Long? = null,
     val createdAt: String? = null,
     val updatedAt: String? = null,
 )

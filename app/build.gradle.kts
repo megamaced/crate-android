@@ -15,8 +15,8 @@ android {
         applicationId = "com.macebox.crate"
         minSdk = 29
         targetSdk = 36
-        versionCode = 6
-        versionName = "0.2.0"
+        versionCode = 7
+        versionName = "0.2.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }

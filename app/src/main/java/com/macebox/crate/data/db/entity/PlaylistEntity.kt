@@ -11,6 +11,8 @@ data class PlaylistEntity(
     @PrimaryKey val id: Long,
     val name: String,
     val userId: String? = null,
+    val itemCount: Int = 0,
+    val coverId: Long? = null,
     val createdAt: String? = null,
     val updatedAt: String? = null,
 )

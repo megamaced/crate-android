@@ -1,6 +1,7 @@
 package com.macebox.crate.ui.screen.login
 
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.foundation.layout.Arrangement
@@ -51,6 +52,11 @@ fun LoginScreen(
 
     LaunchedEffect(uiState.loginSuccess) {
         if (uiState.loginSuccess) {
+            // Bring our activity to the foreground, dismissing the Custom Tab
+            val intent = Intent(context, context.javaClass).apply {
+                flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            }
+            context.startActivity(intent)
             onLoginSuccess()
         }
     }

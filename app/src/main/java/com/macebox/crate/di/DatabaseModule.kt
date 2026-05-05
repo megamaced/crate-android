@@ -23,6 +23,7 @@ object DatabaseModule {
     ): CrateDatabase =
         Room
             .databaseBuilder(context, CrateDatabase::class.java, CrateDatabase.NAME)
+            .addMigrations(CrateDatabase.MIGRATION_1_2)
             .fallbackToDestructiveMigration(dropAllTables = true)
             .build()
 
