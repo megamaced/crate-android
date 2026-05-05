@@ -103,6 +103,12 @@ class MediaRepositoryImpl
                 dao.deleteAll()
             }
 
+        override suspend fun wipeCollection(scopes: List<String>): ApiResult<Unit> =
+            apiCall {
+                api.deleteAllMedia(scopes = scopes.joinToString(","))
+                dao.deleteAll()
+            }
+
         override suspend fun uploadArtwork(
             id: Long,
             bytes: ByteArray,

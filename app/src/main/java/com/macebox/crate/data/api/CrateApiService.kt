@@ -129,6 +129,7 @@ interface CrateApiService {
         @Query("updatedSince") updatedSince: String? = null,
         @Query("limit") limit: Int = 50,
         @Query("offset") offset: Int = 0,
+        @Query("paginated") paginated: Boolean = true,
     ): PaginatedMediaDto
 
     @OcsResponse
@@ -158,7 +159,7 @@ interface CrateApiService {
 
     @OcsResponse
     @DELETE(API_BASE + "media")
-    suspend fun deleteAllMedia()
+    suspend fun deleteAllMedia(@Query("scopes") scopes: String? = null)
 
     // -- Enrichment & Market --------------------------------------------------
 

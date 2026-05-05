@@ -55,7 +55,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.macebox.crate.domain.model.Category
 import com.macebox.crate.domain.model.Status
 import com.macebox.crate.ui.components.ArtworkImage
@@ -68,12 +68,23 @@ fun AddEditItemScreen(
     onBack: () -> Unit,
     onScan: (String) -> Unit,
     modifier: Modifier = Modifier,
+    scanResultJson: String? = null,
+    onScanResultConsumed: () -> Unit = {},
     viewModel: AddEditViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     var searchSheetOpen by remember { mutableStateOf(false) }
     val context = LocalContext.current
+
+    LaunchedEffect(scanResultJson) {
+        scanResultJson?.let { json ->
+            runCatching { kotlinx.serialization.json.Json.decodeFromString<ExternalSearchResult>(json) }
+                .getOrNull()
+                ?.let(viewModel::applyExternalResult)
+            onScanResultConsumed()
+        }
+    }
 
     LaunchedEffect(state.errorMessage) {
         state.errorMessage?.let { msg ->

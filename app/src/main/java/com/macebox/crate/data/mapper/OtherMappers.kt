@@ -1,6 +1,6 @@
 package com.macebox.crate.data.mapper
 
-import com.macebox.crate.data.api.dto.FormatRowDto
+import com.macebox.crate.data.api.dto.CategoryFeedDto
 import com.macebox.crate.data.api.dto.HomeFeedDto
 import com.macebox.crate.data.api.dto.MarketSettingsDto
 import com.macebox.crate.data.api.dto.MeDto
@@ -8,7 +8,8 @@ import com.macebox.crate.data.api.dto.RefreshAllDto
 import com.macebox.crate.data.api.dto.ShareDto
 import com.macebox.crate.data.api.dto.SharedWithMeDto
 import com.macebox.crate.data.api.dto.UserSearchResultDto
-import com.macebox.crate.domain.model.FormatRow
+import com.macebox.crate.domain.model.Category
+import com.macebox.crate.domain.model.CategoryFeed
 import com.macebox.crate.domain.model.HomeFeed
 import com.macebox.crate.domain.model.MarketSettings
 import com.macebox.crate.domain.model.RefreshableMarketValues
@@ -17,19 +18,24 @@ import com.macebox.crate.domain.model.SharedWithMe
 import com.macebox.crate.domain.model.UserProfile
 import com.macebox.crate.domain.model.UserSearchResult
 
-fun HomeFeedDto.toDomain(): HomeFeed =
-    HomeFeed(
-        albumOfDay = albumOfDay?.toDomain(),
-        recentItems = recentItems.map { it.toDomain() },
-        formatRows = formatRows.map(FormatRowDto::toDomain),
+fun HomeFeedDto.toDomain(): HomeFeed {
+    val categoryFeeds = categories.mapNotNull { (key, dto) ->
+        val category = Category.fromApi(key) ?: return@mapNotNull null
+        dto.toDomain(category)
+    }
+    return HomeFeed(
+        categoryFeeds = categoryFeeds,
+        recentlyAdded = recentlyAdded.map { it.toDomain() },
         mostValuable = mostValuable.map { it.toDomain() },
     )
+}
 
-fun FormatRowDto.toDomain(): FormatRow =
-    FormatRow(
-        format = format,
-        label = label,
-        items = items.map { it.toDomain() },
+fun CategoryFeedDto.toDomain(category: Category): CategoryFeed =
+    CategoryFeed(
+        category = category,
+        count = count,
+        itemOfDay = itemOfDay?.toDomain(),
+        recentItems = recentItems.map { it.toDomain() },
     )
 
 fun MeDto.toDomain(): UserProfile =
@@ -42,18 +48,23 @@ fun MeDto.toDomain(): UserProfile =
         autoFetchMarketRates = autoFetchMarketRates,
         autoEnrichOnClick = autoEnrichOnClick,
         autoEnrichOnImport = autoEnrichOnImport,
+        crateVersion = crateVersion,
     )
 
 fun MarketSettingsDto.toDomain(): MarketSettings =
     MarketSettings(
         autoFetchMarketRates = autoFetchMarketRates,
         marketCurrency = marketCurrency,
+        autoEnrichOnClick = autoEnrichOnClick,
+        autoEnrichOnImport = autoEnrichOnImport,
     )
 
 fun MarketSettings.toDto(): MarketSettingsDto =
     MarketSettingsDto(
         autoFetchMarketRates = autoFetchMarketRates,
         marketCurrency = marketCurrency,
+        autoEnrichOnClick = autoEnrichOnClick,
+        autoEnrichOnImport = autoEnrichOnImport,
     )
 
 fun ShareDto.toDomain(): Share =

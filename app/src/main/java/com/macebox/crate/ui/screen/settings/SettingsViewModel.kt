@@ -9,10 +9,11 @@ import com.macebox.crate.data.prefs.UserPreferences
 import com.macebox.crate.domain.model.MarketSettings
 import com.macebox.crate.domain.model.UserProfile
 import com.macebox.crate.domain.repository.EnrichmentRepository
+import com.macebox.crate.domain.repository.MediaRepository
 import com.macebox.crate.domain.repository.SettingsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -45,6 +46,7 @@ data class SettingsUiState(
     val isMarketLoading: Boolean = true,
     val currencies: List<String> = emptyList(),
     val refreshAllProgress: RefreshAllProgress? = null,
+    val enrichAllProgress: RefreshAllProgress? = null,
     val themeMode: ThemeMode = ThemeMode.System,
     val errorMessage: String? = null,
 )
@@ -55,6 +57,7 @@ class SettingsViewModel
     constructor(
         private val settingsRepository: SettingsRepository,
         private val enrichmentRepository: EnrichmentRepository,
+        private val mediaRepository: MediaRepository,
         private val userPreferences: UserPreferences,
         private val sessionManager: SessionManager,
     ) : ViewModel() {
@@ -62,6 +65,7 @@ class SettingsViewModel
         private val profile = MutableStateFlow<ProfileState>(ProfileState())
         private val market = MutableStateFlow(MarketState())
         private val refreshProgress = MutableStateFlow<RefreshAllProgress?>(null)
+        private val enrichProgress = MutableStateFlow<RefreshAllProgress?>(null)
         private val errorMessage = MutableStateFlow<String?>(null)
 
         val uiState: StateFlow<SettingsUiState> =
@@ -69,8 +73,8 @@ class SettingsViewModel
                 combine(profile, market) { p, m -> p to m },
                 tokens,
                 userPreferences.flow.map { it.themeMode },
-                combine(refreshProgress, errorMessage) { r, e -> r to e },
-            ) { (p, m), t, theme, (progress, err) ->
+                combine(refreshProgress, enrichProgress, errorMessage) { r, e, err -> Triple(r, e, err) },
+            ) { (p, m), t, theme, (progress, enrichProg, err) ->
                 SettingsUiState(
                     profile = p.profile,
                     isProfileLoading = p.isLoading,
@@ -83,6 +87,7 @@ class SettingsViewModel
                     isMarketLoading = m.isLoading,
                     currencies = m.currencies,
                     refreshAllProgress = progress,
+                    enrichAllProgress = enrichProg,
                     themeMode = theme,
                     errorMessage = err,
                 )
@@ -117,30 +122,18 @@ class SettingsViewModel
 
         private fun loadTokens() {
             viewModelScope.launch {
-                val (discogs, tmdb, rawg, comicVine, priceCharting) =
-                    awaitAll(
-                        async { settingsRepository.hasDiscogsToken() },
-                        async { settingsRepository.hasTmdbToken() },
-                        async { settingsRepository.hasRawgKey() },
-                        async { settingsRepository.hasComicVineKey() },
-                        async { settingsRepository.hasPriceChartingToken() },
-                    ).let { results ->
-                        @Suppress("UNCHECKED_CAST")
-                        Quintet(
-                            results[0] as ApiResult<Boolean>,
-                            results[1] as ApiResult<Boolean>,
-                            results[2] as ApiResult<Boolean>,
-                            results[3] as ApiResult<Boolean>,
-                            results[4] as ApiResult<Boolean>,
-                        )
-                    }
+                val discogs = async { settingsRepository.hasDiscogsToken() }
+                val tmdb = async { settingsRepository.hasTmdbToken() }
+                val rawg = async { settingsRepository.hasRawgKey() }
+                val comicVine = async { settingsRepository.hasComicVineKey() }
+                val priceCharting = async { settingsRepository.hasPriceChartingToken() }
                 tokens.value =
                     TokensState(
-                        discogs = boolToState(discogs),
-                        tmdb = boolToState(tmdb),
-                        rawg = boolToState(rawg),
-                        comicVine = boolToState(comicVine),
-                        priceCharting = boolToState(priceCharting),
+                        discogs = boolToState(discogs.await()),
+                        tmdb = boolToState(tmdb.await()),
+                        rawg = boolToState(rawg.await()),
+                        comicVine = boolToState(comicVine.await()),
+                        priceCharting = boolToState(priceCharting.await()),
                     )
             }
         }
@@ -234,10 +227,52 @@ class SettingsViewModel
                 val ids = refreshable.itemIds
                 refreshProgress.value = RefreshAllProgress(total = ids.size, done = 0)
                 ids.forEachIndexed { index, id ->
+                    ensureActive()
                     enrichmentRepository.fetchMarketValue(id)
                     refreshProgress.value = RefreshAllProgress(total = ids.size, done = index + 1)
                 }
                 refreshProgress.value = null
+            }
+        }
+
+        fun setAutoEnrichOnClick(enabled: Boolean) {
+            val current = market.value.settings ?: return
+            updateMarket(current.copy(autoEnrichOnClick = enabled))
+        }
+
+        fun setAutoEnrichOnImport(enabled: Boolean) {
+            val current = market.value.settings ?: return
+            updateMarket(current.copy(autoEnrichOnImport = enabled))
+        }
+
+        fun enrichAll() {
+            viewModelScope.launch {
+                enrichProgress.value = RefreshAllProgress(total = 0, done = 0)
+                val mediaResult = enrichmentRepository.listUnenrichedItems()
+                val ids = when (mediaResult) {
+                    is ApiResult.Success -> mediaResult.value
+                    ApiResult.NetworkError -> {
+                        reportError("Couldn't reach the server.")
+                        enrichProgress.value = null
+                        return@launch
+                    }
+                    is ApiResult.HttpError -> {
+                        reportError(mediaResult.message ?: "Server error (${mediaResult.code}).")
+                        enrichProgress.value = null
+                        return@launch
+                    }
+                    ApiResult.Unauthorised -> {
+                        enrichProgress.value = null
+                        return@launch
+                    }
+                }
+                enrichProgress.value = RefreshAllProgress(total = ids.size, done = 0)
+                ids.forEachIndexed { index, id ->
+                    ensureActive()
+                    enrichmentRepository.enrich(id)
+                    enrichProgress.value = RefreshAllProgress(total = ids.size, done = index + 1)
+                }
+                enrichProgress.value = null
             }
         }
 
@@ -247,6 +282,17 @@ class SettingsViewModel
 
         fun logout() {
             sessionManager.logout()
+        }
+
+        fun wipeCollection(scopes: List<String>) {
+            viewModelScope.launch {
+                when (val result = mediaRepository.wipeCollection(scopes)) {
+                    is ApiResult.Success -> { /* local DB also cleared by repo */ }
+                    ApiResult.NetworkError -> reportError("Couldn't reach the server.")
+                    is ApiResult.HttpError -> reportError(result.message ?: "Server error (${result.code}).")
+                    ApiResult.Unauthorised -> { /* SessionManager handles */ }
+                }
+            }
         }
 
         fun dismissError() {
@@ -299,11 +345,4 @@ class SettingsViewModel
             val isLoading: Boolean = true,
         )
 
-        private data class Quintet<A, B, C, D, E>(
-            val a: A,
-            val b: B,
-            val c: C,
-            val d: D,
-            val e: E,
-        )
     }

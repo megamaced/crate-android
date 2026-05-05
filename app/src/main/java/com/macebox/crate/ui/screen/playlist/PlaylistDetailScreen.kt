@@ -49,7 +49,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.macebox.crate.domain.model.MediaItem
 import com.macebox.crate.ui.components.ArtworkImage
 import com.macebox.crate.ui.components.CategoryBadge

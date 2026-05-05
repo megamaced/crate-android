@@ -12,4 +12,6 @@ interface EnrichmentRepository {
     suspend fun fetchMarketValue(itemId: Long): ApiResult<MediaItem>
 
     suspend fun listRefreshableMarketValues(): ApiResult<RefreshableMarketValues>
+
+    suspend fun listUnenrichedItems(): ApiResult<List<Long>>
 }

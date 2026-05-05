@@ -38,6 +38,8 @@ interface MediaRepository {
 
     suspend fun deleteAll(): ApiResult<Unit>
 
+    suspend fun wipeCollection(scopes: List<String>): ApiResult<Unit>
+
     suspend fun uploadArtwork(
         id: Long,
         bytes: ByteArray,

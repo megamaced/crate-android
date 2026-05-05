@@ -25,7 +25,8 @@ class PlaylistRepositoryImpl
         private val dao: PlaylistDao,
         private val codec: MediaItemJsonCodec,
     ) : PlaylistRepository {
-        override fun observeAll(): Flow<List<Playlist>> = dao.observeAll().map { rows -> rows.map { it.toDomain() } }
+        override fun observeAll(): Flow<List<Playlist>> =
+            dao.observeAll().map { rows -> rows.map { it.toDomain(codec) } }
 
         override fun observe(id: Long): Flow<Playlist?> = dao.observeWithItems(id).map { row -> row?.toDomain(codec) }
 
@@ -33,6 +34,14 @@ class PlaylistRepositoryImpl
             apiCall {
                 val playlists = api.listPlaylists()
                 dao.upsertAll(playlists.map { it.toEntity() })
+                playlists.forEach { playlist ->
+                    playlist.items?.let { items ->
+                        dao.replacePlaylistItems(
+                            playlistId = playlist.id,
+                            mediaItemIds = items.map { it.id },
+                        )
+                    }
+                }
             }
 
         override suspend fun refresh(id: Long): ApiResult<Playlist> =

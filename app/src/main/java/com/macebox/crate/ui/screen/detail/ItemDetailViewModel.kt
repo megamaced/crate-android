@@ -7,11 +7,13 @@ import com.macebox.crate.data.api.ApiResult
 import com.macebox.crate.domain.model.MediaItem
 import com.macebox.crate.domain.repository.EnrichmentRepository
 import com.macebox.crate.domain.repository.MediaRepository
+import com.macebox.crate.domain.repository.SettingsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -39,6 +41,7 @@ class ItemDetailViewModel
         savedStateHandle: SavedStateHandle,
         private val mediaRepository: MediaRepository,
         private val enrichmentRepository: EnrichmentRepository,
+        private val settingsRepository: SettingsRepository,
     ) : ViewModel() {
         private val itemId: Long = checkNotNull(savedStateHandle["itemId"]) {
             "Detail route requires an itemId argument"
@@ -70,7 +73,20 @@ class ItemDetailViewModel
             )
 
         init {
-            viewModelScope.launch { mediaRepository.refreshSingle(itemId) }
+            viewModelScope.launch {
+                mediaRepository.refreshSingle(itemId)
+                autoEnrichIfEnabled()
+            }
+        }
+
+        private suspend fun autoEnrichIfEnabled() {
+            val meResult = settingsRepository.getMe()
+            val autoEnrich = (meResult as? ApiResult.Success)?.value?.autoEnrichOnClick == true
+            if (!autoEnrich) return
+            val item = mediaRepository.observe(itemId).firstOrNull()
+            if (item != null && item.genres.isNullOrBlank() && item.artistBio.isNullOrBlank()) {
+                enrichmentRepository.enrich(itemId)
+            }
         }
 
         fun enrich() {

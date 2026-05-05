@@ -63,7 +63,7 @@ data class ArtistMemberDto(
     val active: Boolean? = null,
 )
 
-private object ArtistMemberDtoSerializer : KSerializer<ArtistMemberDto> {
+internal object ArtistMemberDtoSerializer : KSerializer<ArtistMemberDto> {
     override val descriptor: SerialDescriptor =
         buildClassSerialDescriptor("ArtistMemberDto") {
             element<String>("name")

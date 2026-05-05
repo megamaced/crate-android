@@ -3,7 +3,6 @@ package com.macebox.crate.data.db.dao
 import androidx.room.Dao
 import androidx.room.Query
 import com.macebox.crate.data.db.entity.MediaItemEntity
-import kotlinx.coroutines.flow.Flow
 
 /**
  * Read-only views over [MediaItemEntity] that approximate the server's
@@ -14,20 +13,20 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface HomeFeedDao {
     @Query("SELECT * FROM media_items WHERE status = 'owned' ORDER BY createdAt DESC LIMIT :limit")
-    fun observeRecentOwned(limit: Int = 6): Flow<List<MediaItemEntity>>
+    suspend fun getRecentOwned(limit: Int = 12): List<MediaItemEntity>
 
     @Query(
         """
         SELECT * FROM media_items
-        WHERE status = 'owned' AND format = :format
+        WHERE status = 'owned' AND category = :category
         ORDER BY createdAt DESC
         LIMIT :limit
         """,
     )
-    fun observeRecentByFormat(
-        format: String,
+    suspend fun getRecentByCategory(
+        category: String,
         limit: Int = 6,
-    ): Flow<List<MediaItemEntity>>
+    ): List<MediaItemEntity>
 
     @Query(
         """
@@ -37,8 +36,11 @@ interface HomeFeedDao {
         LIMIT :limit
         """,
     )
-    fun observeMostValuable(limit: Int = 6): Flow<List<MediaItemEntity>>
+    suspend fun getMostValuable(limit: Int = 6): List<MediaItemEntity>
 
-    @Query("SELECT DISTINCT format FROM media_items WHERE status = 'owned' AND format IS NOT NULL")
-    fun observeOwnedFormats(): Flow<List<String>>
+    @Query("SELECT DISTINCT category FROM media_items WHERE status = 'owned' AND category IS NOT NULL")
+    suspend fun getOwnedCategories(): List<String>
+
+    @Query("SELECT COUNT(*) FROM media_items WHERE status = 'owned' AND category = :category")
+    suspend fun countByCategory(category: String): Int
 }

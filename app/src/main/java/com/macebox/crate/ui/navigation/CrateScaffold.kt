@@ -2,6 +2,7 @@ package com.macebox.crate.ui.navigation
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -120,6 +121,7 @@ fun CrateScaffold(
             }
         } else {
             Scaffold(
+                contentWindowInsets = WindowInsets(0, 0, 0, 0),
                 bottomBar = {
                     NavigationBar {
                         topLevelRoutes.forEach { route ->

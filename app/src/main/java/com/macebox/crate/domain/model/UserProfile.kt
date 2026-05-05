@@ -9,11 +9,14 @@ data class UserProfile(
     val autoFetchMarketRates: Boolean,
     val autoEnrichOnClick: Boolean,
     val autoEnrichOnImport: Boolean,
+    val crateVersion: String?,
 )
 
 data class MarketSettings(
     val autoFetchMarketRates: Boolean,
     val marketCurrency: String,
+    val autoEnrichOnClick: Boolean = true,
+    val autoEnrichOnImport: Boolean = true,
 )
 
 data class RefreshableMarketValues(

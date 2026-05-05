@@ -39,9 +39,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.macebox.crate.domain.model.Category
-import com.macebox.crate.domain.model.FormatRow
+import com.macebox.crate.domain.model.CategoryFeed
 import com.macebox.crate.domain.model.HomeFeed
 import com.macebox.crate.domain.model.MarketValue
 import com.macebox.crate.domain.model.MediaItem
@@ -103,19 +103,30 @@ private fun HomeContent(
         contentPadding = PaddingValues(vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(24.dp),
     ) {
-        feed.albumOfDay?.let { hero ->
-            item(key = "hero-${hero.id}") {
-                HeroItemOfTheDay(
-                    item = hero,
-                    onClick = { onItemClick(hero.id) },
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                )
+        feed.categoryFeeds.forEach { categoryFeed ->
+            categoryFeed.itemOfDay?.let { hero ->
+                item(key = "hero-${categoryFeed.category.apiValue}") {
+                    HeroItemOfTheDay(
+                        item = hero,
+                        category = categoryFeed.category,
+                        onClick = { onItemClick(hero.id) },
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                    )
+                }
             }
         }
 
-        feed.formatRows.forEach { row ->
-            item(key = "format-${row.format}") {
-                FormatRowSection(row = row, onItemClick = onItemClick)
+        if (feed.recentlyAdded.isNotEmpty()) {
+            item(key = "recently-added") {
+                RecentlyAddedSection(items = feed.recentlyAdded, onItemClick = onItemClick)
+            }
+        }
+
+        feed.categoryFeeds.forEach { categoryFeed ->
+            if (categoryFeed.recentItems.isNotEmpty()) {
+                item(key = "category-${categoryFeed.category.apiValue}") {
+                    CategoryRecentSection(categoryFeed = categoryFeed, onItemClick = onItemClick)
+                }
             }
         }
 
@@ -130,10 +141,11 @@ private fun HomeContent(
 @Composable
 private fun HeroItemOfTheDay(
     item: MediaItem,
+    category: Category,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val accent = categoryAccent(item.category)
+    val accent = categoryAccent(category)
     Card(
         onClick = onClick,
         modifier = modifier.fillMaxWidth(),
@@ -152,7 +164,7 @@ private fun HeroItemOfTheDay(
                 contentAlignment = Alignment.CenterStart,
             ) {
                 Text(
-                    text = "${item.category.label} · Item of the Day",
+                    text = "${category.label} · Item of the Day",
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.padding(horizontal = 16.dp),
@@ -204,13 +216,12 @@ private fun HeroItemOfTheDay(
 }
 
 @Composable
-private fun FormatRowSection(
-    row: FormatRow,
+private fun RecentlyAddedSection(
+    items: List<MediaItem>,
     onItemClick: (Long) -> Unit,
 ) {
-    if (row.items.isEmpty()) return
     SectionHeader(
-        title = row.label.ifBlank { row.format },
+        title = "Recently Added",
         modifier = Modifier.padding(horizontal = 16.dp),
     )
     LazyRow(
@@ -220,7 +231,33 @@ private fun FormatRowSection(
             .fillMaxWidth()
             .padding(top = 8.dp),
     ) {
-        items(row.items, key = { it.id }) { item ->
+        items(items, key = { it.id }) { item ->
+            MediaCard(
+                item = item,
+                onClick = { onItemClick(item.id) },
+                modifier = Modifier.width(140.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun CategoryRecentSection(
+    categoryFeed: CategoryFeed,
+    onItemClick: (Long) -> Unit,
+) {
+    SectionHeader(
+        title = "${categoryFeed.category.label} · Recent",
+        modifier = Modifier.padding(horizontal = 16.dp),
+    )
+    LazyRow(
+        contentPadding = PaddingValues(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 8.dp),
+    ) {
+        items(categoryFeed.recentItems, key = { it.id }) { item ->
             MediaCard(
                 item = item,
                 onClick = { onItemClick(item.id) },

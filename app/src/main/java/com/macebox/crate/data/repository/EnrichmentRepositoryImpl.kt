@@ -44,4 +44,20 @@ class EnrichmentRepositoryImpl
 
         override suspend fun listRefreshableMarketValues(): ApiResult<RefreshableMarketValues> =
             apiCall { api.listRefreshableMarketValues().toDomain() }
+
+        override suspend fun listUnenrichedItems(): ApiResult<List<Long>> =
+            apiCall {
+                val items = mutableListOf<Long>()
+                var offset = 0
+                val limit = 50
+                while (true) {
+                    val page = api.getMedia(limit = limit, offset = offset)
+                    page.items
+                        .filter { it.genres.isNullOrBlank() && it.artistBio.isNullOrBlank() }
+                        .forEach { items.add(it.id) }
+                    if (page.items.size < limit) break
+                    offset += limit
+                }
+                items
+            }
     }

@@ -12,6 +12,7 @@ data class MeDto(
     val autoFetchMarketRates: Boolean = false,
     val autoEnrichOnClick: Boolean = false,
     val autoEnrichOnImport: Boolean = false,
+    val crateVersion: String? = null,
 )
 
 @Serializable
@@ -38,6 +39,8 @@ data class KeyRequest(
 data class MarketSettingsDto(
     val autoFetchMarketRates: Boolean,
     val marketCurrency: String,
+    val autoEnrichOnClick: Boolean = true,
+    val autoEnrichOnImport: Boolean = true,
 )
 
 @Serializable

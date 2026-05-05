@@ -4,14 +4,17 @@ import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
 import com.macebox.crate.data.api.ApiResult
 import com.macebox.crate.domain.model.Category
+import com.macebox.crate.domain.model.MarketSettings
 import com.macebox.crate.domain.model.MarketValue
 import com.macebox.crate.domain.model.MediaItem
 import com.macebox.crate.domain.model.MediaItemDraft
 import com.macebox.crate.domain.model.RefreshableMarketValues
 import com.macebox.crate.domain.model.Status
+import com.macebox.crate.domain.model.UserProfile
 import com.macebox.crate.domain.repository.EnrichmentRepository
 import com.macebox.crate.domain.repository.MediaRepository
 import com.macebox.crate.domain.repository.MediaRepository.RefreshResult
+import com.macebox.crate.domain.repository.SettingsRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -77,7 +80,7 @@ class ItemDetailViewModelTest {
         media: MediaRepository,
         enrichment: EnrichmentRepository,
         itemId: Long,
-    ): ItemDetailViewModel = ItemDetailViewModel(SavedStateHandle(mapOf("itemId" to itemId)), media, enrichment)
+    ): ItemDetailViewModel = ItemDetailViewModel(SavedStateHandle(mapOf("itemId" to itemId)), media, enrichment, FakeSettingsRepository())
 }
 
 private class FakeMediaRepository : MediaRepository {
@@ -154,6 +157,8 @@ private class FakeEnrichmentRepository : EnrichmentRepository {
     }
 
     override suspend fun listRefreshableMarketValues(): ApiResult<RefreshableMarketValues> = error("not used")
+
+    override suspend fun listUnenrichedItems(): ApiResult<List<Long>> = ApiResult.Success(emptyList())
 }
 
 private fun item(id: Long) =
@@ -182,3 +187,34 @@ private fun item(id: Long) =
         createdAt = null,
         updatedAt = null,
     )
+
+private class FakeSettingsRepository : SettingsRepository {
+    override suspend fun getMe(): ApiResult<UserProfile> =
+        ApiResult.Success(
+            UserProfile(
+                userId = "test",
+                displayName = "Test",
+                avatarUrl = null,
+                hasDiscogsToken = false,
+                marketCurrency = "GBP",
+                autoFetchMarketRates = false,
+                autoEnrichOnClick = false,
+                autoEnrichOnImport = false,
+            ),
+        )
+
+    override suspend fun hasDiscogsToken() = ApiResult.Success(false)
+    override suspend fun setDiscogsToken(token: String) = ApiResult.Success(Unit)
+    override suspend fun hasTmdbToken() = ApiResult.Success(false)
+    override suspend fun setTmdbToken(token: String) = ApiResult.Success(Unit)
+    override suspend fun hasRawgKey() = ApiResult.Success(false)
+    override suspend fun setRawgKey(key: String) = ApiResult.Success(Unit)
+    override suspend fun hasComicVineKey() = ApiResult.Success(false)
+    override suspend fun setComicVineKey(key: String) = ApiResult.Success(Unit)
+    override suspend fun hasPriceChartingToken() = ApiResult.Success(false)
+    override suspend fun setPriceChartingToken(token: String) = ApiResult.Success(Unit)
+    override suspend fun getMarketSettings() = ApiResult.Success(MarketSettings(false, "GBP"))
+    override suspend fun setMarketSettings(settings: MarketSettings) = ApiResult.Success(Unit)
+    override suspend fun setCurrency(currency: String) = ApiResult.Success(currency)
+    override suspend fun getCurrencies() = ApiResult.Success(listOf("GBP", "USD", "EUR"))
+}

@@ -4,10 +4,16 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class HomeFeedDto(
-    val albumOfDay: MediaItemDto? = null,
-    val recentItems: List<MediaItemDto> = emptyList(),
-    val formatRows: List<FormatRowDto> = emptyList(),
+    val categories: Map<String, CategoryFeedDto> = emptyMap(),
+    val recentlyAdded: List<MediaItemDto> = emptyList(),
     val mostValuable: List<MediaItemDto> = emptyList(),
+)
+
+@Serializable
+data class CategoryFeedDto(
+    val count: Int = 0,
+    val itemOfDay: MediaItemDto? = null,
+    val recentItems: List<MediaItemDto> = emptyList(),
 )
 
 @Serializable

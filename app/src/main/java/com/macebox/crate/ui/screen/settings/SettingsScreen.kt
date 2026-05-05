@@ -57,7 +57,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import coil3.compose.SubcomposeAsyncImage
 import com.macebox.crate.data.prefs.ThemeMode
 import com.macebox.crate.domain.model.UserProfile
@@ -108,14 +108,14 @@ fun SettingsScreen(
                 onSave = viewModel::setTmdbToken,
             )
             TokenEditor(
-                label = "RAWG key",
-                placeholder = "API key",
+                label = "RAWG token",
+                placeholder = "API token",
                 state = state.rawg,
                 onSave = viewModel::setRawgKey,
             )
             TokenEditor(
-                label = "ComicVine key",
-                placeholder = "API key",
+                label = "ComicVine token",
+                placeholder = "API token",
                 state = state.comicVine,
                 onSave = viewModel::setComicVineKey,
             )
@@ -128,6 +128,9 @@ fun SettingsScreen(
 
             SectionHeader("Market")
             MarketSection(state = state, viewModel = viewModel)
+
+            SectionHeader("Enrichment")
+            EnrichmentSection(state = state, viewModel = viewModel)
 
             SectionHeader("Appearance")
             ThemeSection(
@@ -142,6 +145,13 @@ fun SettingsScreen(
             ) {
                 Text("Log out")
             }
+
+            SectionHeader("Danger zone")
+            DangerZoneSection(viewModel = viewModel)
+
+            SectionHeader("About")
+            AboutSection(state = state)
+
             Spacer(modifier = Modifier.height(16.dp))
         }
     }
@@ -231,7 +241,7 @@ private fun Avatar(profile: UserProfile?) {
     } else {
         SubcomposeAsyncImage(
             model = url,
-            contentDescription = profile?.displayName,
+            contentDescription = profile.displayName,
             modifier = Modifier
                 .size(48.dp)
                 .clip(CircleShape),
@@ -401,6 +411,88 @@ private fun MarketSection(
     }
 }
 
+@Composable
+private fun EnrichmentSection(
+    state: SettingsUiState,
+    viewModel: SettingsViewModel,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Auto-enrich when opened",
+                        style = MaterialTheme.typography.titleSmall,
+                    )
+                    Text(
+                        text = "Automatically enrich an item when you view its details.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Switch(
+                    checked = state.market?.autoEnrichOnClick == true,
+                    onCheckedChange = viewModel::setAutoEnrichOnClick,
+                )
+            }
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Auto-enrich on import",
+                        style = MaterialTheme.typography.titleSmall,
+                    )
+                    Text(
+                        text = "Automatically enrich items added via CSV import.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Switch(
+                    checked = state.market?.autoEnrichOnImport == true,
+                    onCheckedChange = viewModel::setAutoEnrichOnImport,
+                )
+            }
+
+            HorizontalDivider()
+
+            val enriching = state.enrichAllProgress != null
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Enrich all items",
+                        style = MaterialTheme.typography.titleSmall,
+                    )
+                    val progress = state.enrichAllProgress
+                    if (progress != null) {
+                        Text(
+                            text = "Enriched ${progress.done} of ${progress.total}…",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    } else {
+                        Text(
+                            text = "Enrich all un-enriched items via their provider.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+                if (enriching) {
+                    CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                } else {
+                    IconButton(onClick = viewModel::enrichAll) {
+                        Icon(Icons.Filled.Refresh, contentDescription = "Enrich all")
+                    }
+                }
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CurrencyPicker(
@@ -470,6 +562,110 @@ private fun ThemeSection(
                         Text(mode.name)
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DangerZoneSection(viewModel: SettingsViewModel) {
+    var confirmWipe by remember { mutableStateOf(false) }
+    val scopes = listOf("music", "film", "book", "game", "comic", "playlists")
+    var selected by remember { mutableStateOf(scopes.toSet()) }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)),
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                text = "Wipe collection",
+                style = MaterialTheme.typography.titleSmall,
+            )
+            Text(
+                text = "Permanently delete selected data from your collection on the server. This cannot be undone.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Button(
+                onClick = { confirmWipe = true },
+                modifier = Modifier.fillMaxWidth(),
+                colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error,
+                ),
+            ) {
+                Text("Wipe data…")
+            }
+        }
+    }
+
+    if (confirmWipe) {
+        AlertDialog(
+            onDismissRequest = { confirmWipe = false },
+            title = { Text("Wipe data") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("Select categories to permanently delete:")
+                    scopes.forEach { scope ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            androidx.compose.material3.Checkbox(
+                                checked = scope in selected,
+                                onCheckedChange = { checked ->
+                                    selected = if (checked) selected + scope else selected - scope
+                                },
+                            )
+                            Text(
+                                text = scope.replaceFirstChar { it.uppercase() },
+                                modifier = Modifier.padding(start = 8.dp),
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        confirmWipe = false
+                        viewModel.wipeCollection(selected.toList())
+                    },
+                    enabled = selected.isNotEmpty(),
+                ) { Text("Wipe selected", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmWipe = false }) { Text("Cancel") }
+            },
+        )
+    }
+}
+
+@Composable
+private fun AboutSection(state: SettingsUiState) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text("App version", style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    text = com.macebox.crate.BuildConfig.VERSION_NAME,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text("Crate server version", style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    text = state.profile?.crateVersion ?: "—",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
     }
