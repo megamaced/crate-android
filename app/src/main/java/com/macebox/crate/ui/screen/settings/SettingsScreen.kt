@@ -99,7 +99,6 @@ fun SettingsScreen(
                 label = "Discogs token",
                 placeholder = "Personal access token",
                 state = state.discogs,
-                isOpaque = true,
                 onSave = viewModel::setDiscogsToken,
             )
             TokenEditor(
@@ -256,10 +255,11 @@ private fun TokenEditor(
     placeholder: String,
     state: TokenState,
     onSave: (String) -> Unit,
-    isOpaque: Boolean = false,
 ) {
     var expanded by remember { mutableStateOf(false) }
-    var input by remember(state.value) { mutableStateOf(state.value.orEmpty()) }
+    // Saved tokens are never sent back from the server, so the input always
+    // starts empty. The user types to set or replace.
+    var input by remember { mutableStateOf("") }
     var revealed by remember { mutableStateOf(false) }
 
     Card(
@@ -274,7 +274,6 @@ private fun TokenEditor(
                         text =
                             when {
                                 state.isLoading -> "Loading…"
-                                state.hasValue && isOpaque -> "Token saved (hidden by server)."
                                 state.hasValue -> "Configured."
                                 else -> "Not set."
                             },

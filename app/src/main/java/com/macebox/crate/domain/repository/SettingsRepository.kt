@@ -7,32 +7,29 @@ import com.macebox.crate.domain.model.UserProfile
 /**
  * Wraps the `/me` profile and the various external-provider settings.
  *
- * Token getters report only whether a token is set (never expose the value
- * to the UI for Discogs); for TMDB / RAWG / ComicVine / PriceCharting the
- * API returns the value itself for the editor.
+ * All token getters report only whether a token is set; the server never
+ * returns saved values to the client.
  */
 interface SettingsRepository {
     suspend fun getMe(): ApiResult<UserProfile>
 
-    // Discogs (presence only — server never returns the value)
     suspend fun hasDiscogsToken(): ApiResult<Boolean>
 
     suspend fun setDiscogsToken(token: String): ApiResult<Unit>
 
-    // Editable tokens (server returns the value when set)
-    suspend fun getTmdbToken(): ApiResult<String?>
+    suspend fun hasTmdbToken(): ApiResult<Boolean>
 
     suspend fun setTmdbToken(token: String): ApiResult<Unit>
 
-    suspend fun getRawgKey(): ApiResult<String?>
+    suspend fun hasRawgKey(): ApiResult<Boolean>
 
     suspend fun setRawgKey(key: String): ApiResult<Unit>
 
-    suspend fun getComicVineKey(): ApiResult<String?>
+    suspend fun hasComicVineKey(): ApiResult<Boolean>
 
     suspend fun setComicVineKey(key: String): ApiResult<Unit>
 
-    suspend fun getPriceChartingToken(): ApiResult<String?>
+    suspend fun hasPriceChartingToken(): ApiResult<Boolean>
 
     suspend fun setPriceChartingToken(token: String): ApiResult<Unit>
 

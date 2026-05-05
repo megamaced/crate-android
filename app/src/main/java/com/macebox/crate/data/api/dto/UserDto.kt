@@ -17,13 +17,11 @@ data class MeDto(
 @Serializable
 data class HasTokenDto(
     val hasToken: Boolean,
-    val token: String? = null,
 )
 
 @Serializable
 data class HasKeyDto(
     val hasKey: Boolean,
-    val key: String? = null,
 )
 
 @Serializable

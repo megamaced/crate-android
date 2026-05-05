@@ -26,19 +26,19 @@ class SettingsRepositoryImpl
 
         override suspend fun setDiscogsToken(token: String): ApiResult<Unit> = apiCall { api.setDiscogsToken(TokenRequest(token)) }
 
-        override suspend fun getTmdbToken(): ApiResult<String?> = apiCall { api.getTmdbToken().token }
+        override suspend fun hasTmdbToken(): ApiResult<Boolean> = apiCall { api.getTmdbToken().hasToken }
 
         override suspend fun setTmdbToken(token: String): ApiResult<Unit> = apiCall { api.setTmdbToken(TokenRequest(token)) }
 
-        override suspend fun getRawgKey(): ApiResult<String?> = apiCall { api.getRawgKey().key }
+        override suspend fun hasRawgKey(): ApiResult<Boolean> = apiCall { api.getRawgKey().hasKey }
 
         override suspend fun setRawgKey(key: String): ApiResult<Unit> = apiCall { api.setRawgKey(KeyRequest(key)) }
 
-        override suspend fun getComicVineKey(): ApiResult<String?> = apiCall { api.getComicVineKey().key }
+        override suspend fun hasComicVineKey(): ApiResult<Boolean> = apiCall { api.getComicVineKey().hasKey }
 
         override suspend fun setComicVineKey(key: String): ApiResult<Unit> = apiCall { api.setComicVineKey(KeyRequest(key)) }
 
-        override suspend fun getPriceChartingToken(): ApiResult<String?> = apiCall { api.getPriceChartingToken().token }
+        override suspend fun hasPriceChartingToken(): ApiResult<Boolean> = apiCall { api.getPriceChartingToken().hasToken }
 
         override suspend fun setPriceChartingToken(token: String): ApiResult<Unit> =
             apiCall { api.setPriceChartingToken(TokenRequest(token)) }

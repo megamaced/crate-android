@@ -26,8 +26,6 @@ import javax.inject.Inject
 data class TokenState(
     val isLoading: Boolean = true,
     val hasValue: Boolean = false,
-    /** Null when the server doesn't expose the value (Discogs) or it isn't set. */
-    val value: String? = null,
 )
 
 data class RefreshAllProgress(
@@ -122,27 +120,27 @@ class SettingsViewModel
                 val (discogs, tmdb, rawg, comicVine, priceCharting) =
                     awaitAll(
                         async { settingsRepository.hasDiscogsToken() },
-                        async { settingsRepository.getTmdbToken() },
-                        async { settingsRepository.getRawgKey() },
-                        async { settingsRepository.getComicVineKey() },
-                        async { settingsRepository.getPriceChartingToken() },
+                        async { settingsRepository.hasTmdbToken() },
+                        async { settingsRepository.hasRawgKey() },
+                        async { settingsRepository.hasComicVineKey() },
+                        async { settingsRepository.hasPriceChartingToken() },
                     ).let { results ->
                         @Suppress("UNCHECKED_CAST")
                         Quintet(
                             results[0] as ApiResult<Boolean>,
-                            results[1] as ApiResult<String?>,
-                            results[2] as ApiResult<String?>,
-                            results[3] as ApiResult<String?>,
-                            results[4] as ApiResult<String?>,
+                            results[1] as ApiResult<Boolean>,
+                            results[2] as ApiResult<Boolean>,
+                            results[3] as ApiResult<Boolean>,
+                            results[4] as ApiResult<Boolean>,
                         )
                     }
                 tokens.value =
                     TokensState(
-                        discogs = discogsToState(discogs),
-                        tmdb = stringTokenToState(tmdb),
-                        rawg = stringTokenToState(rawg),
-                        comicVine = stringTokenToState(comicVine),
-                        priceCharting = stringTokenToState(priceCharting),
+                        discogs = boolToState(discogs),
+                        tmdb = boolToState(tmdb),
+                        rawg = boolToState(rawg),
+                        comicVine = boolToState(comicVine),
+                        priceCharting = boolToState(priceCharting),
                     )
             }
         }
@@ -163,28 +161,28 @@ class SettingsViewModel
         fun setDiscogsToken(value: String) =
             saveString({ settingsRepository.setDiscogsToken(value) }) {
                 tokens.update {
-                    it.copy(discogs = TokenState(isLoading = false, hasValue = value.isNotBlank(), value = null))
+                    it.copy(discogs = TokenState(isLoading = false, hasValue = value.isNotBlank()))
                 }
             }
 
         fun setTmdbToken(value: String) =
             saveString({ settingsRepository.setTmdbToken(value) }) {
-                tokens.update { it.copy(tmdb = stringTokenToState(value)) }
+                tokens.update { it.copy(tmdb = presenceToState(value)) }
             }
 
         fun setRawgKey(value: String) =
             saveString({ settingsRepository.setRawgKey(value) }) {
-                tokens.update { it.copy(rawg = stringTokenToState(value)) }
+                tokens.update { it.copy(rawg = presenceToState(value)) }
             }
 
         fun setComicVineKey(value: String) =
             saveString({ settingsRepository.setComicVineKey(value) }) {
-                tokens.update { it.copy(comicVine = stringTokenToState(value)) }
+                tokens.update { it.copy(comicVine = presenceToState(value)) }
             }
 
         fun setPriceChartingToken(value: String) =
             saveString({ settingsRepository.setPriceChartingToken(value) }) {
-                tokens.update { it.copy(priceCharting = stringTokenToState(value)) }
+                tokens.update { it.copy(priceCharting = presenceToState(value)) }
             }
 
         fun setAutoFetchMarketRates(enabled: Boolean) {
@@ -273,21 +271,14 @@ class SettingsViewModel
             errorMessage.value = message
         }
 
-        private fun discogsToState(result: ApiResult<Boolean>): TokenState =
+        private fun boolToState(result: ApiResult<Boolean>): TokenState =
             when (result) {
-                is ApiResult.Success -> TokenState(isLoading = false, hasValue = result.value, value = null)
+                is ApiResult.Success -> TokenState(isLoading = false, hasValue = result.value)
                 else -> TokenState(isLoading = false)
             }
 
-        private fun stringTokenToState(result: ApiResult<String?>): TokenState =
-            when (result) {
-                is ApiResult.Success ->
-                    TokenState(isLoading = false, hasValue = !result.value.isNullOrBlank(), value = result.value)
-                else -> TokenState(isLoading = false)
-            }
-
-        private fun stringTokenToState(value: String): TokenState =
-            TokenState(isLoading = false, hasValue = value.isNotBlank(), value = value.takeIf { it.isNotBlank() })
+        private fun presenceToState(value: String): TokenState =
+            TokenState(isLoading = false, hasValue = value.isNotBlank())
 
         private data class ProfileState(
             val profile: UserProfile? = null,
