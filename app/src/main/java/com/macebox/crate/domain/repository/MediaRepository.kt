@@ -46,6 +46,8 @@ interface MediaRepository {
         mimeType: String,
     ): ApiResult<Unit>
 
+    suspend fun deleteArtwork(id: Long): ApiResult<Unit>
+
     /**
      * Pages through `GET /api/v1/media?updatedSince={cursor}` writing every
      * row into Room, and returns the new high-water `updatedAt` to persist

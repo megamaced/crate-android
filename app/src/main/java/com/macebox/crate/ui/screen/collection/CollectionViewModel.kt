@@ -4,8 +4,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.macebox.crate.data.api.ApiResult
 import com.macebox.crate.domain.model.Category
+import com.macebox.crate.domain.model.CategorySortConfig
 import com.macebox.crate.domain.model.CollectionSort
 import com.macebox.crate.domain.model.MediaItem
+import com.macebox.crate.domain.model.SortDirection
+import com.macebox.crate.domain.model.SortField
 import com.macebox.crate.domain.repository.MediaRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -21,7 +24,7 @@ import javax.inject.Inject
 
 data class CollectionUiState(
     val category: Category = Category.Music,
-    val sort: CollectionSort = CollectionSort.RecentlyAdded,
+    val sort: CollectionSort = CollectionSort.Default,
     val selectedFormats: Set<String> = emptySet(),
     val items: List<MediaItem> = emptyList(),
     val availableFormats: List<String> = emptyList(),
@@ -43,7 +46,7 @@ class CollectionViewModel
         private val mediaRepository: MediaRepository,
     ) : ViewModel() {
         private val category = MutableStateFlow(Category.Music)
-        private val sort = MutableStateFlow(CollectionSort.RecentlyAdded)
+        private val sort = MutableStateFlow(CollectionSort.Default)
         private val selectedFormats = MutableStateFlow<Set<String>>(emptySet())
         private val isRefreshing = MutableStateFlow(false)
         private val errorMessage = MutableStateFlow<String?>(null)
@@ -59,7 +62,7 @@ class CollectionViewModel
                     .toList()
                 val activeFormats = f.selectedFormats.intersect(available.toSet())
                 val filtered = if (activeFormats.isEmpty()) items else items.filter { it.format in activeFormats }
-                val sorted = filtered.sortedBy(f.sort)
+                val sorted = filtered.sortedWith(comparatorFor(f.sort))
 
                 CollectionUiState(
                     category = f.category,
@@ -84,6 +87,13 @@ class CollectionViewModel
             if (value != category.value) {
                 category.value = value
                 selectedFormats.value = emptySet()
+                // If the active sort axis isn't supported by the new category
+                // (e.g. coming from Games' "Format" axis to Music), fall back
+                // to the default — mirrors CollectionView.vue's reset logic.
+                val cfg = CategorySortConfig.forCategory(value)
+                if (!cfg.supports(sort.value.axis)) {
+                    sort.value = CollectionSort.Default
+                }
                 refresh()
             }
         }
@@ -117,10 +127,14 @@ class CollectionViewModel
         }
     }
 
-private fun List<MediaItem>.sortedBy(sort: CollectionSort): List<MediaItem> =
-    when (sort) {
-        CollectionSort.RecentlyAdded -> sortedByDescending { it.updatedAt.orEmpty() }
-        CollectionSort.Title -> sortedBy { it.title.lowercase() }
-        CollectionSort.Artist -> sortedBy { it.artist.orEmpty().lowercase() }
-        CollectionSort.Year -> sortedByDescending { it.year ?: Int.MIN_VALUE }
+private fun comparatorFor(sort: CollectionSort): Comparator<MediaItem> {
+    val base: Comparator<MediaItem> = when (sort.axis) {
+        SortField.CreatedAt -> compareBy { it.createdAt.orEmpty() }
+        SortField.Artist -> compareBy(String.CASE_INSENSITIVE_ORDER) { it.artist.orEmpty() }
+        SortField.Title -> compareBy(String.CASE_INSENSITIVE_ORDER) { it.title }
+        SortField.Year -> compareBy { it.year ?: Int.MIN_VALUE }
+        SortField.Format -> compareBy(String.CASE_INSENSITIVE_ORDER) { it.format.orEmpty() }
+        SortField.MarketValue -> compareBy { it.marketValue.main ?: Double.NEGATIVE_INFINITY }
     }
+    return if (sort.direction == SortDirection.Desc) base.reversed() else base
+}

@@ -5,6 +5,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
+import androidx.room.Upsert
 import com.macebox.crate.data.db.entity.PlaylistEntity
 import com.macebox.crate.data.db.entity.PlaylistItemCrossRef
 import com.macebox.crate.data.db.entity.PlaylistWithItems
@@ -20,10 +21,15 @@ interface PlaylistDao {
     @Query("SELECT * FROM playlists WHERE id = :id")
     fun observeWithItems(id: Long): Flow<PlaylistWithItems?>
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    // @Upsert (INSERT-or-UPDATE) is used instead of @Insert(REPLACE) so that
+    // refreshing the playlist list — which doesn't include items — doesn't
+    // cascade-delete the playlist_items cross-refs that the detail endpoint
+    // populated. With REPLACE, Room deletes-then-inserts the row, which fires
+    // the FK CASCADE on playlist_items and wipes the cached membership.
+    @Upsert
     suspend fun upsert(playlist: PlaylistEntity)
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Upsert
     suspend fun upsertAll(playlists: List<PlaylistEntity>)
 
     @Query("DELETE FROM playlists WHERE id = :id")

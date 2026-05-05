@@ -104,12 +104,14 @@ private fun DiscogsSearchResultDto.toResult(): ExternalSearchResult =
         label = label,
         country = country,
         discogsId = discogsId,
+        coverUrl = thumb,
     )
 
 private fun TmdbSearchResultDto.toResult(): ExternalSearchResult =
     ExternalSearchResult(
         title = title,
         year = year,
+        coverUrl = thumb,
     )
 
 private fun OpenLibraryResultDto.toResult(): ExternalSearchResult =
@@ -119,6 +121,7 @@ private fun OpenLibraryResultDto.toResult(): ExternalSearchResult =
         year = year,
         barcode = barcode,
         label = label,
+        coverUrl = thumb,
     )
 
 private fun RawgSearchResultDto.toResult(): ExternalSearchResult =
@@ -126,6 +129,7 @@ private fun RawgSearchResultDto.toResult(): ExternalSearchResult =
         title = title,
         year = year,
         subtitle = genres,
+        coverUrl = thumb,
     )
 
 private fun ComicVineSearchResultDto.toResult(): ExternalSearchResult =
@@ -134,4 +138,5 @@ private fun ComicVineSearchResultDto.toResult(): ExternalSearchResult =
         year = year,
         label = label,
         subtitle = genres,
+        coverUrl = thumb,
     )

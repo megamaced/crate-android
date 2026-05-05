@@ -64,6 +64,7 @@ fun CollectionScreen(
                 title = { Text(uiState.category.label) },
                 actions = {
                     SortMenuButton(
+                        category = uiState.category,
                         selected = uiState.sort,
                         onSelected = viewModel::selectSort,
                     )

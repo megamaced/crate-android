@@ -172,6 +172,7 @@ private fun HeroItemOfTheDay(
                     contentDescription = item.title,
                     updatedAt = item.updatedAt,
                     size = ArtworkSize.Full,
+                    category = item.category,
                     modifier = Modifier
                         .size(140.dp)
                         .clip(RoundedCornerShape(12.dp)),
@@ -308,6 +309,7 @@ private fun MostValuableCard(
                 itemId = item.id,
                 contentDescription = item.title,
                 updatedAt = item.updatedAt,
+                category = item.category,
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(1f)

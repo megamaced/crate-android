@@ -7,6 +7,8 @@ import com.macebox.crate.domain.model.CollectionSort
 import com.macebox.crate.domain.model.MarketValue
 import com.macebox.crate.domain.model.MediaItem
 import com.macebox.crate.domain.model.MediaItemDraft
+import com.macebox.crate.domain.model.SortDirection
+import com.macebox.crate.domain.model.SortField
 import com.macebox.crate.domain.model.Status
 import com.macebox.crate.domain.repository.MediaRepository
 import com.macebox.crate.domain.repository.MediaRepository.RefreshResult
@@ -59,7 +61,7 @@ class CollectionViewModelTest {
                 while (current.items.isEmpty()) current = awaitItem()
                 assertEquals(3, current.items.size)
                 assertEquals(listOf("CD", "LP"), current.availableFormats)
-                assertEquals(CollectionSort.RecentlyAdded, current.sort)
+                assertEquals(CollectionSort.Default, current.sort)
                 cancelAndIgnoreRemainingEvents()
             }
         }
@@ -103,11 +105,11 @@ class CollectionViewModelTest {
                 )
             }
             val vm = CollectionViewModel(repo)
-            vm.selectSort(CollectionSort.Title)
+            vm.selectSort(CollectionSort(SortField.Title, SortDirection.Asc))
 
             vm.uiState.test {
                 var current = awaitItem()
-                while (current.items.size != 3 || current.sort != CollectionSort.Title) {
+                while (current.items.size != 3 || current.sort != CollectionSort(SortField.Title, SortDirection.Asc)) {
                     current = awaitItem()
                 }
                 assertEquals(listOf("Apple", "Bee", "Cherry"), current.items.map { it.title })
@@ -195,6 +197,8 @@ private class FakeMediaRepository : MediaRepository {
         bytes: ByteArray,
         mimeType: String,
     ): ApiResult<Unit> = ApiResult.Success(Unit)
+
+    override suspend fun deleteArtwork(id: Long): ApiResult<Unit> = ApiResult.Success(Unit)
 
     override suspend fun syncDelta(updatedSince: String?): ApiResult<String?> = ApiResult.Success(updatedSince)
 

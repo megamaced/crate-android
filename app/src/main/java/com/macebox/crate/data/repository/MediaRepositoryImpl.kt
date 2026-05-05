@@ -123,6 +123,13 @@ class MediaRepositoryImpl
                 dao.upsert(dto.toEntity(codec))
             }
 
+        override suspend fun deleteArtwork(id: Long): ApiResult<Unit> =
+            apiCall {
+                binary.deleteArtwork(id)
+                val dto = api.getMediaItem(id)
+                dao.upsert(dto.toEntity(codec))
+            }
+
         override suspend fun syncDelta(updatedSince: String?): ApiResult<String?> =
             apiCall {
                 var offset = 0

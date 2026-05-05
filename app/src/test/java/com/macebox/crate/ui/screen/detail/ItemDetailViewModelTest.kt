@@ -133,6 +133,8 @@ private class FakeMediaRepository : MediaRepository {
         mimeType: String,
     ): ApiResult<Unit> = ApiResult.Success(Unit)
 
+    override suspend fun deleteArtwork(id: Long): ApiResult<Unit> = ApiResult.Success(Unit)
+
     override suspend fun syncDelta(updatedSince: String?): ApiResult<String?> = ApiResult.Success(updatedSince)
 
     override suspend fun wipeCollection(scopes: List<String>): ApiResult<Unit> = ApiResult.Success(Unit)

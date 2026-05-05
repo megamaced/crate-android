@@ -191,6 +191,7 @@ private fun PlaylistRow(
                 itemId = firstItem.id,
                 contentDescription = playlist.name,
                 updatedAt = firstItem.updatedAt,
+                category = firstItem.category,
                 modifier = Modifier
                     .size(48.dp)
                     .clip(RoundedCornerShape(6.dp)),

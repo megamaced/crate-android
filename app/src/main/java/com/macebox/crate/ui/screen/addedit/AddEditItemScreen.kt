@@ -9,13 +9,13 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -25,12 +25,13 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -61,7 +62,7 @@ import com.macebox.crate.ui.components.ArtworkSize
 import com.macebox.crate.ui.components.LoadingState
 import kotlinx.serialization.json.Json
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddEditItemScreen(
     onBack: () -> Unit,
@@ -102,11 +103,16 @@ fun AddEditItemScreen(
             uri?.let { handlePickedUri(context, it, viewModel) }
         }
 
+    val titleLabels = remember(state.category) { CategoryLabels.forCategory(state.category) }
     Scaffold(
         modifier = modifier.fillMaxSize(),
         topBar = {
             TopAppBar(
-                title = { Text(if (state.isEditing) "Edit item" else "Add item") },
+                title = {
+                    Text(
+                        text = (if (state.isEditing) "Edit " else "Add ") + titleLabels.singularNoun,
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -152,7 +158,6 @@ fun AddEditItemScreen(
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun FormContent(
     state: AddEditUiState,
@@ -197,7 +202,15 @@ private fun FormContent(
                     }
                 }
                 OutlinedButton(onClick = onPickArtwork, modifier = Modifier.fillMaxWidth()) {
-                    Text(if (state.pendingArtwork != null) "Replace artwork" else "Pick artwork")
+                    Text(if (state.hasArtworkPreview) "Replace artwork" else "Pick artwork")
+                }
+                if (state.hasArtworkPreview) {
+                    OutlinedButton(
+                        onClick = viewModel::onRemoveArtwork,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text("Remove artwork")
+                    }
                 }
             }
         }
@@ -211,7 +224,8 @@ private fun FormContent(
             value = state.title,
             onValueChange = viewModel::onTitleChange,
             modifier = Modifier.fillMaxWidth(),
-            label = { Text("Title") },
+            label = { Text(labels.title) },
+            placeholder = { Text(labels.titlePlaceholder) },
             singleLine = true,
             isError = state.title.isBlank(),
         )
@@ -220,13 +234,14 @@ private fun FormContent(
             onValueChange = viewModel::onArtistChange,
             modifier = Modifier.fillMaxWidth(),
             label = { Text(labels.artist) },
+            placeholder = { Text(labels.artistPlaceholder) },
             singleLine = true,
             isError = state.artist.isBlank(),
         )
 
         FormatField(
             label = labels.format,
-            suggestions = labels.formatSuggestions,
+            category = state.category,
             value = state.format,
             onValueChange = viewModel::onFormatChange,
         )
@@ -240,7 +255,14 @@ private fun FormContent(
                 onValueChange = viewModel::onYearChange,
                 modifier = Modifier.weight(1f),
                 label = { Text("Year") },
+                placeholder = { Text("e.g. 1973") },
                 singleLine = true,
+                isError = state.yearError,
+                supportingText = if (state.yearError) {
+                    { Text("Enter a year between 1800 and now.") }
+                } else {
+                    null
+                },
                 keyboardOptions =
                     KeyboardOptions(
                         keyboardType = KeyboardType.Number,
@@ -252,6 +274,7 @@ private fun FormContent(
                 onValueChange = viewModel::onBarcodeChange,
                 modifier = Modifier.weight(2f),
                 label = { Text(labels.barcode) },
+                placeholder = { Text(labels.barcodePlaceholder) },
                 singleLine = true,
                 keyboardOptions =
                     KeyboardOptions(
@@ -261,11 +284,22 @@ private fun FormContent(
             )
         }
 
+        if (state.category == Category.Books) {
+            OutlinedButton(
+                onClick = viewModel::lookupIsbn,
+                enabled = state.barcode.isNotBlank() && !state.isLookingUpIsbn,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(if (state.isLookingUpIsbn) "Looking up…" else "Look up ISBN")
+            }
+        }
+
         OutlinedTextField(
             value = state.label,
             onValueChange = viewModel::onLabelChange,
             modifier = Modifier.fillMaxWidth(),
             label = { Text(labels.label) },
+            placeholder = { Text(labels.labelPlaceholder) },
             singleLine = true,
         )
         OutlinedTextField(
@@ -326,30 +360,94 @@ private fun StatusToggle(
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun FormatField(
     label: String,
-    suggestions: List<String>,
+    category: Category,
     value: String,
     onValueChange: (String) -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    var sheetOpen by remember { mutableStateOf(false) }
+
+    Box(modifier = Modifier.fillMaxWidth()) {
         OutlinedTextField(
             value = value,
-            onValueChange = onValueChange,
+            onValueChange = {},
+            readOnly = true,
+            enabled = false,
             modifier = Modifier.fillMaxWidth(),
             label = { Text(label) },
+            placeholder = { Text("Select…") },
             singleLine = true,
             isError = value.isBlank(),
+            colors = OutlinedTextFieldDefaults.colors(
+                disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                disabledBorderColor = if (value.isBlank()) {
+                    MaterialTheme.colorScheme.error
+                } else {
+                    MaterialTheme.colorScheme.outline
+                },
+                disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                disabledPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            ),
         )
-        if (suggestions.isNotEmpty()) {
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                suggestions.forEach { suggestion ->
-                    FilterChip(
-                        selected = suggestion.equals(value, ignoreCase = true),
-                        onClick = { onValueChange(suggestion) },
-                        label = { Text(suggestion) },
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .clickable { sheetOpen = true },
+        )
+    }
+
+    if (sheetOpen) {
+        FormatPickerSheet(
+            category = category,
+            currentValue = value,
+            onPick = {
+                onValueChange(it)
+                sheetOpen = false
+            },
+            onDismiss = { sheetOpen = false },
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FormatPickerSheet(
+    category: Category,
+    currentValue: String,
+    onPick: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val groups = remember(category) { CategoryFormats.groupsFor(category) }
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+    ) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 16.dp),
+        ) {
+            groups.forEach { group ->
+                item(key = "header-${group.label}") {
+                    Text(
+                        text = group.label,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 24.dp, vertical = 8.dp),
+                    )
+                }
+                items(group.formats, key = { "${group.label}-$it" }) { fmt ->
+                    val selected = fmt.equals(currentValue, ignoreCase = true)
+                    Text(
+                        text = fmt + if (selected) "  ✓" else "",
+                        style = MaterialTheme.typography.bodyLarge,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onPick(fmt) }
+                            .padding(horizontal = 32.dp, vertical = 12.dp),
                     )
                 }
             }
@@ -379,12 +477,20 @@ private fun ArtworkPreview(
                     contentScale = androidx.compose.ui.layout.ContentScale.Crop,
                     modifier = Modifier.fillMaxSize(),
                 )
-            state.isEditing && state.editingItemId != null ->
+            !state.pendingArtworkUrl.isNullOrBlank() ->
+                coil3.compose.AsyncImage(
+                    model = state.pendingArtworkUrl,
+                    contentDescription = "Selected artwork",
+                    contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            state.isEditing && !state.removeArtwork && state.editingItemId != null ->
                 ArtworkImage(
                     itemId = state.editingItemId,
                     contentDescription = state.title,
                     size = ArtworkSize.Thumb,
                     updatedAt = state.itemUpdatedAt,
+                    category = state.category,
                     modifier = Modifier.fillMaxSize(),
                 )
             else ->
@@ -414,60 +520,87 @@ private fun handlePickedUri(
 
 private data class CategoryLabels(
     val artist: String,
+    val title: String,
     val format: String,
     val barcode: String,
     val label: String,
     val providerName: String,
-    val formatSuggestions: List<String>,
+    val singularNoun: String,
+    val artistPlaceholder: String,
+    val titlePlaceholder: String,
+    val labelPlaceholder: String,
+    val barcodePlaceholder: String,
 ) {
     companion object {
+        // Mirror of crate/src/utils/categoryFormats.js FIELD_CONFIG plus the
+        // per-category placeholder/heading text from AddEditModal.vue.
         fun forCategory(category: Category): CategoryLabels =
             when (category) {
-                Category.Music ->
-                    CategoryLabels(
-                        artist = "Artist",
-                        format = "Format",
-                        barcode = "Barcode",
-                        label = "Label",
-                        providerName = "Discogs",
-                        formatSuggestions = listOf("LP", "12\"", "7\"", "CD", "Cassette", "Digital"),
-                    )
-                Category.Films ->
-                    CategoryLabels(
-                        artist = "Director",
-                        format = "Format",
-                        barcode = "Barcode",
-                        label = "Studio",
-                        providerName = "TMDB",
-                        formatSuggestions = listOf("Blu-ray", "4K UHD", "DVD", "VHS", "Digital"),
-                    )
-                Category.Books ->
-                    CategoryLabels(
-                        artist = "Author",
-                        format = "Format",
-                        barcode = "ISBN",
-                        label = "Publisher",
-                        providerName = "Open Library",
-                        formatSuggestions = listOf("Hardback", "Paperback", "eBook", "Audiobook"),
-                    )
-                Category.Games ->
-                    CategoryLabels(
-                        artist = "Developer",
-                        format = "Platform",
-                        barcode = "Barcode",
-                        label = "Publisher",
-                        providerName = "RAWG",
-                        formatSuggestions = listOf("PC", "PS5", "PS4", "Xbox", "Switch", "Cartridge"),
-                    )
-                Category.Comics ->
-                    CategoryLabels(
-                        artist = "Writer",
-                        format = "Format",
-                        barcode = "Barcode",
-                        label = "Publisher",
-                        providerName = "ComicVine",
-                        formatSuggestions = listOf("Issue", "TPB", "Hardcover", "Omnibus", "Digital"),
-                    )
+                Category.Music -> CategoryLabels(
+                    artist = "Artist",
+                    title = "Album / Title",
+                    format = "Format",
+                    barcode = "Barcode",
+                    label = "Label",
+                    providerName = "Discogs",
+                    singularNoun = "album",
+                    artistPlaceholder = "e.g. Pink Floyd",
+                    titlePlaceholder = "e.g. The Dark Side of the Moon",
+                    labelPlaceholder = "e.g. EMI",
+                    barcodePlaceholder = "e.g. 5099902987521",
+                )
+                Category.Films -> CategoryLabels(
+                    artist = "Director",
+                    title = "Film Title",
+                    format = "Format",
+                    barcode = "Barcode",
+                    label = "Studio",
+                    providerName = "TMDB",
+                    singularNoun = "film",
+                    artistPlaceholder = "e.g. Christopher Nolan",
+                    titlePlaceholder = "e.g. Inception",
+                    labelPlaceholder = "e.g. Warner Bros.",
+                    barcodePlaceholder = "",
+                )
+                Category.Books -> CategoryLabels(
+                    artist = "Author",
+                    title = "Title",
+                    format = "Format",
+                    barcode = "ISBN",
+                    label = "Publisher",
+                    providerName = "Open Library",
+                    singularNoun = "book",
+                    artistPlaceholder = "e.g. George Orwell",
+                    titlePlaceholder = "e.g. 1984",
+                    labelPlaceholder = "e.g. Penguin",
+                    barcodePlaceholder = "e.g. 978-0451524935",
+                )
+                Category.Games -> CategoryLabels(
+                    artist = "Developer",
+                    title = "Game Title",
+                    format = "Platform",
+                    barcode = "Barcode",
+                    label = "Publisher",
+                    providerName = "RAWG",
+                    singularNoun = "game",
+                    artistPlaceholder = "e.g. Nintendo",
+                    titlePlaceholder = "e.g. Super Mario Bros.",
+                    labelPlaceholder = "e.g. Nintendo",
+                    barcodePlaceholder = "",
+                )
+                Category.Comics -> CategoryLabels(
+                    artist = "Writer",
+                    title = "Series / Volume Title",
+                    format = "Format",
+                    barcode = "Barcode",
+                    label = "Publisher",
+                    providerName = "ComicVine",
+                    singularNoun = "comic",
+                    artistPlaceholder = "e.g. Alan Moore",
+                    titlePlaceholder = "e.g. Watchmen",
+                    labelPlaceholder = "e.g. DC Comics",
+                    barcodePlaceholder = "",
+                )
             }
     }
 }

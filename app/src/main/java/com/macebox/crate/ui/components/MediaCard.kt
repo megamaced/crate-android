@@ -36,6 +36,7 @@ fun MediaCard(
                 itemId = item.id,
                 contentDescription = item.title,
                 updatedAt = item.updatedAt,
+                category = item.category,
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(1f)

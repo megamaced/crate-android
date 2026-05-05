@@ -212,6 +212,7 @@ private fun PlaylistItemRow(
             itemId = item.id,
             contentDescription = item.title,
             updatedAt = item.updatedAt,
+            category = item.category,
             modifier = Modifier
                 .size(48.dp)
                 .clip(RoundedCornerShape(6.dp)),

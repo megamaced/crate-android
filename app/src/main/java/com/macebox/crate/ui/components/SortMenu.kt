@@ -12,14 +12,19 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import com.macebox.crate.domain.model.Category
 import com.macebox.crate.domain.model.CollectionSort
+import com.macebox.crate.domain.model.sortOptionsFor
 
 @Composable
 fun SortMenuButton(
+    category: Category,
     selected: CollectionSort,
     onSelected: (CollectionSort) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
+    val options = remember(category) { sortOptionsFor(category) }
+
     IconButton(onClick = { expanded = true }) {
         Icon(
             imageVector = Icons.AutoMirrored.Filled.Sort,
@@ -30,9 +35,9 @@ fun SortMenuButton(
         expanded = expanded,
         onDismissRequest = { expanded = false },
     ) {
-        CollectionSort.entries.forEach { option ->
+        options.forEach { (option, label) ->
             DropdownMenuItem(
-                text = { Text(option.label + if (option == selected) "  ✓" else "") },
+                text = { Text(label + if (option == selected) "  ✓" else "") },
                 onClick = {
                     onSelected(option)
                     expanded = false

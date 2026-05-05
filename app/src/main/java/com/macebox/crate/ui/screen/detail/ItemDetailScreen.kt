@@ -3,6 +3,8 @@ package com.macebox.crate.ui.screen.detail
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -255,6 +257,7 @@ private fun ItemDetailContent(
                 contentDescription = item.title,
                 size = ArtworkSize.Full,
                 updatedAt = item.updatedAt,
+                category = item.category,
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(1f),
@@ -351,6 +354,7 @@ private fun ItemDetailContent(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ChipRow(item: MediaItem) {
     val chips = buildList {
@@ -360,14 +364,21 @@ private fun ChipRow(item: MediaItem) {
         item.country?.takeIf { it.isNotBlank() }?.let { add(it) }
     }
     if (chips.isEmpty()) return
-    Row(
+    FlowRow(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
         modifier = Modifier.fillMaxWidth(),
     ) {
         chips.forEach { value ->
             AssistChip(
                 onClick = {},
-                label = { Text(value) },
+                label = {
+                    Text(
+                        text = value,
+                        maxLines = 1,
+                        softWrap = false,
+                    )
+                },
                 shape = AssistChipDefaults.shape,
             )
         }

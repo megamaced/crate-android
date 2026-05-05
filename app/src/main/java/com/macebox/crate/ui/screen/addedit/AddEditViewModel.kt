@@ -4,6 +4,8 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.macebox.crate.data.api.ApiResult
+import com.macebox.crate.data.api.CrateApiService
+import com.macebox.crate.data.api.apiCall
 import com.macebox.crate.domain.model.Category
 import com.macebox.crate.domain.model.MediaItem
 import com.macebox.crate.domain.model.MediaItemDraft
@@ -20,7 +22,11 @@ import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
+import java.util.Calendar
 import javax.inject.Inject
+
+private val CURRENT_YEAR: Int = Calendar.getInstance().get(Calendar.YEAR)
+private const val MIN_YEAR = 1800
 
 data class AddEditUiState(
     val isEditing: Boolean = false,
@@ -42,11 +48,33 @@ data class AddEditUiState(
     val category: Category = Category.Music,
     val autoEnrich: Boolean = false,
     val pendingArtwork: PendingArtwork? = null,
+    /**
+     * Cover URL supplied by an enrichment source (Discogs/TMDB/etc.). Shown
+     * in the artwork preview before save; on save the backend caches the
+     * image and the local /apps/crate/artwork/{id} URL takes over. Mirrors
+     * `enrichPreviewUrl` in AddEditModal.vue.
+     */
+    val pendingArtworkUrl: String? = null,
+    /** True when the user clicked Remove on existing artwork. */
+    val removeArtwork: Boolean = false,
+    val isLookingUpIsbn: Boolean = false,
     val errorMessage: String? = null,
     val savedItemId: Long? = null,
 ) {
+    val yearError: Boolean
+        get() = year.isNotBlank() && (year.toIntOrNull()?.let { it !in MIN_YEAR..CURRENT_YEAR } ?: true)
+
     val canSave: Boolean
-        get() = title.isNotBlank() && artist.isNotBlank() && format.isNotBlank() && !isSaving
+        get() = title.isNotBlank() &&
+            artist.isNotBlank() &&
+            format.isNotBlank() &&
+            !yearError &&
+            !isSaving
+
+    val hasArtworkPreview: Boolean
+        get() = pendingArtwork != null ||
+            !pendingArtworkUrl.isNullOrBlank() ||
+            (isEditing && !removeArtwork && editingItemId != null)
 }
 
 data class PendingArtwork(
@@ -64,6 +92,7 @@ class AddEditViewModel
         private val mediaRepository: MediaRepository,
         private val settingsRepository: SettingsRepository,
         private val enrichmentRepository: EnrichmentRepository,
+        private val api: CrateApiService,
     ) : ViewModel() {
         private val itemId: Long? = savedStateHandle.get<Long>("itemId")?.takeIf { it > 0L }
         private val initialCategory: Category =
@@ -196,12 +225,29 @@ class AddEditViewModel
         fun onArtworkPicked(
             bytes: ByteArray,
             mimeType: String,
-        ) = update { copy(pendingArtwork = PendingArtwork(bytes, mimeType)) }
+        ) = update {
+            copy(
+                pendingArtwork = PendingArtwork(bytes, mimeType),
+                pendingArtworkUrl = null,
+                removeArtwork = false,
+            )
+        }
 
         fun onArtworkCleared() = update { copy(pendingArtwork = null) }
 
+        fun onRemoveArtwork() =
+            update {
+                copy(
+                    pendingArtwork = null,
+                    pendingArtworkUrl = null,
+                    artworkPath = null,
+                    removeArtwork = true,
+                )
+            }
+
         fun applyExternalResult(result: ExternalSearchResult) {
             _uiState.update { current ->
+                val cover = result.coverUrl?.takeIf { it.isNotBlank() }
                 current.copy(
                     title = result.title.ifBlank { current.title },
                     artist = result.artist?.takeIf { it.isNotBlank() } ?: current.artist,
@@ -211,7 +257,48 @@ class AddEditViewModel
                     label = result.label?.takeIf { it.isNotBlank() } ?: current.label,
                     country = result.country?.takeIf { it.isNotBlank() } ?: current.country,
                     discogsId = result.discogsId ?: current.discogsId,
+                    pendingArtworkUrl = cover ?: current.pendingArtworkUrl,
+                    artworkPath = cover ?: current.artworkPath,
+                    removeArtwork = if (cover != null) false else current.removeArtwork,
                 )
+            }
+        }
+
+        fun lookupIsbn() {
+            val isbn = _uiState.value.barcode.trim()
+            if (isbn.isBlank() || _uiState.value.isLookingUpIsbn) return
+            viewModelScope.launch {
+                _uiState.update { it.copy(isLookingUpIsbn = true, errorMessage = null) }
+                val result = apiCall { api.openLibraryIsbn(isbn) }
+                when (result) {
+                    is ApiResult.Success -> {
+                        val dto = result.value
+                        applyExternalResult(
+                            ExternalSearchResult(
+                                title = dto.title,
+                                artist = dto.artist,
+                                year = dto.year,
+                                barcode = dto.barcode ?: isbn,
+                                label = dto.label,
+                                coverUrl = dto.artworkUrl ?: dto.thumb,
+                            ),
+                        )
+                        _uiState.update { it.copy(isLookingUpIsbn = false) }
+                    }
+                    ApiResult.NetworkError ->
+                        _uiState.update {
+                            it.copy(isLookingUpIsbn = false, errorMessage = "Couldn't reach the server.")
+                        }
+                    is ApiResult.HttpError ->
+                        _uiState.update {
+                            it.copy(
+                                isLookingUpIsbn = false,
+                                errorMessage = "ISBN not found in Open Library",
+                            )
+                        }
+                    ApiResult.Unauthorised ->
+                        _uiState.update { it.copy(isLookingUpIsbn = false) }
+                }
             }
         }
 
@@ -242,8 +329,18 @@ class AddEditViewModel
             saved: MediaItem,
             beforeState: AddEditUiState,
         ) {
-            beforeState.pendingArtwork?.let { art ->
-                mediaRepository.uploadArtwork(saved.id, art.bytes, art.mimeType)
+            // A picked file always wins. Otherwise, if the user clicked Remove
+            // and the row already existed on the server, wipe the cached image.
+            // Enrichment-supplied URLs are sent through MediaItemDraft.artworkPath
+            // so the backend caches them server-side — no client upload needed.
+            when {
+                beforeState.pendingArtwork != null -> {
+                    val art = beforeState.pendingArtwork
+                    mediaRepository.uploadArtwork(saved.id, art.bytes, art.mimeType)
+                }
+                beforeState.removeArtwork && beforeState.isEditing -> {
+                    mediaRepository.deleteArtwork(saved.id)
+                }
             }
             if (beforeState.autoEnrich) {
                 enrichmentRepository.enrich(saved.id)
