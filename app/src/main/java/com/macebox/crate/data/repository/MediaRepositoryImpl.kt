@@ -15,6 +15,7 @@ import com.macebox.crate.domain.model.MediaItemDraft
 import com.macebox.crate.domain.model.Status
 import com.macebox.crate.domain.repository.MediaRepository
 import com.macebox.crate.domain.repository.MediaRepository.RefreshResult
+import com.macebox.crate.domain.repository.MediaRepository.SyncResult
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import okhttp3.MediaType.Companion.toMediaType
@@ -130,12 +131,31 @@ class MediaRepositoryImpl
                 dao.upsert(dto.toEntity(codec))
             }
 
-        override suspend fun syncDelta(updatedSince: String?): ApiResult<String?> =
+        override suspend fun syncDelta(
+            updatedSince: String?,
+            lastSeenWipedAt: String?,
+        ): ApiResult<SyncResult> =
             apiCall {
+                // Probe with a 1-item page to learn the server's current wipedAt
+                // before committing to a delta vs. full resync.
+                val probe = api.getMedia(updatedSince = updatedSince, limit = 1, offset = 0)
+                val serverWipedAt = probe.wipedAt
+
+                // If the server has been wiped since our last sync, our local
+                // rows are stale (re-import generates new IDs, so delta sync
+                // would just append duplicates). Drop the local DB and refetch.
+                val effectiveSince =
+                    if (serverWipedAt != null && (lastSeenWipedAt == null || serverWipedAt > lastSeenWipedAt)) {
+                        dao.deleteAll()
+                        null
+                    } else {
+                        updatedSince
+                    }
+
                 var offset = 0
-                var maxUpdatedAt: String? = updatedSince
+                var maxUpdatedAt: String? = effectiveSince
                 while (true) {
-                    val page = api.getMedia(updatedSince = updatedSince, limit = SYNC_PAGE_SIZE, offset = offset)
+                    val page = api.getMedia(updatedSince = effectiveSince, limit = SYNC_PAGE_SIZE, offset = offset)
                     if (page.items.isEmpty()) break
                     dao.upsertAll(page.items.map { it.toEntity(codec) })
                     page.items.forEach { dto ->
@@ -147,7 +167,7 @@ class MediaRepositoryImpl
                     if (page.items.size < SYNC_PAGE_SIZE) break
                     offset += SYNC_PAGE_SIZE
                 }
-                maxUpdatedAt
+                SyncResult(cursor = maxUpdatedAt, wipedAt = serverWipedAt)
             }
 
         companion object {

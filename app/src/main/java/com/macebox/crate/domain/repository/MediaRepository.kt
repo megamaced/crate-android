@@ -50,15 +50,28 @@ interface MediaRepository {
 
     /**
      * Pages through `GET /api/v1/media?updatedSince={cursor}` writing every
-     * row into Room, and returns the new high-water `updatedAt` to persist
-     * as the next cursor (or `null` when nothing has changed).
+     * row into Room.
+     *
+     * If the server reports a `wipedAt` newer than [lastSeenWipedAt], the
+     * local DB is wiped before paging so deletions that delta sync can't
+     * otherwise see are reconciled (e.g. after a server-side delete-all +
+     * re-import, which generates fresh IDs and would otherwise leave the
+     * old rows orphaned).
      */
-    suspend fun syncDelta(updatedSince: String?): ApiResult<String?>
+    suspend fun syncDelta(
+        updatedSince: String?,
+        lastSeenWipedAt: String?,
+    ): ApiResult<SyncResult>
 
     data class RefreshResult(
         val total: Int,
         val limit: Int,
         val offset: Int,
         val itemCount: Int,
+    )
+
+    data class SyncResult(
+        val cursor: String?,
+        val wipedAt: String?,
     )
 }

@@ -22,14 +22,20 @@ class SyncWorker
         private val userPreferences: UserPreferences,
     ) : CoroutineWorker(appContext, params) {
         override suspend fun doWork(): Result {
-            val cursor = userPreferences.flow.first().lastSyncCursor
-            return when (val result = mediaRepository.syncDelta(cursor)) {
+            val prefs = userPreferences.flow.first()
+            val cursor = prefs.lastSyncCursor
+            val seenWipedAt = prefs.lastSeenWipedAt
+            return when (val result = mediaRepository.syncDelta(cursor, seenWipedAt)) {
                 is ApiResult.Success -> {
-                    val newCursor = result.value
+                    val newCursor = result.value.cursor
+                    val newWipedAt = result.value.wipedAt
                     if (newCursor != null && newCursor != cursor) {
                         userPreferences.setLastSyncCursor(newCursor)
                     }
-                    Timber.d("Sync ok (cursor %s -> %s)", cursor, newCursor)
+                    if (newWipedAt != seenWipedAt) {
+                        userPreferences.setLastSeenWipedAt(newWipedAt)
+                    }
+                    Timber.d("Sync ok (cursor %s -> %s, wipedAt %s -> %s)", cursor, newCursor, seenWipedAt, newWipedAt)
                     Result.success()
                 }
                 ApiResult.NetworkError -> {

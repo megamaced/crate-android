@@ -109,6 +109,7 @@ data class PaginatedMediaDto(
     val total: Int,
     val limit: Int,
     val offset: Int,
+    val wipedAt: String? = null,
 )
 
 @Serializable

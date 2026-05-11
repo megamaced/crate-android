@@ -22,6 +22,7 @@ enum class ThemeMode {
 
 data class UserPrefs(
     val lastSyncCursor: String? = null,
+    val lastSeenWipedAt: String? = null,
     val themeMode: ThemeMode = ThemeMode.System,
 )
 
@@ -37,12 +38,17 @@ class UserPreferences
             ds.data.map { prefs ->
                 UserPrefs(
                     lastSyncCursor = prefs[Keys.LAST_SYNC_CURSOR],
+                    lastSeenWipedAt = prefs[Keys.LAST_SEEN_WIPED_AT],
                     themeMode = prefs[Keys.THEME_MODE]?.let(::parseThemeMode) ?: ThemeMode.System,
                 )
             }
 
         suspend fun setLastSyncCursor(cursor: String?) {
             ds.edit { it.write(Keys.LAST_SYNC_CURSOR, cursor) }
+        }
+
+        suspend fun setLastSeenWipedAt(wipedAt: String?) {
+            ds.edit { it.write(Keys.LAST_SEEN_WIPED_AT, wipedAt) }
         }
 
         suspend fun setThemeMode(mode: ThemeMode) {
@@ -60,6 +66,7 @@ class UserPreferences
 
         private object Keys {
             val LAST_SYNC_CURSOR = stringPreferencesKey("last_sync_cursor")
+            val LAST_SEEN_WIPED_AT = stringPreferencesKey("last_seen_wiped_at")
             val THEME_MODE = stringPreferencesKey("theme_mode")
         }
     }
