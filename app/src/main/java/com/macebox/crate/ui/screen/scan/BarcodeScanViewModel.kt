@@ -105,6 +105,7 @@ private fun DiscogsSearchResultDto.toResult(): ExternalSearchResult =
         label = label,
         country = country,
         discogsId = discogsId,
+        coverUrl = thumb,
     )
 
 private fun OpenLibraryResultDto.toResult(): ExternalSearchResult? =
@@ -117,5 +118,6 @@ private fun OpenLibraryResultDto.toResult(): ExternalSearchResult? =
             year = year,
             barcode = barcode,
             label = label,
+            coverUrl = artworkUrl ?: thumb,
         )
     }

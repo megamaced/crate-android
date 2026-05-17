@@ -129,6 +129,12 @@ private fun CameraPreview(
         remember {
             DecoratedBarcodeView(context).apply {
                 barcodeView.decoderFactory = DefaultDecoderFactory()
+                // Continuous autofocus — without it, the preview comes up
+                // blurry and the user has to leave & re-enter to trigger focus.
+                barcodeView.cameraSettings.apply {
+                    isAutoFocusEnabled = true
+                    isContinuousFocusEnabled = true
+                }
                 setStatusText("Point at a barcode")
             }
         }

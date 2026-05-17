@@ -120,17 +120,17 @@ private fun HomeContent(
             }
         }
 
+        if (feed.mostValuable.isNotEmpty()) {
+            item(key = "most-valuable") {
+                MostValuableSection(items = feed.mostValuable, onItemClick = onItemClick)
+            }
+        }
+
         feed.categoryFeeds.forEach { categoryFeed ->
             if (categoryFeed.recentItems.isNotEmpty()) {
                 item(key = "category-${categoryFeed.category.apiValue}") {
                     CategoryRecentSection(categoryFeed = categoryFeed, onItemClick = onItemClick)
                 }
-            }
-        }
-
-        if (feed.mostValuable.isNotEmpty()) {
-            item(key = "most-valuable") {
-                MostValuableSection(items = feed.mostValuable, onItemClick = onItemClick)
             }
         }
     }

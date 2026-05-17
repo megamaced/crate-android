@@ -4,11 +4,11 @@ enum class Category(
     val apiValue: String,
     val label: String,
 ) {
-    Music("music", "Music"),
-    Films("film", "Films"),
     Books("book", "Books"),
-    Games("game", "Games"),
     Comics("comic", "Comics"),
+    Films("film", "Films"),
+    Games("game", "Games"),
+    Music("music", "Music"),
     ;
 
     companion object {
