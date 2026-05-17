@@ -19,15 +19,17 @@ Native Android companion for [Crate](https://github.com/megamaced/crate), a pers
 
 ## Status
 
-Functional — all core features are implemented and working. Releases are currently **debug builds only**, which means in-place upgrades are not supported; you must uninstall before installing a new version.
+Released — v1.0.0. Signed APKs are published on the [Releases page](https://github.com/megamaced/crate-android/releases/latest); in-place upgrades from one signed release to the next are supported.
+
+The app checks GitHub for newer releases on launch (no more than once per 24h) and posts a notification when one is available. Tapping it opens the release page in the browser so you can download and install the new APK.
 
 ## Features
 
-- **Home feed** — Item of the Day, Recently Added, and per-category recent items
+- **Home feed** — Item of the Day, Recently Added, Most Valuable, and per-category recent items
 - **Collection browsing** — browse by category (Music, Films, Books, Games, Comics) with format chip filters and sorting
 - **Add & edit items** — full form with category-specific formats, year, barcode, label, and artwork
-- **Barcode scanning** — scan barcodes with the camera (ZXing, no Google Play Services required)
-- **Discogs search** — search Discogs to auto-fill album metadata when adding music
+- **Barcode scanning** — scan barcodes with the camera (ZXing)
+- **External metadata search** — Discogs (music), TMDB (films), Open Library (books), RAWG (games), ComicVine (comics)
 - **Artwork** — pick artwork from your device or pull it from external search results
 - **Playlists** — create, edit, and delete playlists; add/remove items
 - **Search** — search your own collection or external sources
@@ -41,6 +43,10 @@ Functional — all core features are implemented and working. Releases are curre
 - Android 10 (API 29) or newer
 - A Nextcloud instance running the [Crate server app](https://github.com/megamaced/crate)
 
+## Installation
+
+Download the latest signed APK from the [Releases page](https://github.com/megamaced/crate-android/releases/latest) and install it. You will need to allow "install from unknown sources" for your browser the first time. Subsequent updates install in place over the existing app — the in-app update notification points you back to the Releases page when a new version is published.
+
 ## Tech stack
 
 - Kotlin 2.x + Jetpack Compose + Material 3 (with Material You dynamic colour on Android 12+)
@@ -48,7 +54,7 @@ Functional — all core features are implemented and working. Releases are curre
 - Retrofit 2 + OkHttp 5 + kotlinx.serialization
 - Room 2.7 for offline cache
 - Coil 3 for image loading
-- ZXing for barcode scanning (F-Droid friendly — no Google Play Services)
+- ZXing for barcode scanning
 - WorkManager for background delta sync
 
 ## Building
@@ -59,9 +65,7 @@ Functional — all core features are implemented and working. Releases are curre
 
 Debug APK is written to `app/build/outputs/apk/debug/`.
 
-## Distribution
-
-F-Droid + sideload. The build intentionally avoids any Google Play Services dependencies so it can be published through F-Droid and installed on de-Googled devices.
+For signed release builds, see [docs/SIGNING.md](docs/SIGNING.md).
 
 ## License
 

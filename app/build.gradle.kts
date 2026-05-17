@@ -7,6 +7,22 @@ plugins {
     alias(libs.plugins.hilt)
 }
 
+// Release-signing config is sourced from environment variables so the keystore
+// never lands on disk in the repo. CI decodes ANDROID_RELEASE_KEYSTORE_BASE64
+// into a file and exports ANDROID_RELEASE_KEYSTORE_FILE for this script; local
+// signed builds export the same four vars from a shell-rc file. If any are
+// absent the release build still works but produces an unsigned APK.
+val releaseKeystoreFile: String? = System.getenv("ANDROID_RELEASE_KEYSTORE_FILE")
+val releaseStorePassword: String? = System.getenv("ANDROID_RELEASE_STORE_PASSWORD")
+val releaseKeyAlias: String? = System.getenv("ANDROID_RELEASE_KEY_ALIAS")
+val releaseKeyPassword: String? = System.getenv("ANDROID_RELEASE_KEY_PASSWORD")
+val hasReleaseSigningConfig =
+    releaseKeystoreFile != null &&
+        releaseStorePassword != null &&
+        releaseKeyAlias != null &&
+        releaseKeyPassword != null &&
+        file(releaseKeystoreFile).exists()
+
 android {
     namespace = "com.macebox.crate"
     compileSdk = 36
@@ -15,11 +31,22 @@ android {
         applicationId = "com.macebox.crate"
         minSdk = 29
         targetSdk = 36
-        versionCode = 8
-        versionName = "0.2.2"
+        versionCode = 9
+        versionName = "1.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
+    }
+
+    signingConfigs {
+        if (hasReleaseSigningConfig) {
+            create("release") {
+                storeFile = file(releaseKeystoreFile!!)
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
     }
 
     buildTypes {
@@ -34,6 +61,9 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
+            if (hasReleaseSigningConfig) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
 

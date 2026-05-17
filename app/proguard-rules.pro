@@ -31,3 +31,7 @@
 -dontwarn org.conscrypt.**
 -dontwarn org.bouncycastle.**
 -dontwarn org.openjsse.**
+
+# Tink references errorprone annotations at compile time only; they're not on
+# the runtime classpath.
+-dontwarn com.google.errorprone.annotations.**

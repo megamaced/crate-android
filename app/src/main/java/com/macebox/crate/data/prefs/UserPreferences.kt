@@ -4,10 +4,12 @@ import android.content.Context
 import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -55,6 +57,22 @@ class UserPreferences
             ds.edit { it[Keys.THEME_MODE] = mode.name }
         }
 
+        suspend fun getUpdateState(): UpdateCheckState {
+            val prefs = ds.data.first()
+            return UpdateCheckState(
+                lastCheckedAt = prefs[Keys.UPDATE_LAST_CHECKED_AT] ?: 0L,
+                lastNotifiedVersion = prefs[Keys.UPDATE_LAST_NOTIFIED_VERSION],
+            )
+        }
+
+        suspend fun setUpdateLastCheckedAt(epochMillis: Long) {
+            ds.edit { it[Keys.UPDATE_LAST_CHECKED_AT] = epochMillis }
+        }
+
+        suspend fun setUpdateLastNotifiedVersion(version: String) {
+            ds.edit { it[Keys.UPDATE_LAST_NOTIFIED_VERSION] = version }
+        }
+
         private fun parseThemeMode(value: String): ThemeMode = runCatching { ThemeMode.valueOf(value) }.getOrDefault(ThemeMode.System)
 
         private fun <T> MutablePreferences.write(
@@ -68,5 +86,12 @@ class UserPreferences
             val LAST_SYNC_CURSOR = stringPreferencesKey("last_sync_cursor")
             val LAST_SEEN_WIPED_AT = stringPreferencesKey("last_seen_wiped_at")
             val THEME_MODE = stringPreferencesKey("theme_mode")
+            val UPDATE_LAST_CHECKED_AT = longPreferencesKey("update_last_checked_at")
+            val UPDATE_LAST_NOTIFIED_VERSION = stringPreferencesKey("update_last_notified_version")
         }
     }
+
+data class UpdateCheckState(
+    val lastCheckedAt: Long,
+    val lastNotifiedVersion: String?,
+)

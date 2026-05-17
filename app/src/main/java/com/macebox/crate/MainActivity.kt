@@ -9,13 +9,16 @@ import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSiz
 import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.lifecycle.lifecycleScope
 import com.macebox.crate.data.auth.SessionManager
 import com.macebox.crate.data.prefs.ThemeMode
 import com.macebox.crate.data.prefs.UserPreferences
 import com.macebox.crate.ui.navigation.CrateScaffold
 import com.macebox.crate.ui.theme.CrateTheme
 import com.macebox.crate.util.NetworkMonitor
+import com.macebox.crate.util.UpdateChecker
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -29,10 +32,14 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var networkMonitor: NetworkMonitor
 
+    @Inject
+    lateinit var updateChecker: UpdateChecker
+
     @OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        lifecycleScope.launch { updateChecker.checkOnStartup() }
         setContent {
             val prefs by userPreferences.flow.collectAsState(initial = null)
             val systemDark = isSystemInDarkTheme()

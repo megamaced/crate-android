@@ -4,6 +4,7 @@ import com.macebox.crate.BuildConfig
 import com.macebox.crate.data.api.AuthInterceptor
 import com.macebox.crate.data.api.CrateApiService
 import com.macebox.crate.data.api.CrateBinaryService
+import com.macebox.crate.data.api.GitHubReleaseService
 import com.macebox.crate.data.api.HostInterceptor
 import com.macebox.crate.data.api.OcsConverterFactory
 import dagger.Module
@@ -75,4 +76,20 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideCrateBinaryService(retrofit: Retrofit): CrateBinaryService = retrofit.create(CrateBinaryService::class.java)
+
+    @Provides
+    @Singleton
+    fun provideGitHubReleaseService(json: Json): GitHubReleaseService {
+        // Separate OkHttp/Retrofit so the GitHub call doesn't carry the
+        // user's Nextcloud cookies/headers via HostInterceptor + AuthInterceptor.
+        val client = OkHttpClient.Builder().build()
+        val contentType = "application/json".toMediaType()
+        return Retrofit
+            .Builder()
+            .baseUrl("https://api.github.com/")
+            .client(client)
+            .addConverterFactory(json.asConverterFactory(contentType))
+            .build()
+            .create(GitHubReleaseService::class.java)
+    }
 }
