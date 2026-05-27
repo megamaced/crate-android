@@ -7,6 +7,7 @@ import com.macebox.crate.domain.model.CollectionSort
 import com.macebox.crate.domain.model.MarketValue
 import com.macebox.crate.domain.model.MediaItem
 import com.macebox.crate.domain.model.MediaItemDraft
+import com.macebox.crate.domain.model.PurchasePrice
 import com.macebox.crate.domain.model.SortDirection
 import com.macebox.crate.domain.model.SortField
 import com.macebox.crate.domain.model.Status
@@ -239,6 +240,7 @@ private fun item(
     artistBio = null,
     artistMembers = emptyList(),
     marketValue = MarketValue(null, null, null, null, null),
+    purchasePrice = PurchasePrice(null, null),
     createdAt = updatedAt,
     updatedAt = updatedAt,
 )

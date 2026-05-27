@@ -8,6 +8,7 @@ import com.macebox.crate.domain.model.MarketSettings
 import com.macebox.crate.domain.model.MarketValue
 import com.macebox.crate.domain.model.MediaItem
 import com.macebox.crate.domain.model.MediaItemDraft
+import com.macebox.crate.domain.model.PurchasePrice
 import com.macebox.crate.domain.model.RefreshableMarketValues
 import com.macebox.crate.domain.model.Status
 import com.macebox.crate.domain.model.UserProfile
@@ -192,6 +193,7 @@ private fun item(id: Long) =
         artistBio = null,
         artistMembers = emptyList(),
         marketValue = MarketValue(null, null, null, null, null),
+        purchasePrice = PurchasePrice(null, null),
         createdAt = null,
         updatedAt = null,
     )
