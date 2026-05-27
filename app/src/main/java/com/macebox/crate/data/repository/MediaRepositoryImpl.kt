@@ -131,6 +131,32 @@ class MediaRepositoryImpl
                 dao.upsert(dto.toEntity(codec))
             }
 
+        override suspend fun uploadPhoto(
+            id: Long,
+            slot: Int,
+            bytes: ByteArray,
+            mimeType: String,
+        ): ApiResult<Unit> =
+            apiCall {
+                val body = bytes.toRequestBody(mimeType.toMediaType())
+                val part = MultipartBody.Part.createFormData("file", "photo", body)
+                binary.uploadPhoto(id, slot, part).close()
+                // Refresh so hasPhoto{slot} flips true and updatedAt advances
+                // (drives Coil cache-key invalidation in the UI).
+                val dto = api.getMediaItem(id)
+                dao.upsert(dto.toEntity(codec))
+            }
+
+        override suspend fun deletePhoto(
+            id: Long,
+            slot: Int,
+        ): ApiResult<Unit> =
+            apiCall {
+                binary.deletePhoto(id, slot)
+                val dto = api.getMediaItem(id)
+                dao.upsert(dto.toEntity(codec))
+            }
+
         override suspend fun syncDelta(
             updatedSince: String?,
             lastSeenWipedAt: String?,

@@ -69,6 +69,8 @@ fun MediaItemDto.toDomain(): MediaItem =
                 amount = purchasePrice,
                 currency = purchasePriceCurrency,
             ),
+        hasPhoto1 = hasPhoto1,
+        hasPhoto2 = hasPhoto2,
         createdAt = createdAt,
         updatedAt = updatedAt,
     )
@@ -108,6 +110,8 @@ fun MediaItemDto.toEntity(codec: MediaItemJsonCodec): MediaItemEntity =
         marketValueFetchedAt = marketValueFetchedAt,
         purchasePrice = purchasePrice,
         purchasePriceCurrency = purchasePriceCurrency,
+        hasPhoto1 = hasPhoto1,
+        hasPhoto2 = hasPhoto2,
         createdAt = createdAt,
         updatedAt = updatedAt,
     )
@@ -149,6 +153,8 @@ fun MediaItemEntity.toDomain(codec: MediaItemJsonCodec): MediaItem =
                 amount = purchasePrice,
                 currency = purchasePriceCurrency,
             ),
+        hasPhoto1 = hasPhoto1,
+        hasPhoto2 = hasPhoto2,
         createdAt = createdAt,
         updatedAt = updatedAt,
     )

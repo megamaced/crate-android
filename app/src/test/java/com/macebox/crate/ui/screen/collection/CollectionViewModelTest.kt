@@ -201,6 +201,18 @@ private class FakeMediaRepository : MediaRepository {
 
     override suspend fun deleteArtwork(id: Long): ApiResult<Unit> = ApiResult.Success(Unit)
 
+    override suspend fun uploadPhoto(
+        id: Long,
+        slot: Int,
+        bytes: ByteArray,
+        mimeType: String,
+    ): ApiResult<Unit> = ApiResult.Success(Unit)
+
+    override suspend fun deletePhoto(
+        id: Long,
+        slot: Int,
+    ): ApiResult<Unit> = ApiResult.Success(Unit)
+
     override suspend fun syncDelta(
         updatedSince: String?,
         lastSeenWipedAt: String?,

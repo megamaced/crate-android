@@ -80,6 +80,17 @@ data class AddEditUiState(
     val pendingArtworkUrl: String? = null,
     /** True when the user clicked Remove on existing artwork. */
     val removeArtwork: Boolean = false,
+    /**
+     * Extra user photo slots. Each tracks a pending file (uploaded post-save)
+     * and a Remove flag that flips when the user clears an existing photo.
+     * The presence flags come from the loaded item.
+     */
+    val pendingPhoto1: PendingArtwork? = null,
+    val pendingPhoto2: PendingArtwork? = null,
+    val removePhoto1: Boolean = false,
+    val removePhoto2: Boolean = false,
+    val hasPhoto1: Boolean = false,
+    val hasPhoto2: Boolean = false,
     val isLookingUpIsbn: Boolean = false,
     /** Held as a raw string so the user can clear it back to "" without coercion. */
     val purchasePrice: String = "",
@@ -255,6 +266,8 @@ class AddEditViewModel
                         item.purchasePrice.currency
                             ?.takeIf { c -> c.isNotBlank() }
                             ?: it.purchasePriceCurrency,
+                    hasPhoto1 = item.hasPhoto1,
+                    hasPhoto2 = item.hasPhoto2,
                 )
             }
         }
@@ -320,6 +333,28 @@ class AddEditViewModel
                     artworkPath = null,
                     removeArtwork = true,
                 )
+            }
+
+        fun onPhotoPicked(
+            slot: Int,
+            bytes: ByteArray,
+            mimeType: String,
+        ) = update {
+            val pending = PendingArtwork(bytes, mimeType)
+            when (slot) {
+                1 -> copy(pendingPhoto1 = pending, removePhoto1 = false)
+                2 -> copy(pendingPhoto2 = pending, removePhoto2 = false)
+                else -> this
+            }
+        }
+
+        fun onRemovePhoto(slot: Int) =
+            update {
+                when (slot) {
+                    1 -> copy(pendingPhoto1 = null, removePhoto1 = true)
+                    2 -> copy(pendingPhoto2 = null, removePhoto2 = true)
+                    else -> this
+                }
             }
 
         fun applyExternalResult(result: ExternalSearchResult) {
@@ -419,10 +454,27 @@ class AddEditViewModel
                     mediaRepository.deleteArtwork(saved.id)
                 }
             }
+            // Same logic applied to each photo slot. Independent of artwork
+            // (different endpoint, different appdata folder server-side).
+            applyPhotoSlot(saved.id, slot = 1, beforeState.pendingPhoto1, beforeState.removePhoto1, beforeState.isEditing)
+            applyPhotoSlot(saved.id, slot = 2, beforeState.pendingPhoto2, beforeState.removePhoto2, beforeState.isEditing)
             if (beforeState.autoEnrich) {
                 enrichmentRepository.enrich(saved.id)
             }
             _uiState.update { it.copy(isSaving = false, savedItemId = saved.id) }
+        }
+
+        private suspend fun applyPhotoSlot(
+            itemId: Long,
+            slot: Int,
+            pending: PendingArtwork?,
+            remove: Boolean,
+            isEditing: Boolean,
+        ) {
+            when {
+                pending != null -> mediaRepository.uploadPhoto(itemId, slot, pending.bytes, pending.mimeType)
+                remove && isEditing -> mediaRepository.deletePhoto(itemId, slot)
+            }
         }
 
         private fun setError(message: String) {

@@ -177,6 +177,23 @@ private class NoopBinaryService : CrateBinaryService {
 
     override suspend fun deleteArtwork(itemId: Long) = error("not used")
 
+    override suspend fun getPhoto(
+        itemId: Long,
+        slot: Int,
+        size: String?,
+    ) = error("not used")
+
+    override suspend fun uploadPhoto(
+        itemId: Long,
+        slot: Int,
+        file: okhttp3.MultipartBody.Part,
+    ) = error("not used")
+
+    override suspend fun deletePhoto(
+        itemId: Long,
+        slot: Int,
+    ) = error("not used")
+
     override suspend fun export(
         format: String,
         scope: String,

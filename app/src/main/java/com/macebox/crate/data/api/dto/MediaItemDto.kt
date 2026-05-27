@@ -42,6 +42,8 @@ data class MediaItemDto(
     val marketValueFetchedAt: String? = null,
     val purchasePrice: Double? = null,
     val purchasePriceCurrency: String? = null,
+    val hasPhoto1: Boolean = false,
+    val hasPhoto2: Boolean = false,
     val createdAt: String? = null,
     val updatedAt: String? = null,
 )

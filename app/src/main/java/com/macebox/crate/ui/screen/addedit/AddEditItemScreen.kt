@@ -62,6 +62,7 @@ import com.macebox.crate.domain.model.Status
 import com.macebox.crate.ui.components.ArtworkImage
 import com.macebox.crate.ui.components.ArtworkSize
 import com.macebox.crate.ui.components.LoadingState
+import com.macebox.crate.ui.components.PhotoImage
 import com.macebox.crate.ui.navigation.CategorySegmentedRow
 import kotlinx.serialization.json.Json
 
@@ -106,6 +107,18 @@ fun AddEditItemScreen(
             uri?.let { handlePickedUri(context, it, viewModel) }
         }
 
+    // Photo pickers — one per slot so the launcher knows which slot to set
+    // the bytes on. Registering two launchers is cheaper than juggling a
+    // "pendingSlot" state variable across recomposition.
+    val photo1Picker =
+        rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+            uri?.let { handlePickedPhoto(context, it, slot = 1, viewModel) }
+        }
+    val photo2Picker =
+        rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+            uri?.let { handlePickedPhoto(context, it, slot = 2, viewModel) }
+        }
+
     val titleLabels = remember(state.category) { CategoryLabels.forCategory(state.category) }
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -141,6 +154,12 @@ fun AddEditItemScreen(
                 state = state,
                 viewModel = viewModel,
                 onPickArtwork = { artworkPicker.launch("image/*") },
+                onPickPhoto = { slot ->
+                    when (slot) {
+                        1 -> photo1Picker.launch("image/*")
+                        2 -> photo2Picker.launch("image/*")
+                    }
+                },
                 onOpenSearch = { searchSheetOpen = true },
                 onScan = { onScan(state.category.apiValue) },
                 modifier = Modifier
@@ -166,6 +185,7 @@ private fun FormContent(
     state: AddEditUiState,
     viewModel: AddEditViewModel,
     onPickArtwork: () -> Unit,
+    onPickPhoto: (Int) -> Unit,
     onOpenSearch: () -> Unit,
     onScan: () -> Unit,
     modifier: Modifier = Modifier,
@@ -319,6 +339,15 @@ private fun FormContent(
             currencyOptions = state.availableCurrencies,
             onPriceChange = viewModel::onPurchasePriceChange,
             onCurrencyChange = viewModel::onPurchasePriceCurrencyChange,
+        )
+
+        // Extra photo slots (disc shots, receipts, sleevenotes etc.). Each
+        // slot tracks its own pending file + remove flag; uploads happen
+        // after the main save resolves so the new item ID is known.
+        PhotoSlotsRow(
+            state = state,
+            onPickPhoto = onPickPhoto,
+            onRemovePhoto = viewModel::onRemovePhoto,
         )
 
         OutlinedTextField(
@@ -588,6 +617,126 @@ private fun handlePickedUri(
         val bytes = stream.readBytes()
         if (bytes.isNotEmpty()) {
             viewModel.onArtworkPicked(bytes, mime)
+        }
+    }
+}
+
+private fun handlePickedPhoto(
+    context: Context,
+    uri: Uri,
+    slot: Int,
+    viewModel: AddEditViewModel,
+) {
+    val contentResolver = context.contentResolver
+    val mime = contentResolver.getType(uri) ?: "image/*"
+    contentResolver.openInputStream(uri)?.use { stream ->
+        val bytes = stream.readBytes()
+        if (bytes.isNotEmpty()) {
+            viewModel.onPhotoPicked(slot, bytes, mime)
+        }
+    }
+}
+
+@Composable
+private fun PhotoSlotsRow(
+    state: AddEditUiState,
+    onPickPhoto: (Int) -> Unit,
+    onRemovePhoto: (Int) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(
+            text = "Additional photos",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            PhotoSlotPreview(
+                slot = 1,
+                pendingBytes = state.pendingPhoto1?.bytes,
+                hasExisting = state.hasPhoto1 && !state.removePhoto1,
+                isEditing = state.isEditing,
+                editingItemId = state.editingItemId,
+                updatedAt = state.itemUpdatedAt,
+                onPick = { onPickPhoto(1) },
+                onRemove = { onRemovePhoto(1) },
+                modifier = Modifier.weight(1f),
+            )
+            PhotoSlotPreview(
+                slot = 2,
+                pendingBytes = state.pendingPhoto2?.bytes,
+                hasExisting = state.hasPhoto2 && !state.removePhoto2,
+                isEditing = state.isEditing,
+                editingItemId = state.editingItemId,
+                updatedAt = state.itemUpdatedAt,
+                onPick = { onPickPhoto(2) },
+                onRemove = { onRemovePhoto(2) },
+                modifier = Modifier.weight(1f),
+            )
+        }
+    }
+}
+
+@Composable
+private fun PhotoSlotPreview(
+    slot: Int,
+    pendingBytes: ByteArray?,
+    hasExisting: Boolean,
+    isEditing: Boolean,
+    editingItemId: Long?,
+    updatedAt: String?,
+    onPick: () -> Unit,
+    onRemove: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val shape = RoundedCornerShape(12.dp)
+    val hasPhoto = pendingBytes != null || hasExisting
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .size(96.dp)
+                .clip(shape)
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .clickable(onClick = onPick),
+            contentAlignment = Alignment.Center,
+        ) {
+            when {
+                pendingBytes != null ->
+                    coil3.compose.AsyncImage(
+                        model = pendingBytes,
+                        contentDescription = "Photo $slot",
+                        contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                hasExisting && isEditing && editingItemId != null ->
+                    PhotoImage(
+                        itemId = editingItemId,
+                        slot = slot,
+                        contentDescription = "Photo $slot",
+                        updatedAt = updatedAt,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                else ->
+                    Text(
+                        text = "Slot $slot",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+            }
+        }
+        OutlinedButton(onClick = onPick, modifier = Modifier.fillMaxWidth()) {
+            Text(if (hasPhoto) "Replace" else "Upload")
+        }
+        if (hasPhoto) {
+            OutlinedButton(onClick = onRemove, modifier = Modifier.fillMaxWidth()) {
+                Text("Remove")
+            }
         }
     }
 }

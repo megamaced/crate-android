@@ -17,7 +17,7 @@ import com.macebox.crate.data.db.entity.PlaylistItemCrossRef
         PlaylistEntity::class,
         PlaylistItemCrossRef::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = true,
 )
 abstract class CrateDatabase : RoomDatabase() {
@@ -47,6 +47,19 @@ abstract class CrateDatabase : RoomDatabase() {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE media_items ADD COLUMN purchasePrice REAL")
                 db.execSQL("ALTER TABLE media_items ADD COLUMN purchasePriceCurrency TEXT")
+            }
+        }
+
+        /**
+         * Mirrors the Nextcloud-side Version0005 migration: two extra
+         * user-photo presence flags. Stored as INTEGER (0/1) per Room
+         * convention for Boolean columns; default 0 so existing rows
+         * report no photos until the user uploads one.
+         */
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE media_items ADD COLUMN hasPhoto1 INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE media_items ADD COLUMN hasPhoto2 INTEGER NOT NULL DEFAULT 0")
             }
         }
     }

@@ -36,6 +36,28 @@ interface CrateBinaryService {
     )
 
     @Streaming
+    @GET("apps/crate/photo/{itemId}/{slot}")
+    suspend fun getPhoto(
+        @Path("itemId") itemId: Long,
+        @Path("slot") slot: Int,
+        @Query("size") size: String? = null,
+    ): ResponseBody
+
+    @Multipart
+    @POST("apps/crate/photo/{itemId}/{slot}")
+    suspend fun uploadPhoto(
+        @Path("itemId") itemId: Long,
+        @Path("slot") slot: Int,
+        @Part file: MultipartBody.Part,
+    ): ResponseBody
+
+    @DELETE("apps/crate/photo/{itemId}/{slot}")
+    suspend fun deletePhoto(
+        @Path("itemId") itemId: Long,
+        @Path("slot") slot: Int,
+    )
+
+    @Streaming
     @GET("apps/crate/export")
     suspend fun export(
         @Query("format") format: String = "csv",

@@ -85,6 +85,8 @@ data class MediaItem(
     val artistMembers: List<ArtistMember>,
     val marketValue: MarketValue,
     val purchasePrice: PurchasePrice,
+    val hasPhoto1: Boolean = false,
+    val hasPhoto2: Boolean = false,
     val createdAt: String?,
     val updatedAt: String?,
 )

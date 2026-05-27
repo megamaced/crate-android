@@ -49,6 +49,23 @@ interface MediaRepository {
     suspend fun deleteArtwork(id: Long): ApiResult<Unit>
 
     /**
+     * Upload a user-supplied photo to one of the two extra slots. Distinct
+     * from artwork — the catalogue cover is enrichment-sourced, while these
+     * are always user-uploaded (disc shots, receipts, sleevenotes etc.).
+     */
+    suspend fun uploadPhoto(
+        id: Long,
+        slot: Int,
+        bytes: ByteArray,
+        mimeType: String,
+    ): ApiResult<Unit>
+
+    suspend fun deletePhoto(
+        id: Long,
+        slot: Int,
+    ): ApiResult<Unit>
+
+    /**
      * Pages through `GET /api/v1/media?updatedSince={cursor}` writing every
      * row into Room.
      *

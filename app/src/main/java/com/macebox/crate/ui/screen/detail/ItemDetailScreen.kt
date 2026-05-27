@@ -1,5 +1,7 @@
 package com.macebox.crate.ui.screen.detail
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -51,13 +53,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.macebox.crate.domain.model.Category
 import com.macebox.crate.domain.model.MediaItem
 import com.macebox.crate.ui.components.ArtworkImage
 import com.macebox.crate.ui.components.ArtworkSize
 import com.macebox.crate.ui.components.LoadingState
+import com.macebox.crate.ui.components.PhotoImage
 import com.macebox.crate.ui.screen.share.ShareSheet
 import com.macebox.crate.ui.screen.share.ShareTarget
 
@@ -301,6 +306,10 @@ private fun ItemDetailContent(
 
             if (item.purchasePrice.isPresent) {
                 PurchasePriceRow(item)
+            }
+
+            if (item.hasPhoto1 || item.hasPhoto2) {
+                PhotoGallery(item)
             }
 
             if (item.tracklist.isNotEmpty()) {
@@ -559,3 +568,70 @@ private fun PurchasePriceRow(item: MediaItem) {
 }
 
 private val GainGreen = Color(0xFF4ADE80)
+
+/**
+ * Two-up photo strip below the metadata. Tapping a thumbnail opens a
+ * full-size viewer dialog. Photos are rendered via [PhotoImage] so they
+ * go through the same Coil cache + auth pipeline as artwork.
+ */
+@Composable
+private fun PhotoGallery(item: MediaItem) {
+    var fullSlot by remember { mutableStateOf<Int?>(null) }
+    Column(
+        modifier = Modifier.padding(top = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        SectionHeader("Photos")
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            if (item.hasPhoto1) {
+                PhotoThumb(item = item, slot = 1, onClick = { fullSlot = 1 })
+            }
+            if (item.hasPhoto2) {
+                PhotoThumb(item = item, slot = 2, onClick = { fullSlot = 2 })
+            }
+        }
+    }
+    val visibleSlot = fullSlot
+    if (visibleSlot != null) {
+        Dialog(onDismissRequest = { fullSlot = null }) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.92f))
+                    .clickable { fullSlot = null },
+                contentAlignment = Alignment.Center,
+            ) {
+                PhotoImage(
+                    itemId = item.id,
+                    slot = visibleSlot,
+                    contentDescription = "Photo $visibleSlot",
+                    size = ArtworkSize.Full,
+                    updatedAt = item.updatedAt,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier
+                        .padding(16.dp)
+                        .fillMaxWidth(),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PhotoThumb(
+    item: MediaItem,
+    slot: Int,
+    onClick: () -> Unit,
+) {
+    PhotoImage(
+        itemId = item.id,
+        slot = slot,
+        contentDescription = "Photo $slot",
+        size = ArtworkSize.Thumb,
+        updatedAt = item.updatedAt,
+        modifier = Modifier
+            .size(120.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick),
+    )
+}
