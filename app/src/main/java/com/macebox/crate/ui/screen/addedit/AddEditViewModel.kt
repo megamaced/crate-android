@@ -28,6 +28,29 @@ import javax.inject.Inject
 private val CURRENT_YEAR: Int = Calendar.getInstance().get(Calendar.YEAR)
 private const val MIN_YEAR = 1800
 
+/** Currency the price selector defaults to until the user's profile loads. */
+const val DEFAULT_CURRENCY = "GBP"
+
+/**
+ * Static fallback for the currency picker; mirrors MarketValueService::
+ * SUPPORTED_CURRENCIES on the server. Used until `/settings/currencies`
+ * responds, and as a safety net if that request fails.
+ */
+val DEFAULT_CURRENCIES = listOf(
+    "GBP",
+    "USD",
+    "EUR",
+    "CAD",
+    "AUD",
+    "JPY",
+    "CHF",
+    "MXN",
+    "BRL",
+    "NZD",
+    "SEK",
+    "ZAR",
+)
+
 data class AddEditUiState(
     val isEditing: Boolean = false,
     val editingItemId: Long? = null,
@@ -58,6 +81,11 @@ data class AddEditUiState(
     /** True when the user clicked Remove on existing artwork. */
     val removeArtwork: Boolean = false,
     val isLookingUpIsbn: Boolean = false,
+    /** Held as a raw string so the user can clear it back to "" without coercion. */
+    val purchasePrice: String = "",
+    val purchasePriceCurrency: String = DEFAULT_CURRENCY,
+    /** Currency allowlist served from /settings/currencies; falls back to [DEFAULT_CURRENCIES]. */
+    val availableCurrencies: List<String> = DEFAULT_CURRENCIES,
     val errorMessage: String? = null,
     val savedItemId: Long? = null,
 ) {
@@ -114,9 +142,25 @@ class AddEditViewModel
 
         init {
             loadProfileDefaults()
+            loadCurrencyOptions()
             if (itemId != null) loadExisting(itemId)
             applyInitialPrefill(savedStateHandle.get<String>("prefillJson"))
             observeScanResults()
+        }
+
+        /**
+         * Pull the supported-currency allowlist from the server so the
+         * picker stays in sync with MarketValueService::SUPPORTED_CURRENCIES.
+         * Failure leaves the static [DEFAULT_CURRENCIES] in place; the form
+         * stays usable.
+         */
+        private fun loadCurrencyOptions() {
+            viewModelScope.launch {
+                val result = apiCall { api.getCurrencies() }
+                if (result is ApiResult.Success && result.value.isNotEmpty()) {
+                    _uiState.update { it.copy(availableCurrencies = result.value) }
+                }
+            }
         }
 
         private fun applyInitialPrefill(prefillJson: String?) {
@@ -150,8 +194,18 @@ class AddEditViewModel
         }
 
         private fun applyProfile(profile: UserProfile) {
+            val currency = profile.marketCurrency?.takeIf { it.isNotBlank() } ?: DEFAULT_CURRENCY
             _uiState.update {
-                if (it.isEditing) it else it.copy(autoEnrich = profile.autoEnrichOnClick)
+                if (it.isEditing) {
+                    it
+                } else {
+                    it.copy(
+                        autoEnrich = profile.autoEnrichOnClick,
+                        // Pre-fill the currency on new items, but only if the
+                        // user hasn't already typed one.
+                        purchasePriceCurrency = if (it.purchasePriceCurrency == DEFAULT_CURRENCY) currency else it.purchasePriceCurrency,
+                    )
+                }
             }
         }
 
@@ -193,6 +247,14 @@ class AddEditViewModel
                     status = item.status,
                     category = item.category,
                     itemUpdatedAt = item.updatedAt,
+                    purchasePrice =
+                        item.purchasePrice.amount
+                            ?.let(::formatPriceForInput)
+                            .orEmpty(),
+                    purchasePriceCurrency =
+                        item.purchasePrice.currency
+                            ?.takeIf { c -> c.isNotBlank() }
+                            ?: it.purchasePriceCurrency,
                 )
             }
         }
@@ -221,6 +283,21 @@ class AddEditViewModel
         fun onStatusChange(value: Status) = update { copy(status = value) }
 
         fun onAutoEnrichChange(value: Boolean) = update { copy(autoEnrich = value) }
+
+        /**
+         * Accepts any of: "", "12", "12.50", "12,50". Strips currency symbols
+         * and thousand separators that some keyboards inject. Coerces the
+         * decimal separator to a dot so [String.toDoubleOrNull] can parse it.
+         */
+        fun onPurchasePriceChange(value: String) =
+            update {
+                val cleaned = value
+                    .replace(',', '.')
+                    .filter { ch -> ch.isDigit() || ch == '.' }
+                copy(purchasePrice = cleaned)
+            }
+
+        fun onPurchasePriceCurrencyChange(value: String) = update { copy(purchasePriceCurrency = value) }
 
         fun onArtworkPicked(
             bytes: ByteArray,
@@ -357,8 +434,9 @@ class AddEditViewModel
         }
     }
 
-private fun AddEditUiState.toDraft(): MediaItemDraft =
-    MediaItemDraft(
+private fun AddEditUiState.toDraft(): MediaItemDraft {
+    val price = purchasePrice.trim().takeIf { it.isNotEmpty() }?.toDoubleOrNull()
+    return MediaItemDraft(
         title = title.trim(),
         artist = artist.trim(),
         format = format.trim(),
@@ -371,4 +449,17 @@ private fun AddEditUiState.toDraft(): MediaItemDraft =
         artworkPath = artworkPath,
         label = label.trim().takeIf { it.isNotBlank() },
         country = country.trim().takeIf { it.isNotBlank() },
+        purchasePrice = price,
+        purchasePriceCurrency = if (price != null) purchasePriceCurrency else null,
     )
+}
+
+/**
+ * Render a stored purchase price for the input box without losing
+ * precision: integers as "12", fractions as "12.5". Matches the way
+ * [String.toDoubleOrNull] parses what the user typed in the first place.
+ */
+private fun formatPriceForInput(value: Double): String {
+    if (value == value.toLong().toDouble()) return value.toLong().toString()
+    return value.toString()
+}

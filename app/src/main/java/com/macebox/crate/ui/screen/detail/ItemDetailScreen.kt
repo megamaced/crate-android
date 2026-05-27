@@ -50,6 +50,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.macebox.crate.domain.model.Category
@@ -298,6 +299,10 @@ private fun ItemDetailContent(
                 MarketValueCard(item)
             }
 
+            if (item.purchasePrice.isPresent) {
+                PurchasePriceRow(item)
+            }
+
             if (item.tracklist.isNotEmpty()) {
                 SectionHeader("Tracklist")
                 item.tracklist.forEach { track ->
@@ -490,3 +495,67 @@ private fun formatMoney(
     }
     return "$symbol%.2f".format(value)
 }
+
+/**
+ * Renders the user's recorded purchase price with an optional gain/loss
+ * delta against the current market value. The delta is only shown when
+ * both prices share a currency — cross-currency comparisons would require
+ * FX conversion, deliberately out of scope for Phase 13.
+ */
+@Composable
+private fun PurchasePriceRow(item: MediaItem) {
+    val price = item.purchasePrice.amount ?: return
+    val priceCurrency = item.purchasePrice.currency
+    val market = item.marketValue.main
+    val marketCurrency = item.marketValue.currency
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text(
+            text = "Original price",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.width(120.dp),
+        )
+        Text(
+            text = formatMoney(price, priceCurrency),
+            style = MaterialTheme.typography.titleMedium,
+        )
+        when {
+            market != null &&
+                priceCurrency != null &&
+                marketCurrency != null &&
+                priceCurrency.equals(marketCurrency, ignoreCase = true) -> {
+                val diff = market - price
+                val percent =
+                    if (price > 0.0) {
+                        val pct = diff / price * 100
+                        if (pct >= 0) pct.toLong() else -pct.toLong()
+                    } else {
+                        null
+                    }
+                val direction = if (diff >= 0) "+" else "−"
+                val tint = if (diff >= 0) GainGreen else MaterialTheme.colorScheme.error
+                Text(
+                    text = "$direction${formatMoney(kotlin.math.abs(diff), priceCurrency)}" +
+                        (percent?.let { " ($direction$it%)" } ?: ""),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = tint,
+                )
+            }
+            market != null -> {
+                Text(
+                    text = "currencies differ",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+private val GainGreen = Color(0xFF4ADE80)

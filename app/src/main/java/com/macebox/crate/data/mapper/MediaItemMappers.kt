@@ -10,6 +10,7 @@ import com.macebox.crate.domain.model.Category
 import com.macebox.crate.domain.model.MarketValue
 import com.macebox.crate.domain.model.MediaItem
 import com.macebox.crate.domain.model.MediaItemDraft
+import com.macebox.crate.domain.model.PurchasePrice
 import com.macebox.crate.domain.model.Status
 import com.macebox.crate.domain.model.Track
 import kotlinx.serialization.json.Json
@@ -63,6 +64,11 @@ fun MediaItemDto.toDomain(): MediaItem =
                 new = marketValueNew,
                 fetchedAt = marketValueFetchedAt,
             ),
+        purchasePrice =
+            PurchasePrice(
+                amount = purchasePrice,
+                currency = purchasePriceCurrency,
+            ),
         createdAt = createdAt,
         updatedAt = updatedAt,
     )
@@ -100,6 +106,8 @@ fun MediaItemDto.toEntity(codec: MediaItemJsonCodec): MediaItemEntity =
         marketValueNew = marketValueNew,
         marketValueCurrency = marketValueCurrency,
         marketValueFetchedAt = marketValueFetchedAt,
+        purchasePrice = purchasePrice,
+        purchasePriceCurrency = purchasePriceCurrency,
         createdAt = createdAt,
         updatedAt = updatedAt,
     )
@@ -136,6 +144,11 @@ fun MediaItemEntity.toDomain(codec: MediaItemJsonCodec): MediaItem =
                 new = marketValueNew,
                 fetchedAt = marketValueFetchedAt,
             ),
+        purchasePrice =
+            PurchasePrice(
+                amount = purchasePrice,
+                currency = purchasePriceCurrency,
+            ),
         createdAt = createdAt,
         updatedAt = updatedAt,
     )
@@ -156,4 +169,6 @@ fun MediaItemDraft.toRequest(): CreateMediaItemRequest =
         label = label,
         country = country,
         category = category?.apiValue,
+        purchasePrice = purchasePrice,
+        purchasePriceCurrency = purchasePriceCurrency,
     )

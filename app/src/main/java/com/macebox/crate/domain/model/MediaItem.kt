@@ -49,6 +49,19 @@ data class MarketValue(
     val isPresent: Boolean get() = main != null || loose != null || new != null
 }
 
+/**
+ * What the user paid for an item, separate from any market valuation.
+ * Both fields are null when the user hasn't recorded a price; once set,
+ * the currency is guaranteed to be on the shared supported-currencies
+ * allowlist (validated server-side).
+ */
+data class PurchasePrice(
+    val amount: Double?,
+    val currency: String?,
+) {
+    val isPresent: Boolean get() = amount != null
+}
+
 data class MediaItem(
     val id: Long,
     val userId: String?,
@@ -71,6 +84,7 @@ data class MediaItem(
     val artistBio: String?,
     val artistMembers: List<ArtistMember>,
     val marketValue: MarketValue,
+    val purchasePrice: PurchasePrice,
     val createdAt: String?,
     val updatedAt: String?,
 )
@@ -93,4 +107,6 @@ data class MediaItemDraft(
     val artworkPath: String? = null,
     val label: String? = null,
     val country: String? = null,
+    val purchasePrice: Double? = null,
+    val purchasePriceCurrency: String? = null,
 )

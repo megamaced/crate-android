@@ -24,6 +24,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -310,6 +312,15 @@ private fun FormContent(
             label = { Text("Country") },
             singleLine = true,
         )
+        // Original price paid (any category)
+        PurchasePriceRow(
+            price = state.purchasePrice,
+            currency = state.purchasePriceCurrency,
+            currencyOptions = state.availableCurrencies,
+            onPriceChange = viewModel::onPurchasePriceChange,
+            onCurrencyChange = viewModel::onPurchasePriceCurrencyChange,
+        )
+
         OutlinedTextField(
             value = state.notes,
             onValueChange = viewModel::onNotesChange,
@@ -318,6 +329,88 @@ private fun FormContent(
             minLines = 3,
             maxLines = 8,
         )
+    }
+}
+
+@Composable
+private fun PurchasePriceRow(
+    price: String,
+    currency: String,
+    currencyOptions: List<String>,
+    onPriceChange: (String) -> Unit,
+    onCurrencyChange: (String) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        OutlinedTextField(
+            value = price,
+            onValueChange = onPriceChange,
+            modifier = Modifier.weight(2f),
+            label = { Text("Original price") },
+            placeholder = { Text("e.g. 24.99") },
+            singleLine = true,
+            keyboardOptions =
+                KeyboardOptions(
+                    keyboardType = KeyboardType.Decimal,
+                    imeAction = ImeAction.Next,
+                ),
+        )
+        CurrencyDropdown(
+            current = currency,
+            enabled = price.isNotBlank(),
+            options = currencyOptions,
+            onPick = onCurrencyChange,
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
+
+@Composable
+private fun CurrencyDropdown(
+    current: String,
+    enabled: Boolean,
+    options: List<String>,
+    onPick: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Box(modifier = modifier) {
+        OutlinedTextField(
+            value = current,
+            onValueChange = {},
+            readOnly = true,
+            enabled = false,
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text("Currency") },
+            singleLine = true,
+            colors = OutlinedTextFieldDefaults.colors(
+                disabledTextColor =
+                    if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                disabledBorderColor = MaterialTheme.colorScheme.outline,
+                disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            ),
+        )
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .clickable(enabled = enabled) { expanded = true },
+        )
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+        ) {
+            options.forEach { code ->
+                DropdownMenuItem(
+                    text = { Text(code) },
+                    onClick = {
+                        onPick(code)
+                        expanded = false
+                    },
+                )
+            }
+        }
     }
 }
 

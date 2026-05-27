@@ -40,6 +40,8 @@ data class MediaItemEntity(
     val marketValueNew: Double? = null,
     val marketValueCurrency: String? = null,
     val marketValueFetchedAt: String? = null,
+    val purchasePrice: Double? = null,
+    val purchasePriceCurrency: String? = null,
     val createdAt: String? = null,
     val updatedAt: String? = null,
 )

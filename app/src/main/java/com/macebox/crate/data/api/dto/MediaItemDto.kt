@@ -40,6 +40,8 @@ data class MediaItemDto(
     val marketValueNew: Double? = null,
     val marketValueCurrency: String? = null,
     val marketValueFetchedAt: String? = null,
+    val purchasePrice: Double? = null,
+    val purchasePriceCurrency: String? = null,
     val createdAt: String? = null,
     val updatedAt: String? = null,
 )
@@ -127,4 +129,6 @@ data class CreateMediaItemRequest(
     val label: String? = null,
     val country: String? = null,
     val category: String? = null,
+    val purchasePrice: Double? = null,
+    val purchasePriceCurrency: String? = null,
 )
