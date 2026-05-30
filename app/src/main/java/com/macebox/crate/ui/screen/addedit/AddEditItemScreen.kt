@@ -53,10 +53,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import com.macebox.crate.R
 import com.macebox.crate.domain.model.Category
 import com.macebox.crate.domain.model.Status
 import com.macebox.crate.ui.components.ArtworkImage
@@ -377,7 +379,7 @@ private fun PurchasePriceRow(
             value = price,
             onValueChange = onPriceChange,
             modifier = Modifier.weight(2f),
-            label = { Text("Original price") },
+            label = { Text(stringResource(R.string.purchase_price_label)) },
             placeholder = { Text("e.g. 24.99") },
             singleLine = true,
             keyboardOptions =
@@ -412,7 +414,7 @@ private fun CurrencyDropdown(
             readOnly = true,
             enabled = false,
             modifier = Modifier.fillMaxWidth(),
-            label = { Text("Currency") },
+            label = { Text(stringResource(R.string.purchase_currency_label)) },
             singleLine = true,
             colors = OutlinedTextFieldDefaults.colors(
                 disabledTextColor =
@@ -645,7 +647,7 @@ private fun PhotoSlotsRow(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(
-            text = "Additional photos",
+            text = stringResource(R.string.additional_photos_section),
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -724,7 +726,7 @@ private fun PhotoSlotPreview(
                     )
                 else ->
                     Text(
-                        text = "Slot $slot",
+                        text = stringResource(R.string.photo_slot_label, slot),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

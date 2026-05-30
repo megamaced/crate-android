@@ -9,7 +9,11 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.macebox.crate.R
 
 data class FormatBucket(
     val format: String,
@@ -32,16 +36,30 @@ fun FormatFilterChips(
             .padding(horizontal = 16.dp, vertical = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
+        val allLabel = stringResource(R.string.collection_filter_all_chip, totalCount)
+        val allA11y = stringResource(R.string.collection_chip_all_a11y, totalCount)
         FilterChip(
             selected = selected.isEmpty(),
             onClick = onClear,
-            label = { Text("All ($totalCount)") },
+            label = { Text(allLabel) },
+            modifier = Modifier.semantics { contentDescription = allA11y },
         )
         formats.forEach { bucket ->
+            val label = stringResource(
+                R.string.collection_filter_format_chip,
+                bucket.format,
+                bucket.count,
+            )
+            val a11y = stringResource(
+                R.string.collection_chip_format_a11y,
+                bucket.format,
+                bucket.count,
+            )
             FilterChip(
                 selected = bucket.format in selected,
                 onClick = { onToggle(bucket.format) },
-                label = { Text("${bucket.format} (${bucket.count})") },
+                label = { Text(label) },
+                modifier = Modifier.semantics { contentDescription = a11y },
             )
         }
     }

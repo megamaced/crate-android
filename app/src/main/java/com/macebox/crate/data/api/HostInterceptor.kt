@@ -8,17 +8,18 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Rewrites outgoing requests addressed to the Retrofit placeholder host so
- * they actually hit the user's Nextcloud instance. Retrofit needs a static
- * base URL at construction time, so we point it at [PLACEHOLDER_HOST] and
- * patch the real host on every request.
- *
- * Requests addressed to any other host — most notably third-party image URLs
- * that Coil fetches directly via the shared OkHttp client (Discogs thumbnails,
- * TMDB posters, RAWG and ComicVine artwork, Open Library covers) — pass
- * through unchanged.
+ * Retrofit needs a static base URL at construction time, so the client is
+ * pointed at [PlaceholderHost.HOST] and every outgoing request matching that
+ * host is rewritten to the user's real Nextcloud instance by
+ * [HostInterceptor]. Image URLs (Coil → third-party CDNs) and any other
+ * absolute URLs pass through unchanged.
  */
-const val PLACEHOLDER_HOST = "placeholder.invalid"
+object PlaceholderHost {
+    const val HOST = "placeholder.invalid"
+    const val BASE_URL = "https://$HOST/"
+
+    fun urlPath(path: String): String = "$BASE_URL${path.trimStart('/')}"
+}
 
 @Singleton
 class HostInterceptor
@@ -28,7 +29,7 @@ class HostInterceptor
     ) : Interceptor {
         override fun intercept(chain: Interceptor.Chain): Response {
             val original = chain.request()
-            if (original.url.host != PLACEHOLDER_HOST) {
+            if (original.url.host != PlaceholderHost.HOST) {
                 return chain.proceed(original)
             }
             val credentials = tokenStore.getCredentials() ?: return chain.proceed(original)

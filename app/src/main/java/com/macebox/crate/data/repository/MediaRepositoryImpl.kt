@@ -16,6 +16,7 @@ import com.macebox.crate.domain.model.Status
 import com.macebox.crate.domain.repository.MediaRepository
 import com.macebox.crate.domain.repository.MediaRepository.RefreshResult
 import com.macebox.crate.domain.repository.MediaRepository.SyncResult
+import com.macebox.crate.util.ExifStrip
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import okhttp3.MediaType.Companion.toMediaType
@@ -116,7 +117,11 @@ class MediaRepositoryImpl
             mimeType: String,
         ): ApiResult<Unit> =
             apiCall {
-                val body = bytes.toRequestBody(mimeType.toMediaType())
+                // Strip EXIF/GPS client-side before sending. The server also
+                // re-encodes through GD, but stripping here protects the bytes
+                // in transit (logs, proxies) and shields users on older servers.
+                val sanitised = ExifStrip.strip(bytes, mimeType)
+                val body = sanitised.toRequestBody(mimeType.toMediaType())
                 val part = MultipartBody.Part.createFormData("file", "artwork", body)
                 binary.uploadArtwork(id, part).close()
                 // Refresh so updatedAt advances and Coil cache key changes.
@@ -138,7 +143,11 @@ class MediaRepositoryImpl
             mimeType: String,
         ): ApiResult<Unit> =
             apiCall {
-                val body = bytes.toRequestBody(mimeType.toMediaType())
+                // Strip EXIF/GPS client-side. Photos are the "receipts and
+                // personal photos" slot — phone-gallery uploads commonly
+                // carry GPS, timestamps, camera serials.
+                val sanitised = ExifStrip.strip(bytes, mimeType)
+                val body = sanitised.toRequestBody(mimeType.toMediaType())
                 val part = MultipartBody.Part.createFormData("file", "photo", body)
                 binary.uploadPhoto(id, slot, part).close()
                 // Refresh so hasPhoto{slot} flips true and updatedAt advances

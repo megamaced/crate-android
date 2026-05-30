@@ -40,9 +40,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import com.macebox.crate.R
 import com.macebox.crate.data.prefs.CollectionViewMode
 import com.macebox.crate.domain.model.Category
 import com.macebox.crate.domain.model.MarketValue
@@ -145,12 +151,12 @@ private fun ViewModeToggle(
     onSelected: (CollectionViewMode) -> Unit,
 ) {
     val target = if (current == CollectionViewMode.Card) CollectionViewMode.List else CollectionViewMode.Card
-    val (icon, label) = when (current) {
-        CollectionViewMode.Card -> Icons.AutoMirrored.Outlined.ViewList to "Switch to list view"
-        CollectionViewMode.List -> Icons.Outlined.GridView to "Switch to card view"
+    val (icon, labelRes) = when (current) {
+        CollectionViewMode.Card -> Icons.AutoMirrored.Outlined.ViewList to R.string.collection_view_switch_to_list
+        CollectionViewMode.List -> Icons.Outlined.GridView to R.string.collection_view_switch_to_card
     }
     IconButton(onClick = { onSelected(target) }) {
-        Icon(imageVector = icon, contentDescription = label)
+        Icon(imageVector = icon, contentDescription = stringResource(labelRes))
     }
 }
 
@@ -215,11 +221,20 @@ private fun CollectionListRow(
     item: MediaItem,
     onClick: () -> Unit,
 ) {
+    val rowLabel = stringResource(
+        R.string.collection_row_a11y,
+        item.title,
+        item.artist?.takeIf { it.isNotBlank() } ?: "",
+    )
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 10.dp),
+            .padding(horizontal = 16.dp, vertical = 10.dp)
+            .semantics(mergeDescendants = true) {
+                contentDescription = rowLabel
+                role = Role.Button
+            },
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {

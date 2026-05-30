@@ -89,6 +89,12 @@ android {
             isReturnDefaultValues = true
         }
     }
+
+    // Expose the exported Room schemas to the instrumented test suite so
+    // MigrationTestHelper can resolve them at runtime.
+    sourceSets {
+        getByName("androidTest").assets.srcDirs("$projectDir/schemas")
+    }
 }
 
 ksp {
@@ -169,6 +175,7 @@ dependencies {
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
+    androidTestImplementation(libs.androidx.room.testing)
 }
 
 ktlint {

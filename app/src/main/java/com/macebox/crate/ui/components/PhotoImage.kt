@@ -14,6 +14,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import coil3.compose.SubcomposeAsyncImage
 import coil3.request.ImageRequest
+import com.macebox.crate.data.api.PlaceholderHost
 
 /**
  * Renders one of the two user-supplied photo slots from
@@ -33,7 +34,7 @@ fun PhotoImage(
     contentScale: ContentScale = ContentScale.Crop,
 ) {
     val context = LocalContext.current
-    val url = "https://placeholder.invalid/apps/crate/photo/$itemId/$slot?size=${size.apiValue}"
+    val url = PlaceholderHost.urlPath("apps/crate/photo/$itemId/$slot?size=${size.apiValue}")
     val cacheKey = "photo-$itemId-$slot-${size.apiValue}-${updatedAt.orEmpty()}"
 
     val request = ImageRequest

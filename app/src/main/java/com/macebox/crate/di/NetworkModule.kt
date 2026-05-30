@@ -7,6 +7,7 @@ import com.macebox.crate.data.api.CrateBinaryService
 import com.macebox.crate.data.api.GitHubReleaseService
 import com.macebox.crate.data.api.HostInterceptor
 import com.macebox.crate.data.api.OcsConverterFactory
+import com.macebox.crate.data.api.PlaceholderHost
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -22,8 +23,6 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 object NetworkModule {
-    private const val PLACEHOLDER_BASE_URL = "https://placeholder.invalid/"
-
     @Provides
     @Singleton
     fun provideJson(): Json =
@@ -62,7 +61,7 @@ object NetworkModule {
         val contentType = "application/json".toMediaType()
         return Retrofit
             .Builder()
-            .baseUrl(PLACEHOLDER_BASE_URL)
+            .baseUrl(PlaceholderHost.BASE_URL)
             .client(client)
             .addConverterFactory(OcsConverterFactory(json))
             .addConverterFactory(json.asConverterFactory(contentType))

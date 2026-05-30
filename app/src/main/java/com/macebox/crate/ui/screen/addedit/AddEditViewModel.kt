@@ -323,8 +323,6 @@ class AddEditViewModel
             )
         }
 
-        fun onArtworkCleared() = update { copy(pendingArtwork = null) }
-
         fun onRemoveArtwork() =
             update {
                 copy(
@@ -471,9 +469,23 @@ class AddEditViewModel
             remove: Boolean,
             isEditing: Boolean,
         ) {
-            when {
+            val result = when {
                 pending != null -> mediaRepository.uploadPhoto(itemId, slot, pending.bytes, pending.mimeType)
                 remove && isEditing -> mediaRepository.deletePhoto(itemId, slot)
+                else -> return
+            }
+            // Surface upload/delete failure to the user — the item save has
+            // already succeeded by this point, so the snackbar tells them
+            // *what* failed without unwinding the save itself.
+            when (result) {
+                is ApiResult.Success -> Unit
+                ApiResult.NetworkError ->
+                    _uiState.update { it.copy(errorMessage = "Photo $slot didn't upload — offline.") }
+                is ApiResult.HttpError ->
+                    _uiState.update {
+                        it.copy(errorMessage = "Photo $slot didn't upload (${result.code}).")
+                    }
+                ApiResult.Unauthorised -> Unit
             }
         }
 

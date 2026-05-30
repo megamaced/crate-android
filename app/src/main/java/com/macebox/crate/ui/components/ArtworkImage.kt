@@ -19,6 +19,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import coil3.compose.SubcomposeAsyncImage
 import coil3.request.ImageRequest
+import com.macebox.crate.data.api.PlaceholderHost
 import com.macebox.crate.domain.model.Category
 
 enum class ArtworkSize(
@@ -44,7 +45,7 @@ fun ArtworkImage(
     category: Category? = null,
 ) {
     val context = LocalContext.current
-    val url = "https://placeholder.invalid/apps/crate/artwork/$itemId?size=${size.apiValue}"
+    val url = PlaceholderHost.urlPath("apps/crate/artwork/$itemId?size=${size.apiValue}")
     val cacheKey = "artwork-$itemId-${size.apiValue}-${updatedAt.orEmpty()}"
 
     val request = ImageRequest

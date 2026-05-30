@@ -54,9 +54,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import com.macebox.crate.R
 import com.macebox.crate.domain.model.Category
 import com.macebox.crate.domain.model.MediaItem
 import com.macebox.crate.ui.components.ArtworkImage
@@ -525,7 +527,7 @@ private fun PurchasePriceRow(item: MediaItem) {
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text(
-            text = "Original price",
+            text = stringResource(R.string.purchase_price_label),
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.width(120.dp),
@@ -581,7 +583,7 @@ private fun PhotoGallery(item: MediaItem) {
         modifier = Modifier.padding(top = 8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        SectionHeader("Photos")
+        SectionHeader(stringResource(R.string.photos_section))
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             if (item.hasPhoto1) {
                 PhotoThumb(item = item, slot = 1, onClick = { fullSlot = 1 })
