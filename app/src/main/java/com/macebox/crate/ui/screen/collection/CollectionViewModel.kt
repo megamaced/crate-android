@@ -3,6 +3,8 @@ package com.macebox.crate.ui.screen.collection
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.macebox.crate.data.api.ApiResult
+import com.macebox.crate.data.prefs.CollectionPrefs
+import com.macebox.crate.data.prefs.CollectionViewMode
 import com.macebox.crate.domain.model.Category
 import com.macebox.crate.domain.model.CategorySortConfig
 import com.macebox.crate.domain.model.CollectionSort
@@ -10,6 +12,7 @@ import com.macebox.crate.domain.model.MediaItem
 import com.macebox.crate.domain.model.SortDirection
 import com.macebox.crate.domain.model.SortField
 import com.macebox.crate.domain.repository.MediaRepository
+import com.macebox.crate.ui.components.FormatBucket
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -17,6 +20,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -27,7 +31,9 @@ data class CollectionUiState(
     val sort: CollectionSort = CollectionSort.Default,
     val selectedFormats: Set<String> = emptySet(),
     val items: List<MediaItem> = emptyList(),
-    val availableFormats: List<String> = emptyList(),
+    val availableFormats: List<FormatBucket> = emptyList(),
+    val totalCount: Int = 0,
+    val viewMode: CollectionViewMode = CollectionViewMode.Card,
     val isRefreshing: Boolean = false,
     val errorMessage: String? = null,
 )
@@ -44,6 +50,7 @@ class CollectionViewModel
     @Inject
     constructor(
         private val mediaRepository: MediaRepository,
+        private val collectionPrefs: CollectionPrefs,
     ) : ViewModel() {
         private val category = MutableStateFlow(Category.Music)
         private val sort = MutableStateFlow(CollectionSort.Default)
@@ -53,15 +60,23 @@ class CollectionViewModel
 
         private val filters = combine(category, sort, selectedFormats, ::Filters)
         private val itemsForCategory = category.flatMapLatest { mediaRepository.observeByCategory(it) }
+        private val viewMode = collectionPrefs.collectionViewModeFlow
 
         val uiState: StateFlow<CollectionUiState> =
-            combine(filters, itemsForCategory, isRefreshing, errorMessage) { f, items, refreshing, err ->
-                val available = items
+            combine(filters, itemsForCategory, viewMode, isRefreshing, errorMessage) { f, items, mode, refreshing, err ->
+                // Counts are computed against the full category list, not the
+                // currently-filtered subset, so toggling one chip doesn't reshuffle
+                // every other chip's number — mirrors CollectionView.vue.
+                val buckets = items
                     .mapNotNull { it.format?.takeIf { v -> v.isNotBlank() } }
-                    .toSortedSet()
-                    .toList()
-                val activeFormats = f.selectedFormats.intersect(available.toSet())
-                val filtered = if (activeFormats.isEmpty()) items else items.filter { it.format in activeFormats }
+                    .groupingBy { it }
+                    .eachCount()
+                    .toSortedMap()
+                    .map { (fmt, count) -> FormatBucket(fmt, count) }
+                val availableSet = buckets.map { it.format }.toSet()
+                val activeFormats = f.selectedFormats.intersect(availableSet)
+                val filtered =
+                    if (activeFormats.isEmpty()) items else items.filter { it.format in activeFormats }
                 val sorted = filtered.sortedWith(comparatorFor(f.sort))
 
                 CollectionUiState(
@@ -69,7 +84,9 @@ class CollectionViewModel
                     sort = f.sort,
                     selectedFormats = activeFormats,
                     items = sorted,
-                    availableFormats = available,
+                    availableFormats = buckets,
+                    totalCount = items.size,
+                    viewMode = mode,
                     isRefreshing = refreshing,
                     errorMessage = err,
                 )
@@ -104,8 +121,16 @@ class CollectionViewModel
             }
         }
 
+        fun clearFormats() {
+            selectedFormats.value = emptySet()
+        }
+
         fun selectSort(value: CollectionSort) {
             sort.value = value
+        }
+
+        fun setViewMode(mode: CollectionViewMode) {
+            viewModelScope.launch { collectionPrefs.setCollectionViewMode(mode) }
         }
 
         fun refresh() {

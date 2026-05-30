@@ -22,10 +22,27 @@ enum class ThemeMode {
     Dark,
 }
 
+enum class CollectionViewMode {
+    Card,
+    List,
+}
+
+/**
+ * Narrow view of [UserPreferences] surfaced to the collection screen so the
+ * ViewModel can be exercised without the DataStore-backed singleton — handy
+ * for unit tests, which otherwise need a Context.
+ */
+interface CollectionPrefs {
+    val collectionViewModeFlow: Flow<CollectionViewMode>
+
+    suspend fun setCollectionViewMode(mode: CollectionViewMode)
+}
+
 data class UserPrefs(
     val lastSyncCursor: String? = null,
     val lastSeenWipedAt: String? = null,
     val themeMode: ThemeMode = ThemeMode.System,
+    val collectionViewMode: CollectionViewMode = CollectionViewMode.Card,
 )
 
 @Singleton
@@ -33,7 +50,7 @@ class UserPreferences
     @Inject
     constructor(
         @ApplicationContext private val context: Context,
-    ) {
+    ) : CollectionPrefs {
         private val ds get() = context.dataStore
 
         val flow: Flow<UserPrefs> =
@@ -42,6 +59,9 @@ class UserPreferences
                     lastSyncCursor = prefs[Keys.LAST_SYNC_CURSOR],
                     lastSeenWipedAt = prefs[Keys.LAST_SEEN_WIPED_AT],
                     themeMode = prefs[Keys.THEME_MODE]?.let(::parseThemeMode) ?: ThemeMode.System,
+                    collectionViewMode =
+                        prefs[Keys.COLLECTION_VIEW_MODE]?.let(::parseCollectionViewMode)
+                            ?: CollectionViewMode.Card,
                 )
             }
 
@@ -55,6 +75,13 @@ class UserPreferences
 
         suspend fun setThemeMode(mode: ThemeMode) {
             ds.edit { it[Keys.THEME_MODE] = mode.name }
+        }
+
+        override val collectionViewModeFlow: Flow<CollectionViewMode> =
+            flow.map { it.collectionViewMode }
+
+        override suspend fun setCollectionViewMode(mode: CollectionViewMode) {
+            ds.edit { it[Keys.COLLECTION_VIEW_MODE] = mode.name }
         }
 
         suspend fun getUpdateState(): UpdateCheckState {
@@ -75,6 +102,9 @@ class UserPreferences
 
         private fun parseThemeMode(value: String): ThemeMode = runCatching { ThemeMode.valueOf(value) }.getOrDefault(ThemeMode.System)
 
+        private fun parseCollectionViewMode(value: String): CollectionViewMode =
+            runCatching { CollectionViewMode.valueOf(value) }.getOrDefault(CollectionViewMode.Card)
+
         private fun <T> MutablePreferences.write(
             key: Preferences.Key<T>,
             value: T?,
@@ -86,6 +116,7 @@ class UserPreferences
             val LAST_SYNC_CURSOR = stringPreferencesKey("last_sync_cursor")
             val LAST_SEEN_WIPED_AT = stringPreferencesKey("last_seen_wiped_at")
             val THEME_MODE = stringPreferencesKey("theme_mode")
+            val COLLECTION_VIEW_MODE = stringPreferencesKey("collection_view_mode")
             val UPDATE_LAST_CHECKED_AT = longPreferencesKey("update_last_checked_at")
             val UPDATE_LAST_NOTIFIED_VERSION = stringPreferencesKey("update_last_notified_version")
         }

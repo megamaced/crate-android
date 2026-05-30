@@ -2,6 +2,8 @@ package com.macebox.crate.ui.screen.collection
 
 import app.cash.turbine.test
 import com.macebox.crate.data.api.ApiResult
+import com.macebox.crate.data.prefs.CollectionPrefs
+import com.macebox.crate.data.prefs.CollectionViewMode
 import com.macebox.crate.domain.model.Category
 import com.macebox.crate.domain.model.CollectionSort
 import com.macebox.crate.domain.model.MarketValue
@@ -13,6 +15,7 @@ import com.macebox.crate.domain.model.SortField
 import com.macebox.crate.domain.model.Status
 import com.macebox.crate.domain.repository.MediaRepository
 import com.macebox.crate.domain.repository.MediaRepository.RefreshResult
+import com.macebox.crate.ui.components.FormatBucket
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -54,14 +57,18 @@ class CollectionViewModelTest {
                     ),
                 )
             }
-            val vm = CollectionViewModel(repo)
+            val vm = CollectionViewModel(repo, FakeCollectionPrefs())
 
             vm.uiState.test {
                 // Skip the initial empty emission until items arrive.
                 var current = awaitItem()
                 while (current.items.isEmpty()) current = awaitItem()
                 assertEquals(3, current.items.size)
-                assertEquals(listOf("CD", "LP"), current.availableFormats)
+                assertEquals(
+                    listOf(FormatBucket("CD", 1), FormatBucket("LP", 2)),
+                    current.availableFormats,
+                )
+                assertEquals(3, current.totalCount)
                 assertEquals(CollectionSort.Default, current.sort)
                 cancelAndIgnoreRemainingEvents()
             }
@@ -78,7 +85,7 @@ class CollectionViewModelTest {
                     ),
                 )
             }
-            val vm = CollectionViewModel(repo)
+            val vm = CollectionViewModel(repo, FakeCollectionPrefs())
 
             vm.toggleFormat("LP")
 
@@ -105,7 +112,7 @@ class CollectionViewModelTest {
                     ),
                 )
             }
-            val vm = CollectionViewModel(repo)
+            val vm = CollectionViewModel(repo, FakeCollectionPrefs())
             vm.selectSort(CollectionSort(SortField.Title, SortDirection.Asc))
 
             vm.uiState.test {
@@ -124,7 +131,7 @@ class CollectionViewModelTest {
             val repo = FakeMediaRepository().apply {
                 seed(listOf(item(1, "OK Computer", format = "LP", category = Category.Music)))
             }
-            val vm = CollectionViewModel(repo)
+            val vm = CollectionViewModel(repo, FakeCollectionPrefs())
             vm.toggleFormat("LP")
 
             repo.seed(
@@ -256,3 +263,12 @@ private fun item(
     createdAt = updatedAt,
     updatedAt = updatedAt,
 )
+
+private class FakeCollectionPrefs : CollectionPrefs {
+    private val mode = MutableStateFlow(CollectionViewMode.Card)
+    override val collectionViewModeFlow: Flow<CollectionViewMode> = mode
+
+    override suspend fun setCollectionViewMode(mode: CollectionViewMode) {
+        this.mode.value = mode
+    }
+}
