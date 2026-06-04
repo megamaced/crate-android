@@ -5,35 +5,48 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- Vinyl disc body -->
+    <!-- Crate's launcher mark: a stylised vinyl disc sitting alongside the
+         NC Collectives star in the megamaced suite. Cream disc body on
+         Nextcloud-blue background with a punched-through "C" label so
+         "Crate" reads at home-screen sizes. Whole composition lives
+         inside the 66dp circular safe-zone of the adaptive-icon viewport
+         centred on (54, 54). -->
+
+    <!-- Outer disc body — cream, r=32, sits inside the 66dp safe-zone. -->
     <path
-        android:fillColor="#1C1B1F"
+        android:fillColor="@color/ic_launcher_foreground"
         android:pathData="M22,54a32,32 0 1,0 64,0a32,32 0 1,0 -64,0z" />
 
-    <!-- Groove rings -->
+    <!-- Three concentric groove rings drawn as thin strokes for that
+         vinyl LP feel without darkening the overall mark. -->
     <path
         android:fillColor="#00000000"
-        android:strokeColor="#2E2B30"
-        android:strokeWidth="0.6"
+        android:strokeColor="@color/ic_launcher_groove"
+        android:strokeWidth="0.7"
         android:pathData="M26,54a28,28 0 1,0 56,0a28,28 0 1,0 -56,0z" />
     <path
         android:fillColor="#00000000"
-        android:strokeColor="#2E2B30"
-        android:strokeWidth="0.6"
+        android:strokeColor="@color/ic_launcher_groove"
+        android:strokeWidth="0.7"
         android:pathData="M30,54a24,24 0 1,0 48,0a24,24 0 1,0 -48,0z" />
     <path
         android:fillColor="#00000000"
-        android:strokeColor="#2E2B30"
-        android:strokeWidth="0.6"
+        android:strokeColor="@color/ic_launcher_groove"
+        android:strokeWidth="0.7"
         android:pathData="M34,54a20,20 0 1,0 40,0a20,20 0 1,0 -40,0z" />
 
-    <!-- Copper label -->
+    <!-- Centre label, painted in the background blue so it punches
+         through the cream disc and the C reads on a blue field. -->
     <path
-        android:fillColor="#B8763F"
+        android:fillColor="@color/ic_launcher_background"
         android:pathData="M40,54a14,14 0 1,0 28,0a14,14 0 1,0 -28,0z" />
 
-    <!-- Spindle hole -->
+    <!-- "C" letterform: 270° arc opening to the right, centred at the
+         label centre, arc radius 7, stroke 3 with rounded caps. Cream
+         stroke so it sits proud on the blue label. -->
     <path
-        android:fillColor="#1B1F2A"
-        android:pathData="M52.5,54a1.5,1.5 0 1,0 3,0a1.5,1.5 0 1,0 -3,0z" />
+        android:strokeColor="@color/ic_launcher_foreground"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:pathData="M58.95,49.05 A7,7 0 1 0 58.95,58.95" />
 </vector>

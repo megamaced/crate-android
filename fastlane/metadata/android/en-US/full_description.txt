@@ -7,21 +7,28 @@ Everything is stored on your own Nextcloud server, so you own your data.
 Features:
 
 * Browse your collection by category, format and artist
+* Card or list view, with format-filter chips and per-format totals
 * Full album / film / book / game / comic detail view with tracklist,
-  cast, author bio, and more
+  cast, author bio and more
+* Record what you originally paid alongside the current market value,
+  with gain or loss surfaced on each item
+* Add up to two extra user photos per item — receipts, sleevenotes,
+  disc shots — separate from the cover artwork
 * Wishlist — track what you want next
 * Barcode scanning to add new items quickly
 * Enrich items automatically from Discogs, TMDB, Open Library, RAWG or
   ComicVine (you provide your own API keys)
-* Market values (Discogs for music, PriceCharting for games & comics)
+* Market values (Discogs for music, PriceCharting for games and comics)
 * Share albums or playlists with other users of your Nextcloud instance
 * Full offline mode — your collection is cached locally and syncs when
   you have a connection
-* Follows the Material 3 design system, with Material You dynamic colour
-  on Android 12+
+* Strips EXIF / GPS metadata from uploaded photos before they leave the
+  device
+* Follows the Material 3 design system in Nextcloud's brand colours so
+  it sits alongside the official Nextcloud client suite
 
 Requires a Nextcloud instance running the Crate server app:
 https://github.com/megamaced/crate
 
-This build contains no proprietary Google services and is fully open source
-under the AGPL-3.0 licence.
+This build contains no proprietary Google services and is fully open
+source under the AGPL-3.0 licence.

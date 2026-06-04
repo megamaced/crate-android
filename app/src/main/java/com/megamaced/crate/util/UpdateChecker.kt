@@ -29,29 +29,44 @@ class UpdateChecker
         private val service: GitHubReleaseService,
         private val userPreferences: UserPreferences,
     ) {
-        suspend fun checkOnStartup() {
-            val now = System.currentTimeMillis()
-            val state = userPreferences.getUpdateState()
-            if (now - state.lastCheckedAt < CHECK_INTERVAL_MS) return
+        sealed interface Result {
+            data object UpToDate : Result
 
+            data class UpdateAvailable(
+                val tag: String,
+                val htmlUrl: String,
+            ) : Result
+
+            data object Failed : Result
+        }
+
+        /**
+         * User-initiated update check. Only ever called when the user
+         * explicitly taps "Check for updates" in Settings — never on app
+         * launch — so that an F-Droid (or any other) install of the app
+         * never makes an unsolicited network call to github.com.
+         */
+        suspend fun checkNow(): Result {
             val release =
                 runCatching { service.latestRelease() }
                     .onFailure { Timber.tag(TAG).d(it, "GitHub release check failed") }
-                    .getOrNull() ?: return
+                    .getOrNull() ?: return Result.Failed
 
-            userPreferences.setUpdateLastCheckedAt(now)
+            userPreferences.setUpdateLastCheckedAt(System.currentTimeMillis())
 
-            if (release.draft || release.preRelease) return
+            if (release.draft || release.preRelease) return Result.UpToDate
 
-            val latest = parseSemVer(release.tagName) ?: return
-            val current = parseSemVer(BuildConfig.VERSION_NAME) ?: return
-            if (latest <= current) return
+            val latest = parseSemVer(release.tagName) ?: return Result.UpToDate
+            val current = parseSemVer(BuildConfig.VERSION_NAME) ?: return Result.UpToDate
+            if (latest <= current) return Result.UpToDate
 
             val tag = release.tagName
-            if (tag == state.lastNotifiedVersion) return
-
-            postNotification(tag, release.htmlUrl)
-            userPreferences.setUpdateLastNotifiedVersion(tag)
+            val state = userPreferences.getUpdateState()
+            if (tag != state.lastNotifiedVersion) {
+                postNotification(tag, release.htmlUrl)
+                userPreferences.setUpdateLastNotifiedVersion(tag)
+            }
+            return Result.UpdateAvailable(tag, release.htmlUrl)
         }
 
         private fun postNotification(
@@ -119,7 +134,6 @@ class UpdateChecker
             private const val TAG = "UpdateChecker"
             private const val CHANNEL_ID = "updates"
             private const val NOTIFICATION_ID = 4711
-            private const val CHECK_INTERVAL_MS = 24L * 60L * 60L * 1000L
         }
     }
 

@@ -54,6 +54,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
@@ -150,7 +151,11 @@ fun SettingsScreen(
             DangerZoneSection(viewModel = viewModel)
 
             SectionHeader("About")
-            AboutSection(state = state)
+            AboutSection(
+                state = state,
+                onCheckForUpdates = viewModel::checkForUpdates,
+                onDismissUpdateCheck = viewModel::dismissUpdateCheck,
+            )
 
             Spacer(modifier = Modifier.height(16.dp))
         }
@@ -621,12 +626,17 @@ private fun DangerZoneSection(viewModel: SettingsViewModel) {
 }
 
 @Composable
-private fun AboutSection(state: SettingsUiState) {
+private fun AboutSection(
+    state: SettingsUiState,
+    onCheckForUpdates: () -> Unit,
+    onDismissUpdateCheck: () -> Unit,
+) {
+    val uriHandler = LocalUriHandler.current
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -649,6 +659,78 @@ private fun AboutSection(state: SettingsUiState) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            UpdateCheckRow(
+                state = state.updateCheck,
+                onCheck = onCheckForUpdates,
+                onDismiss = onDismissUpdateCheck,
+                onOpenRelease = { uriHandler.openUri(it) },
+            )
         }
+    }
+}
+
+@Composable
+private fun UpdateCheckRow(
+    state: UpdateCheckState,
+    onCheck: () -> Unit,
+    onDismiss: () -> Unit,
+    onOpenRelease: (String) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("Check for updates", style = MaterialTheme.typography.bodyMedium)
+            when (state) {
+                UpdateCheckState.Checking ->
+                    CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                is UpdateCheckState.Available ->
+                    TextButton(onClick = { onOpenRelease(state.htmlUrl) }) {
+                        Text("Open ${state.tag}")
+                    }
+                else ->
+                    TextButton(onClick = onCheck) { Text("Check") }
+            }
+        }
+        when (state) {
+            UpdateCheckState.UpToDate ->
+                StatusLine(
+                    text = "You're on the latest version.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    onDismiss = onDismiss,
+                )
+            UpdateCheckState.Failed ->
+                StatusLine(
+                    text = "Couldn't reach GitHub. Check your connection and try again.",
+                    color = MaterialTheme.colorScheme.error,
+                    onDismiss = onDismiss,
+                )
+            is UpdateCheckState.Available ->
+                StatusLine(
+                    text = "${state.tag} is available on GitHub.",
+                    color = MaterialTheme.colorScheme.primary,
+                    onDismiss = onDismiss,
+                )
+            UpdateCheckState.Idle, UpdateCheckState.Checking -> Unit
+        }
+    }
+}
+
+@Composable
+private fun StatusLine(
+    text: String,
+    color: androidx.compose.ui.graphics.Color,
+    onDismiss: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(text, style = MaterialTheme.typography.bodySmall, color = color)
+        TextButton(onClick = onDismiss) { Text("Dismiss") }
     }
 }

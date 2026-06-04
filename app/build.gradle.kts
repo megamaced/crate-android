@@ -31,8 +31,8 @@ android {
         applicationId = "com.megamaced.crate"
         minSdk = 29
         targetSdk = 36
-        versionCode = 12
-        versionName = "1.3.0"
+        versionCode = 13
+        versionName = "1.4.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
@@ -81,6 +81,15 @@ android {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
+    }
+
+    // AGP 8.x embeds an extra APK signing block ("Dependency metadata",
+    // id 0x504B4453) intended for Play Console reporting. F-Droid's
+    // `check apk` scanner rejects any non-standard signing block, so we
+    // strip it from both the APK and AAB outputs.
+    dependenciesInfo {
+        includeInApk = false
+        includeInBundle = false
     }
 
     testOptions {

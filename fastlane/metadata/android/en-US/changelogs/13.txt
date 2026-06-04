@@ -1,0 +1,7 @@
+* Reskinned to Nextcloud's brand colours so Crate sits alongside the
+  official Nextcloud client suite.
+* New launcher icon (vinyl mark on Nextcloud blue).
+* Dropped the automatic GitHub update check on launch — moved to a
+  user-initiated "Check for updates" button in Settings.
+* Stripped the AGP "Dependency metadata" signing block from release
+  APKs to satisfy F-Droid's binary scanner.

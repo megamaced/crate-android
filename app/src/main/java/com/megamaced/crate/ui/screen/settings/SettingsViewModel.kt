@@ -11,6 +11,7 @@ import com.megamaced.crate.domain.model.UserProfile
 import com.megamaced.crate.domain.repository.EnrichmentRepository
 import com.megamaced.crate.domain.repository.MediaRepository
 import com.megamaced.crate.domain.repository.SettingsRepository
+import com.megamaced.crate.util.UpdateChecker
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.async
 import kotlinx.coroutines.ensureActive
@@ -48,8 +49,30 @@ data class SettingsUiState(
     val refreshAllProgress: RefreshAllProgress? = null,
     val enrichAllProgress: RefreshAllProgress? = null,
     val themeMode: ThemeMode = ThemeMode.System,
+    val updateCheck: UpdateCheckState = UpdateCheckState.Idle,
     val errorMessage: String? = null,
 )
+
+/**
+ * Status of a user-initiated "Check for updates" request. The check is
+ * never fired on launch — only when the user explicitly taps the button
+ * in Settings — so an F-Droid install (or any install where the user
+ * doesn't want a github.com call) never reaches out unless asked.
+ */
+sealed interface UpdateCheckState {
+    data object Idle : UpdateCheckState
+
+    data object Checking : UpdateCheckState
+
+    data object UpToDate : UpdateCheckState
+
+    data class Available(
+        val tag: String,
+        val htmlUrl: String,
+    ) : UpdateCheckState
+
+    data object Failed : UpdateCheckState
+}
 
 @HiltViewModel
 class SettingsViewModel
@@ -60,12 +83,14 @@ class SettingsViewModel
         private val mediaRepository: MediaRepository,
         private val userPreferences: UserPreferences,
         private val sessionManager: SessionManager,
+        private val updateChecker: UpdateChecker,
     ) : ViewModel() {
         private val tokens = MutableStateFlow(TokensState())
         private val profile = MutableStateFlow<ProfileState>(ProfileState())
         private val market = MutableStateFlow(MarketState())
         private val refreshProgress = MutableStateFlow<RefreshAllProgress?>(null)
         private val enrichProgress = MutableStateFlow<RefreshAllProgress?>(null)
+        private val updateCheck = MutableStateFlow<UpdateCheckState>(UpdateCheckState.Idle)
         private val errorMessage = MutableStateFlow<String?>(null)
 
         val uiState: StateFlow<SettingsUiState> =
@@ -74,7 +99,8 @@ class SettingsViewModel
                 tokens,
                 userPreferences.flow.map { it.themeMode },
                 combine(refreshProgress, enrichProgress, errorMessage) { r, e, err -> Triple(r, e, err) },
-            ) { (p, m), t, theme, (progress, enrichProg, err) ->
+                updateCheck,
+            ) { (p, m), t, theme, (progress, enrichProg, err), update ->
                 SettingsUiState(
                     profile = p.profile,
                     isProfileLoading = p.isLoading,
@@ -89,6 +115,7 @@ class SettingsViewModel
                     refreshAllProgress = progress,
                     enrichAllProgress = enrichProg,
                     themeMode = theme,
+                    updateCheck = update,
                     errorMessage = err,
                 )
             }.stateIn(
@@ -282,6 +309,24 @@ class SettingsViewModel
 
         fun logout() {
             sessionManager.logout()
+        }
+
+        fun checkForUpdates() {
+            if (updateCheck.value is UpdateCheckState.Checking) return
+            viewModelScope.launch {
+                updateCheck.value = UpdateCheckState.Checking
+                updateCheck.value =
+                    when (val result = updateChecker.checkNow()) {
+                        UpdateChecker.Result.UpToDate -> UpdateCheckState.UpToDate
+                        UpdateChecker.Result.Failed -> UpdateCheckState.Failed
+                        is UpdateChecker.Result.UpdateAvailable ->
+                            UpdateCheckState.Available(result.tag, result.htmlUrl)
+                    }
+            }
+        }
+
+        fun dismissUpdateCheck() {
+            updateCheck.value = UpdateCheckState.Idle
         }
 
         fun wipeCollection(scopes: List<String>) {
