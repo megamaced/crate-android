@@ -1,0 +1,94 @@
+package com.megamaced.crate.di
+
+import com.megamaced.crate.BuildConfig
+import com.megamaced.crate.data.api.AuthInterceptor
+import com.megamaced.crate.data.api.CrateApiService
+import com.megamaced.crate.data.api.CrateBinaryService
+import com.megamaced.crate.data.api.GitHubReleaseService
+import com.megamaced.crate.data.api.HostInterceptor
+import com.megamaced.crate.data.api.OcsConverterFactory
+import com.megamaced.crate.data.api.PlaceholderHost
+import dagger.Module
+import dagger.Provides
+import dagger.hilt.InstallIn
+import dagger.hilt.components.SingletonComponent
+import kotlinx.serialization.json.Json
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.logging.HttpLoggingInterceptor
+import retrofit2.Retrofit
+import retrofit2.converter.kotlinx.serialization.asConverterFactory
+import javax.inject.Singleton
+
+@Module
+@InstallIn(SingletonComponent::class)
+object NetworkModule {
+    @Provides
+    @Singleton
+    fun provideJson(): Json =
+        Json {
+            ignoreUnknownKeys = true
+            explicitNulls = false
+            coerceInputValues = true
+        }
+
+    @Provides
+    @Singleton
+    fun provideOkHttpClient(
+        hostInterceptor: HostInterceptor,
+        authInterceptor: AuthInterceptor,
+    ): OkHttpClient =
+        OkHttpClient
+            .Builder()
+            .addInterceptor(hostInterceptor)
+            .addInterceptor(authInterceptor)
+            .apply {
+                if (BuildConfig.DEBUG) {
+                    addInterceptor(
+                        HttpLoggingInterceptor().apply {
+                            level = HttpLoggingInterceptor.Level.BASIC
+                        },
+                    )
+                }
+            }.build()
+
+    @Provides
+    @Singleton
+    fun provideRetrofit(
+        client: OkHttpClient,
+        json: Json,
+    ): Retrofit {
+        val contentType = "application/json".toMediaType()
+        return Retrofit
+            .Builder()
+            .baseUrl(PlaceholderHost.BASE_URL)
+            .client(client)
+            .addConverterFactory(OcsConverterFactory(json))
+            .addConverterFactory(json.asConverterFactory(contentType))
+            .build()
+    }
+
+    @Provides
+    @Singleton
+    fun provideCrateApiService(retrofit: Retrofit): CrateApiService = retrofit.create(CrateApiService::class.java)
+
+    @Provides
+    @Singleton
+    fun provideCrateBinaryService(retrofit: Retrofit): CrateBinaryService = retrofit.create(CrateBinaryService::class.java)
+
+    @Provides
+    @Singleton
+    fun provideGitHubReleaseService(json: Json): GitHubReleaseService {
+        // Separate OkHttp/Retrofit so the GitHub call doesn't carry the
+        // user's Nextcloud cookies/headers via HostInterceptor + AuthInterceptor.
+        val client = OkHttpClient.Builder().build()
+        val contentType = "application/json".toMediaType()
+        return Retrofit
+            .Builder()
+            .baseUrl("https://api.github.com/")
+            .client(client)
+            .addConverterFactory(json.asConverterFactory(contentType))
+            .build()
+            .create(GitHubReleaseService::class.java)
+    }
+}

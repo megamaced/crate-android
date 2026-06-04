@@ -1,0 +1,108 @@
+package com.megamaced.crate.data.repository
+
+import com.megamaced.crate.data.api.ApiResult
+import com.megamaced.crate.data.api.CrateApiService
+import com.megamaced.crate.data.api.apiCall
+import com.megamaced.crate.data.api.dto.AddPlaylistItemRequest
+import com.megamaced.crate.data.api.dto.CreatePlaylistRequest
+import com.megamaced.crate.data.api.dto.PlaylistDto
+import com.megamaced.crate.data.db.dao.MediaItemDao
+import com.megamaced.crate.data.db.dao.PlaylistDao
+import com.megamaced.crate.data.mapper.MediaItemJsonCodec
+import com.megamaced.crate.data.mapper.toDomain
+import com.megamaced.crate.data.mapper.toEntity
+import com.megamaced.crate.domain.model.Playlist
+import com.megamaced.crate.domain.repository.PlaylistRepository
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
+import javax.inject.Inject
+import javax.inject.Singleton
+
+@Singleton
+class PlaylistRepositoryImpl
+    @Inject
+    constructor(
+        private val api: CrateApiService,
+        private val dao: PlaylistDao,
+        private val mediaItemDao: MediaItemDao,
+        private val codec: MediaItemJsonCodec,
+    ) : PlaylistRepository {
+        override fun observeAll(): Flow<List<Playlist>> = dao.observeAll().map { rows -> rows.map { it.toDomain(codec) } }
+
+        override fun observe(id: Long): Flow<Playlist?> = dao.observeWithItems(id).map { row -> row?.toDomain(codec) }
+
+        override suspend fun refresh(): ApiResult<Unit> =
+            apiCall {
+                val playlists = api.listPlaylists()
+                dao.upsertAll(playlists.map { it.toEntity() })
+                playlists.forEach { playlist ->
+                    playlist.items?.let { items ->
+                        mediaItemDao.upsertAll(items.map { it.toEntity(codec) })
+                        dao.replacePlaylistItems(
+                            playlistId = playlist.id,
+                            mediaItemIds = items.map { it.id },
+                        )
+                    }
+                }
+            }
+
+        override suspend fun refresh(id: Long): ApiResult<Playlist> =
+            apiCall {
+                val playlist = api.getPlaylist(id)
+                persistWithItems(playlist)
+                playlist.toDomain()
+            }
+
+        override suspend fun create(name: String): ApiResult<Playlist> =
+            apiCall {
+                val playlist = api.createPlaylist(CreatePlaylistRequest(name))
+                persistWithItems(playlist)
+                playlist.toDomain()
+            }
+
+        override suspend fun rename(
+            id: Long,
+            name: String,
+        ): ApiResult<Playlist> =
+            apiCall {
+                val playlist = api.updatePlaylist(id, CreatePlaylistRequest(name))
+                persistWithItems(playlist)
+                playlist.toDomain()
+            }
+
+        override suspend fun delete(id: Long): ApiResult<Unit> =
+            apiCall {
+                api.deletePlaylist(id)
+                dao.delete(id)
+            }
+
+        override suspend fun addItem(
+            playlistId: Long,
+            mediaItemId: Long,
+        ): ApiResult<Playlist> =
+            apiCall {
+                val playlist = api.addPlaylistItem(playlistId, AddPlaylistItemRequest(mediaItemId))
+                persistWithItems(playlist)
+                playlist.toDomain()
+            }
+
+        override suspend fun removeItem(
+            playlistId: Long,
+            mediaItemId: Long,
+        ): ApiResult<Playlist> =
+            apiCall {
+                val playlist = api.removePlaylistItem(playlistId, mediaItemId)
+                persistWithItems(playlist)
+                playlist.toDomain()
+            }
+
+        private suspend fun persistWithItems(playlist: PlaylistDto) {
+            val items = playlist.items.orEmpty()
+            mediaItemDao.upsertAll(items.map { it.toEntity(codec) })
+            dao.upsert(playlist.toEntity())
+            dao.replacePlaylistItems(
+                playlistId = playlist.id,
+                mediaItemIds = items.map { it.id },
+            )
+        }
+    }

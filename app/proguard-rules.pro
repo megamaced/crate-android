@@ -11,11 +11,11 @@
 }
 
 # kotlinx.serialization — generated @Serializable metadata must survive R8
--keep,includedescriptorclasses class com.macebox.crate.**$$serializer { *; }
--keepclassmembers class com.macebox.crate.** {
+-keep,includedescriptorclasses class com.megamaced.crate.**$$serializer { *; }
+-keepclassmembers class com.megamaced.crate.** {
     *** Companion;
 }
--keepclasseswithmembers class com.macebox.crate.** {
+-keepclasseswithmembers class com.megamaced.crate.** {
     kotlinx.serialization.KSerializer serializer(...);
 }
 
