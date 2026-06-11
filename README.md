@@ -25,16 +25,6 @@ Released — **v1.4.0**. Signed APKs are published on the [Releases page](https:
 
 There's a manual **Check for updates** button under *Settings → About* that polls GitHub for newer releases on demand and posts a notification linking to the release page if one is available. The app does *not* check for updates on launch — F-Droid policy forbids unsolicited third-party network calls at startup, and the app behaves the same way regardless of where you installed it from.
 
-### Upgrading from v1.2 or earlier
-
-v1.3.0 renamed the Android `applicationId` from `com.macebox.crate` to `com.megamaced.crate` to bring it in line with the rest of the megamaced suite. Because Android treats a changed `applicationId` as a different app entirely, in-place updates from v1.2.0 → v1.3.0+ aren't possible. Existing installs need to:
-
-1. Uninstall the old version
-2. Install v1.4.0 (or later) fresh
-3. Log in to your Nextcloud again
-
-Your collection re-syncs from the server on first connect — nothing's lost server-side. Local-only preferences (theme, view mode) reset to defaults.
-
 ## Features
 
 - **Home feed** — Item of the Day, Recently Added, Most Valuable, and per-category recent items
