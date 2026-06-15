@@ -1,6 +1,6 @@
 Categories:
   - Multimedia
-License: AGPL-3.0-only
+License: AGPL-3.0-or-later
 AuthorName: megamaced
 AuthorEmail: david@macemail.co.uk
 SourceCode: https://github.com/megamaced/crate-android
@@ -11,13 +11,12 @@ AutoName: Crate
 
 RepoType: git
 Repo: https://github.com/megamaced/crate-android.git
-Binaries:
-  https://github.com/megamaced/crate-android/releases/download/v%v/app-release.apk
+Binaries: https://github.com/megamaced/crate-android/releases/download/v%v/app-release.apk
 
 Builds:
   - versionName: 1.4.0
     versionCode: 13
-    commit: c7d69402c45f7b8685f8add2ce310bfcf62853b8
+    commit: 0bc96601596f7eadd472dbd3f3b7a49911fc4b0c
     subdir: app
     gradle:
       - yes
