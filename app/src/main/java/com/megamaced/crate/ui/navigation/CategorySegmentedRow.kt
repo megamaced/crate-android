@@ -19,19 +19,21 @@ fun CategorySegmentedRow(
     selected: Category,
     onCategorySelected: (Category) -> Unit,
     modifier: Modifier = Modifier,
+    visible: List<Category> = Category.entries,
 ) {
+    if (visible.isEmpty()) return
     SingleChoiceSegmentedButtonRow(
         modifier = modifier
             .horizontalScroll(rememberScrollState())
             .padding(horizontal = 16.dp, vertical = 8.dp),
     ) {
-        Category.entries.forEachIndexed { index, category ->
+        visible.forEachIndexed { index, category ->
             SegmentedButton(
                 selected = category == selected,
                 onClick = { onCategorySelected(category) },
                 shape = SegmentedButtonDefaults.itemShape(
                     index = index,
-                    count = Category.entries.size,
+                    count = visible.size,
                 ),
             ) {
                 Text(category.label)

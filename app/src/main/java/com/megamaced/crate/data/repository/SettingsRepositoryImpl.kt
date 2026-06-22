@@ -4,13 +4,17 @@ import com.megamaced.crate.data.api.ApiResult
 import com.megamaced.crate.data.api.CrateApiService
 import com.megamaced.crate.data.api.apiCall
 import com.megamaced.crate.data.api.dto.CurrencyRequest
+import com.megamaced.crate.data.api.dto.HiddenCategoriesRequest
 import com.megamaced.crate.data.api.dto.KeyRequest
 import com.megamaced.crate.data.api.dto.TokenRequest
 import com.megamaced.crate.data.mapper.toDomain
 import com.megamaced.crate.data.mapper.toDto
+import com.megamaced.crate.data.prefs.UserPreferences
+import com.megamaced.crate.domain.model.Category
 import com.megamaced.crate.domain.model.MarketSettings
 import com.megamaced.crate.domain.model.UserProfile
 import com.megamaced.crate.domain.repository.SettingsRepository
+import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -19,8 +23,17 @@ class SettingsRepositoryImpl
     @Inject
     constructor(
         private val api: CrateApiService,
+        private val userPreferences: UserPreferences,
     ) : SettingsRepository {
-        override suspend fun getMe(): ApiResult<UserProfile> = apiCall { api.getMe().toDomain() }
+        override suspend fun getMe(): ApiResult<UserProfile> {
+            val result = apiCall { api.getMe().toDomain() }
+            // Mirror server-side hidden_categories into the local DataStore cache
+            // so navigation / home / search can read it synchronously next launch.
+            if (result is ApiResult.Success) {
+                userPreferences.setHiddenCategories(result.value.hiddenCategories)
+            }
+            return result
+        }
 
         override suspend fun hasDiscogsToken(): ApiResult<Boolean> = apiCall { api.getDiscogsToken().hasToken }
 
@@ -52,4 +65,19 @@ class SettingsRepositoryImpl
             apiCall { api.setCurrency(CurrencyRequest(currency)).marketCurrency }
 
         override suspend fun getCurrencies(): ApiResult<List<String>> = apiCall { api.getCurrencies() }
+
+        override val hiddenCategoriesFlow: Flow<Set<Category>> = userPreferences.hiddenCategoriesFlow
+
+        override suspend fun setHiddenCategories(categories: Set<Category>): ApiResult<Unit> {
+            val payload = HiddenCategoriesRequest(categories.map { it.apiValue })
+            val result =
+                apiCall {
+                    api.setHiddenCategories(payload)
+                    Unit
+                }
+            if (result is ApiResult.Success) {
+                userPreferences.setHiddenCategories(categories)
+            }
+            return result
+        }
     }

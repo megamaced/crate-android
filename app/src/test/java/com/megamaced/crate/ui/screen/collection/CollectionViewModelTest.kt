@@ -57,7 +57,7 @@ class CollectionViewModelTest {
                     ),
                 )
             }
-            val vm = CollectionViewModel(repo, FakeCollectionPrefs())
+            val vm = CollectionViewModel(repo, FakeCollectionPrefs(), StubSettingsRepository())
 
             vm.uiState.test {
                 // Skip the initial empty emission until items arrive.
@@ -85,7 +85,7 @@ class CollectionViewModelTest {
                     ),
                 )
             }
-            val vm = CollectionViewModel(repo, FakeCollectionPrefs())
+            val vm = CollectionViewModel(repo, FakeCollectionPrefs(), StubSettingsRepository())
 
             vm.toggleFormat("LP")
 
@@ -112,7 +112,7 @@ class CollectionViewModelTest {
                     ),
                 )
             }
-            val vm = CollectionViewModel(repo, FakeCollectionPrefs())
+            val vm = CollectionViewModel(repo, FakeCollectionPrefs(), StubSettingsRepository())
             vm.selectSort(CollectionSort(SortField.Title, SortDirection.Asc))
 
             vm.uiState.test {
@@ -131,7 +131,7 @@ class CollectionViewModelTest {
             val repo = FakeMediaRepository().apply {
                 seed(listOf(item(1, "OK Computer", format = "LP", category = Category.Music)))
             }
-            val vm = CollectionViewModel(repo, FakeCollectionPrefs())
+            val vm = CollectionViewModel(repo, FakeCollectionPrefs(), StubSettingsRepository())
             vm.toggleFormat("LP")
 
             repo.seed(
@@ -271,4 +271,45 @@ private class FakeCollectionPrefs : CollectionPrefs {
     override suspend fun setCollectionViewMode(mode: CollectionViewMode) {
         this.mode.value = mode
     }
+}
+
+// Minimal SettingsRepository stub for CollectionViewModelTest — only the
+// hidden_categories surface is exercised; everything else explodes if touched.
+private class StubSettingsRepository : com.megamaced.crate.domain.repository.SettingsRepository {
+    override val hiddenCategoriesFlow: Flow<Set<com.megamaced.crate.domain.model.Category>> =
+        kotlinx.coroutines.flow.flowOf(emptySet())
+
+    override suspend fun setHiddenCategories(categories: Set<com.megamaced.crate.domain.model.Category>) =
+        com.megamaced.crate.data.api.ApiResult
+            .Success(Unit)
+
+    override suspend fun getMe() = error("not used")
+
+    override suspend fun hasDiscogsToken() = error("not used")
+
+    override suspend fun setDiscogsToken(token: String) = error("not used")
+
+    override suspend fun hasTmdbToken() = error("not used")
+
+    override suspend fun setTmdbToken(token: String) = error("not used")
+
+    override suspend fun hasRawgKey() = error("not used")
+
+    override suspend fun setRawgKey(key: String) = error("not used")
+
+    override suspend fun hasComicVineKey() = error("not used")
+
+    override suspend fun setComicVineKey(key: String) = error("not used")
+
+    override suspend fun hasPriceChartingToken() = error("not used")
+
+    override suspend fun setPriceChartingToken(token: String) = error("not used")
+
+    override suspend fun getMarketSettings() = error("not used")
+
+    override suspend fun setMarketSettings(settings: com.megamaced.crate.domain.model.MarketSettings) = error("not used")
+
+    override suspend fun setCurrency(currency: String) = error("not used")
+
+    override suspend fun getCurrencies() = error("not used")
 }

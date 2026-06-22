@@ -222,6 +222,7 @@ private class FakeSettingsRepository : SettingsRepository {
                 autoFetchMarketRates = false,
                 autoEnrichOnClick = false,
                 autoEnrichOnImport = false,
+                hiddenCategories = emptySet(),
                 crateVersion = "0.4.2",
             ),
         )
@@ -253,4 +254,9 @@ private class FakeSettingsRepository : SettingsRepository {
     override suspend fun setCurrency(currency: String) = ApiResult.Success(currency)
 
     override suspend fun getCurrencies() = ApiResult.Success(listOf("GBP", "USD", "EUR"))
+
+    override val hiddenCategoriesFlow: kotlinx.coroutines.flow.Flow<Set<com.megamaced.crate.domain.model.Category>> =
+        kotlinx.coroutines.flow.flowOf(emptySet())
+
+    override suspend fun setHiddenCategories(categories: Set<com.megamaced.crate.domain.model.Category>) = ApiResult.Success(Unit)
 }

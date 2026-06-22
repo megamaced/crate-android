@@ -12,6 +12,7 @@ import com.megamaced.crate.domain.model.MediaItem
 import com.megamaced.crate.domain.model.SortDirection
 import com.megamaced.crate.domain.model.SortField
 import com.megamaced.crate.domain.repository.MediaRepository
+import com.megamaced.crate.domain.repository.SettingsRepository
 import com.megamaced.crate.ui.components.FormatBucket
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -36,6 +37,7 @@ data class CollectionUiState(
     val availableFormats: List<FormatBucket> = emptyList(),
     val totalCount: Int = 0,
     val viewMode: CollectionViewMode = CollectionViewMode.Card,
+    val visibleCategories: List<Category> = Category.entries,
     val isRefreshing: Boolean = false,
     val errorMessage: String? = null,
 )
@@ -60,6 +62,7 @@ class CollectionViewModel
     constructor(
         private val mediaRepository: MediaRepository,
         private val collectionPrefs: CollectionPrefs,
+        private val settingsRepository: SettingsRepository,
     ) : ViewModel() {
         private val category = MutableStateFlow(Category.Music)
         private val sort = MutableStateFlow(CollectionSort.Default)
@@ -70,9 +73,30 @@ class CollectionViewModel
         private val filters = combine(category, sort, selectedFormats, ::Filters)
         private val itemsForCategory = category.flatMapLatest { mediaRepository.observeByCategory(it) }
         private val viewMode = collectionPrefs.collectionViewModeFlow
+        private val hiddenCategories = settingsRepository.hiddenCategoriesFlow
 
         val uiState: StateFlow<CollectionUiState> =
-            combine(filters, itemsForCategory, viewMode, isRefreshing, errorMessage) { f, items, mode, refreshing, err ->
+            combine(
+                filters,
+                itemsForCategory,
+                viewMode,
+                isRefreshing,
+                errorMessage,
+                hiddenCategories,
+            ) { args ->
+                @Suppress("UNCHECKED_CAST")
+                val f = args[0] as Filters
+
+                @Suppress("UNCHECKED_CAST")
+                val items = args[1] as List<MediaItem>
+                val mode = args[2] as CollectionViewMode
+                val refreshing = args[3] as Boolean
+
+                @Suppress("UNCHECKED_CAST")
+                val err = args[4] as String?
+
+                @Suppress("UNCHECKED_CAST")
+                val hidden = args[5] as Set<Category>
                 // Counts are computed against the full category list, not the
                 // currently-filtered subset, so toggling one chip doesn't reshuffle
                 // every other chip's number — mirrors CollectionView.vue.
@@ -98,6 +122,7 @@ class CollectionViewModel
                     availableFormats = buckets,
                     totalCount = items.size,
                     viewMode = mode,
+                    visibleCategories = Category.entries.filter { it !in hidden },
                     isRefreshing = refreshing,
                     errorMessage = err,
                 )

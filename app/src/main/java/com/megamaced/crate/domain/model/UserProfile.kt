@@ -9,6 +9,7 @@ data class UserProfile(
     val autoFetchMarketRates: Boolean,
     val autoEnrichOnClick: Boolean,
     val autoEnrichOnImport: Boolean,
+    val hiddenCategories: Set<Category>,
     val crateVersion: String?,
 )
 

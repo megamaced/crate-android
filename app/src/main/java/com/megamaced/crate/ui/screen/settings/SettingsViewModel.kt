@@ -6,6 +6,7 @@ import com.megamaced.crate.data.api.ApiResult
 import com.megamaced.crate.data.auth.SessionManager
 import com.megamaced.crate.data.prefs.ThemeMode
 import com.megamaced.crate.data.prefs.UserPreferences
+import com.megamaced.crate.domain.model.Category
 import com.megamaced.crate.domain.model.MarketSettings
 import com.megamaced.crate.domain.model.UserProfile
 import com.megamaced.crate.domain.repository.EnrichmentRepository
@@ -49,6 +50,7 @@ data class SettingsUiState(
     val refreshAllProgress: RefreshAllProgress? = null,
     val enrichAllProgress: RefreshAllProgress? = null,
     val themeMode: ThemeMode = ThemeMode.System,
+    val hiddenCategories: Set<Category> = emptySet(),
     val updateCheck: UpdateCheckState = UpdateCheckState.Idle,
     val errorMessage: String? = null,
 )
@@ -99,8 +101,9 @@ class SettingsViewModel
                 tokens,
                 userPreferences.flow.map { it.themeMode },
                 combine(refreshProgress, enrichProgress, errorMessage) { r, e, err -> Triple(r, e, err) },
-                updateCheck,
-            ) { (p, m), t, theme, (progress, enrichProg, err), update ->
+                combine(updateCheck, userPreferences.hiddenCategoriesFlow) { u, h -> u to h },
+            ) { (p, m), t, theme, (progress, enrichProg, err), updateAndHidden ->
+                val (update, hidden) = updateAndHidden
                 SettingsUiState(
                     profile = p.profile,
                     isProfileLoading = p.isLoading,
@@ -115,6 +118,7 @@ class SettingsViewModel
                     refreshAllProgress = progress,
                     enrichAllProgress = enrichProg,
                     themeMode = theme,
+                    hiddenCategories = hidden,
                     updateCheck = update,
                     errorMessage = err,
                 )
@@ -305,6 +309,32 @@ class SettingsViewModel
 
         fun setThemeMode(mode: ThemeMode) {
             viewModelScope.launch { userPreferences.setThemeMode(mode) }
+        }
+
+        /**
+         * Toggle visibility of a single category. Always keeps at least one
+         * category visible — the server enforces this too, so an attempt that
+         * would empty the set is short-circuited client-side.
+         */
+        fun setCategoryVisible(
+            category: Category,
+            visible: Boolean,
+        ) {
+            val current = uiState.value.hiddenCategories.toMutableSet()
+            if (visible) {
+                current.remove(category)
+            } else {
+                if (current.size >= Category.entries.size - 1) return
+                current.add(category)
+            }
+            viewModelScope.launch {
+                when (val result = settingsRepository.setHiddenCategories(current)) {
+                    is ApiResult.Success -> { /* userPreferences cache updated inside repo */ }
+                    ApiResult.NetworkError -> reportError("Couldn't reach the server.")
+                    is ApiResult.HttpError -> reportError(result.message ?: "Server error (${result.code}).")
+                    ApiResult.Unauthorised -> { /* SessionManager already handled */ }
+                }
+            }
         }
 
         fun logout() {

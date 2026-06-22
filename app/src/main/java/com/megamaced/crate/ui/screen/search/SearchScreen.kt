@@ -190,6 +190,7 @@ private fun ExternalResults(
         ProviderPicker(
             selected = state.externalCategory,
             onSelected = onCategorySelected,
+            visible = state.visibleCategories,
         )
         Box(modifier = Modifier.fillMaxSize()) {
             when {
@@ -223,18 +224,19 @@ private fun ExternalResults(
 private fun ProviderPicker(
     selected: Category,
     onSelected: (Category) -> Unit,
+    visible: List<Category>,
 ) {
-    val options = remember { Category.entries }
+    if (visible.isEmpty()) return
     SingleChoiceSegmentedButtonRow(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp),
     ) {
-        options.forEachIndexed { index, category ->
+        visible.forEachIndexed { index, category ->
             SegmentedButton(
                 selected = category == selected,
                 onClick = { onSelected(category) },
-                shape = SegmentedButtonDefaults.itemShape(index = index, count = options.size),
+                shape = SegmentedButtonDefaults.itemShape(index = index, count = visible.size),
             ) {
                 Text(category.label)
             }

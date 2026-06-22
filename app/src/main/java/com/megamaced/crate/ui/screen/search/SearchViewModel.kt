@@ -13,6 +13,7 @@ import com.megamaced.crate.data.api.dto.TmdbSearchResultDto
 import com.megamaced.crate.domain.model.Category
 import com.megamaced.crate.domain.model.MediaItem
 import com.megamaced.crate.domain.repository.MediaRepository
+import com.megamaced.crate.domain.repository.SettingsRepository
 import com.megamaced.crate.ui.screen.addedit.ExternalSearchResult
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -40,6 +41,7 @@ data class SearchUiState(
     val isExternalLoading: Boolean = false,
     val externalError: String? = null,
     val externalHasSearched: Boolean = false,
+    val visibleCategories: List<Category> = Category.entries,
 )
 
 @OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
@@ -49,6 +51,7 @@ class SearchViewModel
     constructor(
         private val api: CrateApiService,
         mediaRepository: MediaRepository,
+        settingsRepository: SettingsRepository,
     ) : ViewModel() {
         private val query = MutableStateFlow("")
         private val tab = MutableStateFlow(SearchTab.Collection)
@@ -75,13 +78,18 @@ class SearchViewModel
                     initialValue = emptyList(),
                 )
 
+        private val hiddenCategories = settingsRepository.hiddenCategoriesFlow
+
         val uiState: StateFlow<SearchUiState> =
             combine(
                 combine(query, tab, externalCategory) { q, t, c -> Triple(q, t, c) },
                 collectionResults,
                 externalResults,
                 combine(isExternalLoading, externalError, externalHasSearched) { l, e, s -> Triple(l, e, s) },
-            ) { (q, t, c), coll, ext, (loading, err, searched) ->
+                hiddenCategories,
+            ) { qtc, coll, ext, lesTriple, hidden ->
+                val (q, t, c) = qtc
+                val (loading, err, searched) = lesTriple
                 SearchUiState(
                     query = q,
                     tab = t,
@@ -91,6 +99,7 @@ class SearchViewModel
                     isExternalLoading = loading,
                     externalError = err,
                     externalHasSearched = searched,
+                    visibleCategories = Category.entries.filter { it !in hidden },
                 )
             }.stateIn(
                 scope = viewModelScope,

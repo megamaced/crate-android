@@ -52,6 +52,7 @@ fun MeDto.toDomain(): UserProfile =
         autoFetchMarketRates = autoFetchMarketRates,
         autoEnrichOnClick = autoEnrichOnClick,
         autoEnrichOnImport = autoEnrichOnImport,
+        hiddenCategories = hiddenCategories.mapNotNull { Category.fromApi(it) }.toSet(),
         crateVersion = crateVersion,
     )
 

@@ -6,7 +6,9 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.megamaced.crate.domain.model.Category
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -43,6 +45,7 @@ data class UserPrefs(
     val lastSeenWipedAt: String? = null,
     val themeMode: ThemeMode = ThemeMode.System,
     val collectionViewMode: CollectionViewMode = CollectionViewMode.Card,
+    val hiddenCategories: Set<Category> = emptySet(),
 )
 
 @Singleton
@@ -62,8 +65,19 @@ class UserPreferences
                     collectionViewMode =
                         prefs[Keys.COLLECTION_VIEW_MODE]?.let(::parseCollectionViewMode)
                             ?: CollectionViewMode.Card,
+                    hiddenCategories =
+                        prefs[Keys.HIDDEN_CATEGORIES]
+                            ?.mapNotNull(Category::fromApi)
+                            ?.toSet()
+                            .orEmpty(),
                 )
             }
+
+        val hiddenCategoriesFlow: Flow<Set<Category>> = flow.map { it.hiddenCategories }
+
+        suspend fun setHiddenCategories(categories: Set<Category>) {
+            ds.edit { it[Keys.HIDDEN_CATEGORIES] = categories.map { c -> c.apiValue }.toSet() }
+        }
 
         suspend fun setLastSyncCursor(cursor: String?) {
             ds.edit { it.write(Keys.LAST_SYNC_CURSOR, cursor) }
@@ -117,6 +131,7 @@ class UserPreferences
             val LAST_SEEN_WIPED_AT = stringPreferencesKey("last_seen_wiped_at")
             val THEME_MODE = stringPreferencesKey("theme_mode")
             val COLLECTION_VIEW_MODE = stringPreferencesKey("collection_view_mode")
+            val HIDDEN_CATEGORIES = stringSetPreferencesKey("hidden_categories")
             val UPDATE_LAST_CHECKED_AT = longPreferencesKey("update_last_checked_at")
             val UPDATE_LAST_NOTIFIED_VERSION = stringPreferencesKey("update_last_notified_version")
         }

@@ -10,6 +10,8 @@ import com.megamaced.crate.data.api.dto.CurrencyResponseDto
 import com.megamaced.crate.data.api.dto.DiscogsSearchResultDto
 import com.megamaced.crate.data.api.dto.HasKeyDto
 import com.megamaced.crate.data.api.dto.HasTokenDto
+import com.megamaced.crate.data.api.dto.HiddenCategoriesRequest
+import com.megamaced.crate.data.api.dto.HiddenCategoriesResponse
 import com.megamaced.crate.data.api.dto.HomeFeedDto
 import com.megamaced.crate.data.api.dto.KeyRequest
 import com.megamaced.crate.data.api.dto.MarketSettingsDto
@@ -118,6 +120,12 @@ interface CrateApiService {
     @OcsResponse
     @GET(API_BASE + "settings/currencies")
     suspend fun getCurrencies(): List<String>
+
+    @OcsResponse
+    @PUT(API_BASE + "settings/hidden-categories")
+    suspend fun setHiddenCategories(
+        @Body body: HiddenCategoriesRequest,
+    ): HiddenCategoriesResponse
 
     // -- Media (always paginated; pass updatedSince for delta sync) -----------
 

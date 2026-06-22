@@ -146,6 +146,12 @@ fun SettingsScreen(
                 onThemeChange = viewModel::setThemeMode,
             )
 
+            SectionHeader("Categories")
+            CategoriesSection(
+                hidden = state.hiddenCategories,
+                onSetVisible = viewModel::setCategoryVisible,
+            )
+
             SectionHeader("Sharing")
             ShareSection(
                 onShareLibrary = { shareSheet = ShareTarget.Library to "" },
@@ -569,6 +575,52 @@ private fun ThemeSection(
                     ) {
                         Text(mode.name)
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CategoriesSection(
+    hidden: Set<Category>,
+    onSetVisible: (Category, Boolean) -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                text = "Hide categories you don't use. Hidden categories disappear from navigation and search. At least one must remain visible.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Category.entries.forEach { cat ->
+                val isVisible = cat !in hidden
+                // Don't let the user hide the last visible category.
+                val canToggleOff = hidden.size < Category.entries.size - 1
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = cat.label,
+                        modifier = Modifier.weight(1f),
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                    Switch(
+                        checked = isVisible,
+                        // Disable only when this is the last visible category —
+                        // you can always un-hide, but you can't hide everything.
+                        enabled = !isVisible || canToggleOff,
+                        onCheckedChange = { visible -> onSetVisible(cat, visible) },
+                    )
                 }
             }
         }

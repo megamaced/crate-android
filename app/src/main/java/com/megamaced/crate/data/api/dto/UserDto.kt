@@ -12,7 +12,18 @@ data class MeDto(
     val autoFetchMarketRates: Boolean = false,
     val autoEnrichOnClick: Boolean = false,
     val autoEnrichOnImport: Boolean = false,
+    val hiddenCategories: List<String> = emptyList(),
     val crateVersion: String? = null,
+)
+
+@Serializable
+data class HiddenCategoriesRequest(
+    val categories: List<String>,
+)
+
+@Serializable
+data class HiddenCategoriesResponse(
+    val hiddenCategories: List<String> = emptyList(),
 )
 
 @Serializable

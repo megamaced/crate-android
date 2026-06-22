@@ -89,7 +89,7 @@ class ItemDetailViewModel
                 if (result is ApiResult.Success) item = result.value
             }
 
-            if (me.autoFetchMarketRates && item.marketValue == null && shouldAutoFetchMarket(item)) {
+            if (me.autoFetchMarketRates && !item.marketValue.isPresent && shouldAutoFetchMarket(item)) {
                 enrichmentRepository.fetchMarketValue(itemId)
             }
         }

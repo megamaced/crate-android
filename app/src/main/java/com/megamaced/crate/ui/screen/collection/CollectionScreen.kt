@@ -121,6 +121,7 @@ fun CollectionScreen(
                 CategorySegmentedRow(
                     selected = uiState.category,
                     onCategorySelected = viewModel::selectCategory,
+                    visible = uiState.visibleCategories,
                 )
                 FormatFilterChips(
                     formats = uiState.availableFormats,
