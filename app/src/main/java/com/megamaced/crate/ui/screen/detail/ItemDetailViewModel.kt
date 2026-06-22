@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.megamaced.crate.data.api.ApiResult
+import com.megamaced.crate.domain.model.Category
 import com.megamaced.crate.domain.model.MediaItem
 import com.megamaced.crate.domain.repository.EnrichmentRepository
 import com.megamaced.crate.domain.repository.MediaRepository
@@ -75,19 +76,33 @@ class ItemDetailViewModel
         init {
             viewModelScope.launch {
                 mediaRepository.refreshSingle(itemId)
-                autoEnrichIfEnabled()
+                runAutoBackgroundFetches()
             }
         }
 
-        private suspend fun autoEnrichIfEnabled() {
-            val meResult = settingsRepository.getMe()
-            val autoEnrich = (meResult as? ApiResult.Success)?.value?.autoEnrichOnClick == true
-            if (!autoEnrich) return
-            val item = mediaRepository.observe(itemId).firstOrNull()
-            if (item != null && item.genres.isNullOrBlank() && item.artistBio.isNullOrBlank()) {
-                enrichmentRepository.enrich(itemId)
+        private suspend fun runAutoBackgroundFetches() {
+            val me = (settingsRepository.getMe() as? ApiResult.Success)?.value ?: return
+            var item = mediaRepository.observe(itemId).firstOrNull() ?: return
+
+            if (me.autoEnrichOnClick && item.genres.isNullOrBlank() && item.artistBio.isNullOrBlank()) {
+                val result = enrichmentRepository.enrich(itemId)
+                if (result is ApiResult.Success) item = result.value
+            }
+
+            if (me.autoFetchMarketRates && item.marketValue == null && shouldAutoFetchMarket(item)) {
+                enrichmentRepository.fetchMarketValue(itemId)
             }
         }
+
+        // Mirrors the NC web app's shouldAutoFetchMarket() — music needs a Discogs ID
+        // (the lookup keys on it); game/comic key on the item's title via PriceCharting;
+        // book and film have no market-value source.
+        private fun shouldAutoFetchMarket(item: MediaItem): Boolean =
+            when (item.category) {
+                Category.Music -> !item.discogsId.isNullOrBlank()
+                Category.Games, Category.Comics -> !item.title.isNullOrBlank()
+                else -> false
+            }
 
         fun enrich() {
             run(DetailAction.Enrich) { enrichmentRepository.enrich(itemId) }
