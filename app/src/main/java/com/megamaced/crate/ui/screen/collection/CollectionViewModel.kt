@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.time.LocalDate
 import javax.inject.Inject
 
 data class CollectionUiState(
@@ -31,11 +32,19 @@ data class CollectionUiState(
     val sort: CollectionSort = CollectionSort.Default,
     val selectedFormats: Set<String> = emptySet(),
     val items: List<MediaItem> = emptyList(),
+    val groups: List<ItemGroup> = emptyList(),
     val availableFormats: List<FormatBucket> = emptyList(),
     val totalCount: Int = 0,
     val viewMode: CollectionViewMode = CollectionViewMode.Card,
     val isRefreshing: Boolean = false,
     val errorMessage: String? = null,
+)
+
+// One date-bucket group when sorting by CreatedAt. For other sort axes a single
+// group with header = null is emitted so the View can render uniformly.
+data class ItemGroup(
+    val header: String?,
+    val items: List<MediaItem>,
 )
 
 private data class Filters(
@@ -78,12 +87,14 @@ class CollectionViewModel
                 val filtered =
                     if (activeFormats.isEmpty()) items else items.filter { it.format in activeFormats }
                 val sorted = filtered.sortedWith(comparatorFor(f.sort))
+                val groups = groupForSort(sorted, f.sort.axis)
 
                 CollectionUiState(
                     category = f.category,
                     sort = f.sort,
                     selectedFormats = activeFormats,
                     items = sorted,
+                    groups = groups,
                     availableFormats = buckets,
                     totalCount = items.size,
                     viewMode = mode,
@@ -151,6 +162,33 @@ class CollectionViewModel
             errorMessage.value = null
         }
     }
+
+// Date-bucket grouping mirrors CollectionView.vue. We only attach headers for
+// the CreatedAt axis today; other axes (Artist / Title / Year / Format)
+// emit one anonymous group so the View can render uniformly without headers.
+private fun groupForSort(
+    items: List<MediaItem>,
+    axis: SortField,
+): List<ItemGroup> {
+    if (items.isEmpty()) return emptyList()
+    if (axis != SortField.CreatedAt) return listOf(ItemGroup(header = null, items = items))
+
+    val today = LocalDate.now()
+    val out = mutableListOf<ItemGroup>()
+    val seen = HashMap<String, MutableList<MediaItem>>()
+    for (item in items) {
+        val key = DateBucket.labelFor(item.createdAt, today)
+        val bucket = seen[key]
+        if (bucket == null) {
+            val list = mutableListOf(item)
+            seen[key] = list
+            out.add(ItemGroup(header = key, items = list))
+        } else {
+            bucket.add(item)
+        }
+    }
+    return out
+}
 
 private fun comparatorFor(sort: CollectionSort): Comparator<MediaItem> {
     val base: Comparator<MediaItem> = when (sort.axis) {

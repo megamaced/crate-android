@@ -1,5 +1,6 @@
 package com.megamaced.crate.ui.screen.collection
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
@@ -129,13 +131,13 @@ fun CollectionScreen(
                 )
                 when (uiState.viewMode) {
                     CollectionViewMode.Card -> CollectionGrid(
-                        items = uiState.items,
+                        groups = uiState.groups,
                         onItemClick = onItemClick,
                         widthSizeClass = widthSizeClass,
                         modifier = Modifier.fillMaxSize(),
                     )
                     CollectionViewMode.List -> CollectionList(
-                        items = uiState.items,
+                        groups = uiState.groups,
                         onItemClick = onItemClick,
                         modifier = Modifier.fillMaxSize(),
                     )
@@ -162,12 +164,12 @@ private fun ViewModeToggle(
 
 @Composable
 private fun CollectionGrid(
-    items: List<MediaItem>,
+    groups: List<ItemGroup>,
     onItemClick: (Long) -> Unit,
     widthSizeClass: WindowWidthSizeClass,
     modifier: Modifier = Modifier,
 ) {
-    if (items.isEmpty()) {
+    if (groups.all { it.items.isEmpty() }) {
         EmptyCollection(modifier)
         return
     }
@@ -185,22 +187,32 @@ private fun CollectionGrid(
         verticalArrangement = Arrangement.spacedBy(12.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        items(items, key = { it.id }) { item ->
-            MediaCard(
-                item = item,
-                onClick = { onItemClick(item.id) },
-            )
+        for (group in groups) {
+            if (group.header != null) {
+                item(
+                    key = "header:${group.header}",
+                    span = { GridItemSpan(maxLineSpan) },
+                ) {
+                    GroupHeader(text = group.header)
+                }
+            }
+            items(group.items, key = { it.id }) { item ->
+                MediaCard(
+                    item = item,
+                    onClick = { onItemClick(item.id) },
+                )
+            }
         }
     }
 }
 
 @Composable
 private fun CollectionList(
-    items: List<MediaItem>,
+    groups: List<ItemGroup>,
     onItemClick: (Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    if (items.isEmpty()) {
+    if (groups.all { it.items.isEmpty() }) {
         EmptyCollection(modifier)
         return
     }
@@ -209,11 +221,31 @@ private fun CollectionList(
         modifier = modifier,
         contentPadding = PaddingValues(vertical = 4.dp),
     ) {
-        items(items, key = { it.id }) { item ->
-            CollectionListRow(item = item, onClick = { onItemClick(item.id) })
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        for (group in groups) {
+            if (group.header != null) {
+                item(key = "header:${group.header}") {
+                    GroupHeader(text = group.header)
+                }
+            }
+            items(group.items, key = { it.id }) { item ->
+                CollectionListRow(item = item, onClick = { onItemClick(item.id) })
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            }
         }
     }
+}
+
+@Composable
+private fun GroupHeader(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surface)
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+    )
 }
 
 @Composable
