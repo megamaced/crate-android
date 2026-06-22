@@ -1,0 +1,12 @@
+* Share your whole library or a single category read-only with another
+  Nextcloud user — see Settings → Sharing.
+* Hide categories you don't use from the segmented row and external
+  search — see Settings → Categories.
+* The collection view now opens on the category you last used, instead
+  of always Music.
+* Detail screen for items shared with you is now read-only — no more
+  enrich / strip / delete buttons that 404'd.
+* Date-bucket headers when sorted by date added (Today / Yesterday /
+  Earlier this week / Last week / …).
+* Market value auto-fetched on item detail when the corresponding
+  setting is on, mirroring the NC web app.
