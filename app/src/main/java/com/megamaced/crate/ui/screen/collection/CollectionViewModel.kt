@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -64,11 +65,16 @@ class CollectionViewModel
         private val collectionPrefs: CollectionPrefs,
         private val settingsRepository: SettingsRepository,
     ) : ViewModel() {
+        // category is initialised optimistically to Music — the init block
+        // resolves the persisted last category (if any) and updates it before
+        // the first user interaction. If the persisted category is now hidden
+        // we fall back to the first visible category instead.
         private val category = MutableStateFlow(Category.Music)
         private val sort = MutableStateFlow(CollectionSort.Default)
         private val selectedFormats = MutableStateFlow<Set<String>>(emptySet())
         private val isRefreshing = MutableStateFlow(false)
         private val errorMessage = MutableStateFlow<String?>(null)
+        private var initialCategoryRestored = false
 
         private val filters = combine(category, sort, selectedFormats, ::Filters)
         private val itemsForCategory = category.flatMapLatest { mediaRepository.observeByCategory(it) }
@@ -133,10 +139,50 @@ class CollectionViewModel
             )
 
         init {
-            refresh()
+            viewModelScope.launch {
+                restoreInitialCategory()
+                refresh()
+            }
+        }
+
+        /**
+         * Reads the persisted last-used category from DataStore (Phase A27).
+         * If the persisted value is now hidden — or never set — falls back to
+         * the first visible category. Only runs once per ViewModel instance.
+         */
+        private suspend fun restoreInitialCategory() {
+            if (initialCategoryRestored) return
+            initialCategoryRestored = true
+            // Capture the construction-time default so we don't clobber a
+            // selectCategory() the user made before our init coroutine was
+            // dispatched — the StandardTestDispatcher in unit tests can defer
+            // this far enough that this race actually matters.
+            val initial = category.value
+            val persisted = collectionPrefs.lastCategoryFlow.firstOrNull()
+            val hidden = settingsRepository.hiddenCategoriesFlow.firstOrNull().orEmpty()
+            val visible = Category.entries.filter { it !in hidden }
+            if (visible.isEmpty()) return // server enforces non-empty; defensive guard
+            val resolved =
+                when {
+                    persisted != null && persisted in visible -> persisted
+                    Category.Music in visible -> Category.Music
+                    else -> visible.first()
+                }
+            if (category.value != initial) return // user interacted while we were awaiting
+            if (resolved != category.value) {
+                category.value = resolved
+                val cfg = CategorySortConfig.forCategory(resolved)
+                if (!cfg.supports(sort.value.axis)) {
+                    sort.value = CollectionSort.Default
+                }
+            }
         }
 
         fun selectCategory(value: Category) {
+            // User picked their own category — short-circuit any pending init
+            // restoration so it can't overwrite this choice when its async
+            // DataStore read completes.
+            initialCategoryRestored = true
             if (value != category.value) {
                 category.value = value
                 selectedFormats.value = emptySet()
@@ -147,6 +193,8 @@ class CollectionViewModel
                 if (!cfg.supports(sort.value.axis)) {
                     sort.value = CollectionSort.Default
                 }
+                // Persist for next launch (Phase A27).
+                viewModelScope.launch { collectionPrefs.setLastCategory(value) }
                 refresh()
             }
         }

@@ -595,7 +595,9 @@ private fun CategoriesSection(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(
-                text = "Hide categories you don't use. Hidden categories disappear from navigation and search. At least one must remain visible.",
+                text =
+                    "Hide categories you don't use. Hidden categories disappear from navigation and search. " +
+                        "At least one must remain visible.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

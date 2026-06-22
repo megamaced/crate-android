@@ -266,10 +266,18 @@ private fun item(
 
 private class FakeCollectionPrefs : CollectionPrefs {
     private val mode = MutableStateFlow(CollectionViewMode.Card)
+    private val lastCategory = MutableStateFlow<Category?>(null)
+
     override val collectionViewModeFlow: Flow<CollectionViewMode> = mode
 
     override suspend fun setCollectionViewMode(mode: CollectionViewMode) {
         this.mode.value = mode
+    }
+
+    override val lastCategoryFlow: Flow<Category?> = lastCategory
+
+    override suspend fun setLastCategory(category: Category) {
+        this.lastCategory.value = category
     }
 }
 

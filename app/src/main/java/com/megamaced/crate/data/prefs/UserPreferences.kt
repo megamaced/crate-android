@@ -38,6 +38,11 @@ interface CollectionPrefs {
     val collectionViewModeFlow: Flow<CollectionViewMode>
 
     suspend fun setCollectionViewMode(mode: CollectionViewMode)
+
+    /** Last category the user opened the Collection view on, persisted across launches. */
+    val lastCategoryFlow: Flow<Category?>
+
+    suspend fun setLastCategory(category: Category)
 }
 
 data class UserPrefs(
@@ -46,6 +51,7 @@ data class UserPrefs(
     val themeMode: ThemeMode = ThemeMode.System,
     val collectionViewMode: CollectionViewMode = CollectionViewMode.Card,
     val hiddenCategories: Set<Category> = emptySet(),
+    val lastCategory: Category? = null,
 )
 
 @Singleton
@@ -70,6 +76,7 @@ class UserPreferences
                             ?.mapNotNull(Category::fromApi)
                             ?.toSet()
                             .orEmpty(),
+                    lastCategory = prefs[Keys.LAST_CATEGORY]?.let(Category::fromApi),
                 )
             }
 
@@ -96,6 +103,12 @@ class UserPreferences
 
         override suspend fun setCollectionViewMode(mode: CollectionViewMode) {
             ds.edit { it[Keys.COLLECTION_VIEW_MODE] = mode.name }
+        }
+
+        override val lastCategoryFlow: Flow<Category?> = flow.map { it.lastCategory }
+
+        override suspend fun setLastCategory(category: Category) {
+            ds.edit { it[Keys.LAST_CATEGORY] = category.apiValue }
         }
 
         suspend fun getUpdateState(): UpdateCheckState {
@@ -132,6 +145,7 @@ class UserPreferences
             val THEME_MODE = stringPreferencesKey("theme_mode")
             val COLLECTION_VIEW_MODE = stringPreferencesKey("collection_view_mode")
             val HIDDEN_CATEGORIES = stringSetPreferencesKey("hidden_categories")
+            val LAST_CATEGORY = stringPreferencesKey("last_category")
             val UPDATE_LAST_CHECKED_AT = longPreferencesKey("update_last_checked_at")
             val UPDATE_LAST_NOTIFIED_VERSION = stringPreferencesKey("update_last_notified_version")
         }
