@@ -1,0 +1,2 @@
+* Cosmetic fix: Categories + Sharing settings cards now match the
+  background tone of the rest of the Settings screen.
