@@ -38,15 +38,16 @@ import com.megamaced.crate.domain.model.UserSearchResult
 @Composable
 fun ShareSheet(
     target: ShareTarget,
-    resourceId: Long,
+    resourceId: Long = 0,
+    category: String = "",
     onDismiss: () -> Unit,
-    viewModel: ShareSheetViewModel = hiltViewModel(key = "share-${target.name}-$resourceId"),
+    viewModel: ShareSheetViewModel = hiltViewModel(key = "share-${target.name}-$resourceId-$category"),
 ) {
     val state by viewModel.state.collectAsState()
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    LaunchedEffect(target, resourceId) {
-        viewModel.bind(target, resourceId)
+    LaunchedEffect(target, resourceId, category) {
+        viewModel.bind(target, resourceId, category)
     }
 
     ModalBottomSheet(
@@ -65,9 +66,18 @@ fun ShareSheet(
                     when (target) {
                         ShareTarget.Album -> "Share item"
                         ShareTarget.Playlist -> "Share playlist"
+                        ShareTarget.Library -> "Share whole library"
+                        ShareTarget.Category -> "Share ${category.replaceFirstChar { it.uppercase() }}"
                     },
                 style = MaterialTheme.typography.titleLarge,
             )
+            if (target == ShareTarget.Library || target == ShareTarget.Category) {
+                Text(
+                    text = "Sharees can view items here. Read-only.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             OutlinedTextField(
                 value = state.query,
                 onValueChange = viewModel::onQueryChange,

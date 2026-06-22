@@ -361,6 +361,29 @@ interface CrateApiService {
     ): List<ShareDto>
 
     @OcsResponse
+    @POST(API_BASE + "share/library")
+    suspend fun shareLibrary(
+        @Body body: ShareRequest,
+    ): ShareDto
+
+    @OcsResponse
+    @GET(API_BASE + "share/library")
+    suspend fun listLibraryShares(): List<ShareDto>
+
+    @OcsResponse
+    @POST(API_BASE + "share/category/{category}")
+    suspend fun shareCategory(
+        @Path("category") category: String,
+        @Body body: ShareRequest,
+    ): ShareDto
+
+    @OcsResponse
+    @GET(API_BASE + "share/category/{category}")
+    suspend fun listCategoryShares(
+        @Path("category") category: String,
+    ): List<ShareDto>
+
+    @OcsResponse
     @GET(API_BASE + "share/with-me")
     suspend fun sharedWithMe(): SharedWithMeDto
 

@@ -22,6 +22,17 @@ interface ShareRepository {
         targetUserId: String,
     ): ApiResult<Share>
 
+    suspend fun listLibraryShares(): ApiResult<List<Share>>
+
+    suspend fun shareLibrary(targetUserId: String): ApiResult<Share>
+
+    suspend fun listCategoryShares(category: String): ApiResult<List<Share>>
+
+    suspend fun shareCategory(
+        category: String,
+        targetUserId: String,
+    ): ApiResult<Share>
+
     suspend fun sharedWithMe(): ApiResult<SharedWithMe>
 
     suspend fun removeShare(shareId: Long): ApiResult<Unit>

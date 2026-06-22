@@ -174,6 +174,17 @@ class FakeCrateApiService : CrateApiService {
 
     override suspend fun listPlaylistShares(id: Long): List<ShareDto> = unsupported()
 
+    override suspend fun shareLibrary(body: ShareRequest): ShareDto = unsupported()
+
+    override suspend fun listLibraryShares(): List<ShareDto> = unsupported()
+
+    override suspend fun shareCategory(
+        category: String,
+        body: ShareRequest,
+    ): ShareDto = unsupported()
+
+    override suspend fun listCategoryShares(category: String): List<ShareDto> = unsupported()
+
     override suspend fun sharedWithMe(): SharedWithMeDto = unsupported()
 
     override suspend fun removeShare(id: Long) = unsupported()

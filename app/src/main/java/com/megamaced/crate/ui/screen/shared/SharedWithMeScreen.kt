@@ -111,8 +111,9 @@ fun SharedWithMeScreen(
                                 SharedTab.Playlists -> data.playlists
                                 SharedTab.Items -> emptyList()
                             }
+                        val itemsTabEmpty = data.albums.isEmpty() && data.libraries.isEmpty() && data.categories.isEmpty()
                         when {
-                            tab == SharedTab.Items && data.albums.isEmpty() ->
+                            tab == SharedTab.Items && itemsTabEmpty ->
                                 EmptyState(
                                     title = "No items shared with you",
                                     subtitle = "Ask a Nextcloud user to share something from their collection.",
@@ -132,6 +133,32 @@ fun SharedWithMeScreen(
                                             onClick = { onItemClick(item.id) },
                                         )
                                         HorizontalDivider()
+                                    }
+                                    if (tab == SharedTab.Items) {
+                                        data.libraries.forEach { lib ->
+                                            item(key = "lib-header-${lib.shareId}") {
+                                                ScopeHeader(
+                                                    text = "${lib.sharedByUser}'s library",
+                                                    sub = "${lib.items.size} item${if (lib.items.size == 1) "" else "s"}",
+                                                )
+                                            }
+                                            items(lib.items, key = { "lib-${lib.shareId}-${it.id}" }) { item ->
+                                                SharedItemRow(item = item, onClick = { onItemClick(item.id) })
+                                                HorizontalDivider()
+                                            }
+                                        }
+                                        data.categories.forEach { cat ->
+                                            item(key = "cat-header-${cat.shareId}") {
+                                                ScopeHeader(
+                                                    text = "${cat.sharedByUser}'s ${cat.category?.label ?: "items"}",
+                                                    sub = "${cat.items.size} item${if (cat.items.size == 1) "" else "s"}",
+                                                )
+                                            }
+                                            items(cat.items, key = { "cat-${cat.shareId}-${it.id}" }) { item ->
+                                                SharedItemRow(item = item, onClick = { onItemClick(item.id) })
+                                                HorizontalDivider()
+                                            }
+                                        }
                                     }
                                     items(playlists, key = { "playlist-${it.id}" }) { playlist ->
                                         SharedPlaylistRow(
@@ -170,6 +197,29 @@ private fun SharedTabRow(
                 Text(option.name)
             }
         }
+    }
+}
+
+@Composable
+private fun ScopeHeader(
+    text: String,
+    sub: String,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.titleSmall,
+        )
+        Text(
+            text = sub,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 

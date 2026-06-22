@@ -19,11 +19,16 @@ import javax.inject.Inject
 enum class ShareTarget {
     Album,
     Playlist,
+    Library,
+    Category,
 }
 
 data class ShareSheetUiState(
     val target: ShareTarget = ShareTarget.Album,
+    // resourceId carries album/playlist ID for Album/Playlist; ignored for Library/Category.
     val resourceId: Long = 0,
+    // category key for Category target; empty for others.
+    val category: String = "",
     val isLoadingShares: Boolean = false,
     val isSearching: Boolean = false,
     val isWorking: Boolean = false,
@@ -43,15 +48,23 @@ class ShareSheetViewModel
         val state: StateFlow<ShareSheetUiState> = _state.asStateFlow()
 
         private var searchJob: Job? = null
-        private var bound: Pair<ShareTarget, Long>? = null
+        private var bound: Triple<ShareTarget, Long, String>? = null
 
         fun bind(
             target: ShareTarget,
-            resourceId: Long,
+            resourceId: Long = 0,
+            category: String = "",
         ) {
-            if (bound == target to resourceId) return
-            bound = target to resourceId
-            _state.value = ShareSheetUiState(target = target, resourceId = resourceId, isLoadingShares = true)
+            val key = Triple(target, resourceId, category)
+            if (bound == key) return
+            bound = key
+            _state.value =
+                ShareSheetUiState(
+                    target = target,
+                    resourceId = resourceId,
+                    category = category,
+                    isLoadingShares = true,
+                )
             refresh()
         }
 
@@ -63,6 +76,8 @@ class ShareSheetViewModel
                     when (current.target) {
                         ShareTarget.Album -> shareRepository.listAlbumShares(current.resourceId)
                         ShareTarget.Playlist -> shareRepository.listPlaylistShares(current.resourceId)
+                        ShareTarget.Library -> shareRepository.listLibraryShares()
+                        ShareTarget.Category -> shareRepository.listCategoryShares(current.category)
                     }
                 when (result) {
                     is ApiResult.Success ->
@@ -121,6 +136,8 @@ class ShareSheetViewModel
                     when (current.target) {
                         ShareTarget.Album -> shareRepository.shareAlbum(current.resourceId, targetUserId)
                         ShareTarget.Playlist -> shareRepository.sharePlaylist(current.resourceId, targetUserId)
+                        ShareTarget.Library -> shareRepository.shareLibrary(targetUserId)
+                        ShareTarget.Category -> shareRepository.shareCategory(current.category, targetUserId)
                     }
                 when (result) {
                     is ApiResult.Success ->

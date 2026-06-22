@@ -61,7 +61,10 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import coil3.compose.SubcomposeAsyncImage
 import com.megamaced.crate.data.prefs.ThemeMode
+import com.megamaced.crate.domain.model.Category
 import com.megamaced.crate.domain.model.UserProfile
+import com.megamaced.crate.ui.screen.share.ShareSheet
+import com.megamaced.crate.ui.screen.share.ShareTarget
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -73,6 +76,10 @@ fun SettingsScreen(
     val state by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     var confirmLogout by remember { mutableStateOf(false) }
+    // Share-sheet state: ShareTarget plus optional category key. Library/category
+    // shares don't need a resourceId because the (owner, type[, category]) tuple
+    // alone identifies them server-side.
+    var shareSheet by remember { mutableStateOf<Pair<ShareTarget, String>?>(null) }
 
     LaunchedEffect(state.errorMessage) {
         state.errorMessage?.let { msg ->
@@ -139,6 +146,12 @@ fun SettingsScreen(
                 onThemeChange = viewModel::setThemeMode,
             )
 
+            SectionHeader("Sharing")
+            ShareSection(
+                onShareLibrary = { shareSheet = ShareTarget.Library to "" },
+                onShareCategory = { cat -> shareSheet = ShareTarget.Category to cat.apiValue },
+            )
+
             SectionHeader("Account")
             Button(
                 onClick = { confirmLogout = true },
@@ -159,6 +172,14 @@ fun SettingsScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
         }
+    }
+
+    shareSheet?.let { (target, category) ->
+        ShareSheet(
+            target = target,
+            category = category,
+            onDismiss = { shareSheet = null },
+        )
     }
 
     if (confirmLogout) {
@@ -548,6 +569,47 @@ private fun ThemeSection(
                     ) {
                         Text(mode.name)
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ShareSection(
+    onShareLibrary: () -> Unit,
+    onShareCategory: (Category) -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                text = "Share read-only with another Nextcloud user. Individual items and playlists are shared from the item itself.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Button(
+                onClick = onShareLibrary,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("Share whole library…")
+            }
+            HorizontalDivider()
+            Text(
+                text = "Or share a single category:",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Category.entries.forEach { cat ->
+                TextButton(
+                    onClick = { onShareCategory(cat) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("Share ${cat.label}…")
                 }
             }
         }

@@ -37,6 +37,19 @@ class ShareRepositoryImpl
             targetUserId: String,
         ): ApiResult<Share> = apiCall { api.sharePlaylist(playlistId, ShareRequest(targetUserId)).toDomain() }
 
+        override suspend fun listLibraryShares(): ApiResult<List<Share>> = apiCall { api.listLibraryShares().map { it.toDomain() } }
+
+        override suspend fun shareLibrary(targetUserId: String): ApiResult<Share> =
+            apiCall { api.shareLibrary(ShareRequest(targetUserId)).toDomain() }
+
+        override suspend fun listCategoryShares(category: String): ApiResult<List<Share>> =
+            apiCall { api.listCategoryShares(category).map { it.toDomain() } }
+
+        override suspend fun shareCategory(
+            category: String,
+            targetUserId: String,
+        ): ApiResult<Share> = apiCall { api.shareCategory(category, ShareRequest(targetUserId)).toDomain() }
+
         override suspend fun sharedWithMe(): ApiResult<SharedWithMe> = apiCall { api.sharedWithMe().toDomain() }
 
         override suspend fun removeShare(shareId: Long): ApiResult<Unit> = apiCall { api.removeShare(shareId) }
