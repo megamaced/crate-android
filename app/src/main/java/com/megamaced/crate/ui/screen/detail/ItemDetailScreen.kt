@@ -109,7 +109,9 @@ fun ItemDetailScreen(
                 },
                 actions = {
                     val item = uiState.item
-                    if (item != null) {
+                    // Shared items are read-only — the server would 404 every
+                    // write call anyway, so we hide the kebab menu entirely.
+                    if (item != null && !uiState.isShared) {
                         IconButton(onClick = { menuExpanded = true }) {
                             Icon(
                                 imageVector = Icons.Filled.MoreVert,
@@ -167,6 +169,7 @@ fun ItemDetailScreen(
             else -> ItemDetailContent(
                 item = item,
                 activeAction = uiState.activeAction,
+                sharedByUser = uiState.sharedByUser,
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding),
@@ -254,6 +257,7 @@ private fun DetailMenu(
 private fun ItemDetailContent(
     item: MediaItem,
     activeAction: DetailAction?,
+    sharedByUser: String?,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -286,6 +290,13 @@ private fun ItemDetailContent(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            if (sharedByUser != null) {
+                Text(
+                    text = "Shared by $sharedByUser · read-only",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             Text(
                 text = item.title,
                 style = MaterialTheme.typography.headlineSmall,

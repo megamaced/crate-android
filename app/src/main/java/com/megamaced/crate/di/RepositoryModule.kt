@@ -1,5 +1,7 @@
 package com.megamaced.crate.di
 
+import com.megamaced.crate.data.auth.CurrentSession
+import com.megamaced.crate.data.auth.TokenStoreCurrentSession
 import com.megamaced.crate.data.mapper.MediaItemJsonCodec
 import com.megamaced.crate.data.repository.EnrichmentRepositoryImpl
 import com.megamaced.crate.data.repository.HomeRepositoryImpl
@@ -47,6 +49,10 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindSettingsRepository(impl: SettingsRepositoryImpl): SettingsRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindCurrentSession(impl: TokenStoreCurrentSession): CurrentSession
 
     companion object {
         @Provides

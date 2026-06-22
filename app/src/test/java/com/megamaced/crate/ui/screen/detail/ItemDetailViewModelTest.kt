@@ -81,7 +81,18 @@ class ItemDetailViewModelTest {
         media: MediaRepository,
         enrichment: EnrichmentRepository,
         itemId: Long,
-    ): ItemDetailViewModel = ItemDetailViewModel(SavedStateHandle(mapOf("itemId" to itemId)), media, enrichment, FakeSettingsRepository())
+    ): ItemDetailViewModel =
+        ItemDetailViewModel(
+            SavedStateHandle(mapOf("itemId" to itemId)),
+            media,
+            enrichment,
+            FakeSettingsRepository(),
+            FakeCurrentSession(),
+        )
+}
+
+private class FakeCurrentSession : com.megamaced.crate.data.auth.CurrentSession {
+    override fun loginName(): String? = "test"
 }
 
 private class FakeMediaRepository : MediaRepository {

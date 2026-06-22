@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.megamaced.crate.data.api.ApiResult
+import com.megamaced.crate.data.auth.CurrentSession
 import com.megamaced.crate.domain.model.Category
 import com.megamaced.crate.domain.model.MediaItem
 import com.megamaced.crate.domain.repository.EnrichmentRepository
@@ -26,6 +27,11 @@ data class ItemDetailUiState(
     val activeAction: DetailAction? = null,
     val errorMessage: String? = null,
     val deleted: Boolean = false,
+    // True when the loaded item belongs to another user — i.e. visible to us
+    // only via a share. Write actions (enrich/strip/market-fetch/delete) are
+    // hidden in the UI in this case; the server enforces it too.
+    val isShared: Boolean = false,
+    val sharedByUser: String? = null,
 )
 
 enum class DetailAction {
@@ -43,6 +49,7 @@ class ItemDetailViewModel
         private val mediaRepository: MediaRepository,
         private val enrichmentRepository: EnrichmentRepository,
         private val settingsRepository: SettingsRepository,
+        currentSession: CurrentSession,
     ) : ViewModel() {
         private val itemId: Long = checkNotNull(savedStateHandle["itemId"]) {
             "Detail route requires an itemId argument"
@@ -52,6 +59,10 @@ class ItemDetailViewModel
         private val errorMessage = MutableStateFlow<String?>(null)
         private val deleted = MutableStateFlow(false)
 
+        // Login name is read once at construction; it doesn't change without
+        // a re-authentication that would tear this ViewModel down anyway.
+        private val currentLoginName: String? = currentSession.loginName()
+
         val uiState: StateFlow<ItemDetailUiState> =
             combine(
                 mediaRepository.observe(itemId),
@@ -59,6 +70,8 @@ class ItemDetailViewModel
                 errorMessage,
                 deleted,
             ) { item, action, err, isDeleted ->
+                val itemOwner = item?.userId
+                val shared = item != null && itemOwner != null && currentLoginName != null && itemOwner != currentLoginName
                 ItemDetailUiState(
                     itemId = itemId,
                     item = item,
@@ -66,6 +79,8 @@ class ItemDetailViewModel
                     activeAction = action,
                     errorMessage = err,
                     deleted = isDeleted,
+                    isShared = shared,
+                    sharedByUser = if (shared) itemOwner else null,
                 )
             }.stateIn(
                 scope = viewModelScope,
@@ -83,6 +98,11 @@ class ItemDetailViewModel
         private suspend fun runAutoBackgroundFetches() {
             val me = (settingsRepository.getMe() as? ApiResult.Success)?.value ?: return
             var item = mediaRepository.observe(itemId).firstOrNull() ?: return
+
+            // Shared items are read-only — write paths 404 server-side, so skip.
+            if (item.userId != null && currentLoginName != null && item.userId != currentLoginName) {
+                return
+            }
 
             if (me.autoEnrichOnClick && item.genres.isNullOrBlank() && item.artistBio.isNullOrBlank()) {
                 val result = enrichmentRepository.enrich(itemId)
