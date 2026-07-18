@@ -35,6 +35,9 @@ data class ShareSheetUiState(
     val query: String = "",
     val results: List<UserSearchResult> = emptyList(),
     val existingShares: List<Share> = emptyList(),
+    // Access level to grant when the user picks someone. Defaults to
+    // read-only; the sheet exposes a toggle to switch to read/write.
+    val grantCanWrite: Boolean = false,
     val errorMessage: String? = null,
 )
 
@@ -128,16 +131,21 @@ class ShareSheetViewModel
                 }
         }
 
+        fun onPermissionChange(canWrite: Boolean) {
+            _state.update { it.copy(grantCanWrite = canWrite) }
+        }
+
         fun share(targetUserId: String) {
             val current = _state.value
+            val canWrite = current.grantCanWrite
             viewModelScope.launch {
                 _state.update { it.copy(isWorking = true, errorMessage = null) }
                 val result =
                     when (current.target) {
-                        ShareTarget.Album -> shareRepository.shareAlbum(current.resourceId, targetUserId)
-                        ShareTarget.Playlist -> shareRepository.sharePlaylist(current.resourceId, targetUserId)
-                        ShareTarget.Library -> shareRepository.shareLibrary(targetUserId)
-                        ShareTarget.Category -> shareRepository.shareCategory(current.category, targetUserId)
+                        ShareTarget.Album -> shareRepository.shareAlbum(current.resourceId, targetUserId, canWrite)
+                        ShareTarget.Playlist -> shareRepository.sharePlaylist(current.resourceId, targetUserId, canWrite)
+                        ShareTarget.Library -> shareRepository.shareLibrary(targetUserId, canWrite)
+                        ShareTarget.Category -> shareRepository.shareCategory(current.category, targetUserId, canWrite)
                     }
                 when (result) {
                     is ApiResult.Success ->

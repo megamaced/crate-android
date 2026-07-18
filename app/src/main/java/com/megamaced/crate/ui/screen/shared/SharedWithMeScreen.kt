@@ -15,6 +15,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -27,6 +28,7 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
@@ -58,6 +60,10 @@ fun SharedWithMeScreen(
     onBack: () -> Unit,
     onItemClick: (Long) -> Unit,
     onPlaylistClick: (Long) -> Unit,
+    // Add an item into a shared library/category we can write to. `category`
+    // is the shared category's apiValue for a category share, or null for a
+    // whole-library share (the user then picks the category).
+    onAddToSharedScope: (owner: String, category: String?) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: SharedWithMeViewModel = hiltViewModel(),
 ) {
@@ -140,6 +146,12 @@ fun SharedWithMeScreen(
                                                 ScopeHeader(
                                                     text = "${lib.sharedByUser}'s library",
                                                     sub = "${lib.items.size} item${if (lib.items.size == 1) "" else "s"}",
+                                                    // Whole-library RW share: user picks the category.
+                                                    onAdd = if (lib.canWrite) {
+                                                        { onAddToSharedScope(lib.sharedByUser, null) }
+                                                    } else {
+                                                        null
+                                                    },
                                                 )
                                             }
                                             items(lib.items, key = { "lib-${lib.shareId}-${it.id}" }) { item ->
@@ -152,6 +164,12 @@ fun SharedWithMeScreen(
                                                 ScopeHeader(
                                                     text = "${cat.sharedByUser}'s ${cat.category?.label ?: "items"}",
                                                     sub = "${cat.items.size} item${if (cat.items.size == 1) "" else "s"}",
+                                                    // Category RW share: lock the new item to this category.
+                                                    onAdd = if (cat.canWrite) {
+                                                        { onAddToSharedScope(cat.sharedByUser, cat.category?.apiValue) }
+                                                    } else {
+                                                        null
+                                                    },
                                                 )
                                             }
                                             items(cat.items, key = { "cat-${cat.shareId}-${it.id}" }) { item ->
@@ -204,22 +222,39 @@ private fun SharedTabRow(
 private fun ScopeHeader(
     text: String,
     sub: String,
+    onAdd: (() -> Unit)? = null,
 ) {
-    Column(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(2.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.titleSmall,
-        )
-        Text(
-            text = sub,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Text(
+                text = text,
+                style = MaterialTheme.typography.titleSmall,
+            )
+            Text(
+                text = sub,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        // Only present when the shared scope grants write access.
+        if (onAdd != null) {
+            TextButton(onClick = onAdd) {
+                Icon(
+                    imageVector = Icons.Filled.Add,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                )
+                Text("  Add item")
+            }
+        }
     }
 }
 

@@ -31,14 +31,25 @@ data class ShareDto(
     val resourceId: Long? = null,
     val shareableCategory: String? = null,
     val createdAt: String? = null,
+    // "read" (default) or "readwrite"; `canWrite` is the resolved boolean the
+    // backend derives from it. Older servers omit both — default to read-only.
+    val permission: String? = null,
+    val canWrite: Boolean? = null,
 )
 
-// NC's share controllers accept `{userId}` in the request body.
+// NC's share controllers accept `{userId}` plus an optional access level in
+// the request body. `permission` is "read" (default) or "readwrite".
 @Serializable
 data class ShareRequest(
     @SerialName("userId")
     val targetUserId: String,
-)
+    val permission: String = PERMISSION_READ,
+) {
+    companion object {
+        const val PERMISSION_READ = "read"
+        const val PERMISSION_READWRITE = "readwrite"
+    }
+}
 
 // Wrapper records for a shared whole library / category — each carries the
 // owner uid plus the resolved items so the View can render groupings
@@ -48,6 +59,9 @@ data class LibraryShareDto(
     val shareId: Long,
     val sharedByUser: String,
     val createdAt: String? = null,
+    // Access level for the whole scope — sits on the wrapper, not per item.
+    val permission: String? = null,
+    val canWrite: Boolean? = null,
     val items: List<MediaItemDto> = emptyList(),
 )
 
@@ -57,6 +71,9 @@ data class CategoryShareDto(
     val sharedByUser: String,
     val category: String,
     val createdAt: String? = null,
+    // Access level for the whole scope — sits on the wrapper, not per item.
+    val permission: String? = null,
+    val canWrite: Boolean? = null,
     val items: List<MediaItemDto> = emptyList(),
 )
 

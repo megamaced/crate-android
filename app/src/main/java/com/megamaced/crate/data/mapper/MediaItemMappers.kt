@@ -73,6 +73,7 @@ fun MediaItemDto.toDomain(): MediaItem =
         hasPhoto2 = hasPhoto2,
         createdAt = createdAt,
         updatedAt = updatedAt,
+        canWrite = resolveCanWrite(canWrite, permission),
     )
 
 fun TrackDto.toDomain(): Track = Track(position = position, title = title, duration = duration)
@@ -177,4 +178,5 @@ fun MediaItemDraft.toRequest(): CreateMediaItemRequest =
         category = category?.apiValue,
         purchasePrice = purchasePrice,
         purchasePriceCurrency = purchasePriceCurrency,
+        owner = owner,
     )

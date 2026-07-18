@@ -15,12 +15,17 @@ data class Share(
     val resourceId: Long?,
     val shareableCategory: String?,
     val createdAt: String?,
+    // Access level granted to the target user. `canWrite` is the resolved
+    // boolean; older servers report neither and default to read-only.
+    val permission: String? = null,
+    val canWrite: Boolean = false,
 )
 
 data class LibraryShare(
     val shareId: Long,
     val sharedByUser: String,
     val createdAt: String?,
+    val canWrite: Boolean = false,
     val items: List<MediaItem>,
 )
 
@@ -29,6 +34,7 @@ data class CategoryShare(
     val sharedByUser: String,
     val category: Category?,
     val createdAt: String?,
+    val canWrite: Boolean = false,
     val items: List<MediaItem>,
 )
 

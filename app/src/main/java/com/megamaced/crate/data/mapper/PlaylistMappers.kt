@@ -14,6 +14,7 @@ fun PlaylistDto.toDomain(): Playlist =
         itemCount = itemCount ?: items?.size ?: 0,
         createdAt = createdAt,
         updatedAt = updatedAt,
+        canWrite = resolveCanWrite(canWrite, permission),
     )
 
 fun PlaylistDto.toEntity(): PlaylistEntity =

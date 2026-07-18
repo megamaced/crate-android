@@ -89,6 +89,10 @@ data class MediaItem(
     val hasPhoto2: Boolean = false,
     val createdAt: String?,
     val updatedAt: String?,
+    // Set when the item is visible via a read/write share; null/false for
+    // own-collection items (where ownership already grants write). Not
+    // persisted to Room — carried straight from the network response.
+    val canWrite: Boolean = false,
 )
 
 /**
@@ -111,4 +115,7 @@ data class MediaItemDraft(
     val country: String? = null,
     val purchasePrice: Double? = null,
     val purchasePriceCurrency: String? = null,
+    // Owner uid to create the item under, when a read/write sharee adds into
+    // someone else's shared library/category. Null = the caller's own collection.
+    val owner: String? = null,
 )

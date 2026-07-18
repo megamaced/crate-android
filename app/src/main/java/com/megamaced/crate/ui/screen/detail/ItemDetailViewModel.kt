@@ -28,9 +28,14 @@ data class ItemDetailUiState(
     val errorMessage: String? = null,
     val deleted: Boolean = false,
     // True when the loaded item belongs to another user — i.e. visible to us
-    // only via a share. Write actions (enrich/strip/market-fetch/delete) are
-    // hidden in the UI in this case; the server enforces it too.
+    // only via a share. Ownership is a superset of write permission.
     val isShared: Boolean = false,
+    // True when the item is our own (ownership grants full control including
+    // delete + re-share).
+    val isOwner: Boolean = false,
+    // True when we can add/edit this item — own item OR a read/write share.
+    // Delete and re-share stay owner-only regardless (see [isOwner]).
+    val canWrite: Boolean = false,
     val sharedByUser: String? = null,
 )
 
@@ -59,6 +64,11 @@ class ItemDetailViewModel
         private val errorMessage = MutableStateFlow<String?>(null)
         private val deleted = MutableStateFlow(false)
 
+        // Write permission for a shared item, learned from the network fetch
+        // (the per-item permission isn't persisted through Room). Own items
+        // don't rely on this — ownership already grants write.
+        private val sharedCanWrite = MutableStateFlow(false)
+
         // Login name is read once at construction; it doesn't change without
         // a re-authentication that would tear this ViewModel down anyway.
         private val currentLoginName: String? = currentSession.loginName()
@@ -69,9 +79,11 @@ class ItemDetailViewModel
                 activeAction,
                 errorMessage,
                 deleted,
-            ) { item, action, err, isDeleted ->
+                sharedCanWrite,
+            ) { item, action, err, isDeleted, canWriteShare ->
                 val itemOwner = item?.userId
                 val shared = item != null && itemOwner != null && currentLoginName != null && itemOwner != currentLoginName
+                val owner = item != null && !shared
                 ItemDetailUiState(
                     itemId = itemId,
                     item = item,
@@ -80,6 +92,8 @@ class ItemDetailViewModel
                     errorMessage = err,
                     deleted = isDeleted,
                     isShared = shared,
+                    isOwner = owner,
+                    canWrite = owner || (shared && canWriteShare),
                     sharedByUser = if (shared) itemOwner else null,
                 )
             }.stateIn(
@@ -90,17 +104,23 @@ class ItemDetailViewModel
 
         init {
             viewModelScope.launch {
-                mediaRepository.refreshSingle(itemId)
-                runAutoBackgroundFetches()
+                val refreshed = mediaRepository.refreshSingle(itemId)
+                // Capture the per-item write permission from the network fetch;
+                // it isn't carried through Room, so this is our only source.
+                val networkCanWrite = (refreshed as? ApiResult.Success)?.value?.canWrite == true
+                sharedCanWrite.value = networkCanWrite
+                runAutoBackgroundFetches(networkCanWrite)
             }
         }
 
-        private suspend fun runAutoBackgroundFetches() {
+        private suspend fun runAutoBackgroundFetches(networkCanWrite: Boolean) {
             val me = (settingsRepository.getMe() as? ApiResult.Success)?.value ?: return
             var item = mediaRepository.observe(itemId).firstOrNull() ?: return
 
-            // Shared items are read-only — write paths 404 server-side, so skip.
-            if (item.userId != null && currentLoginName != null && item.userId != currentLoginName) {
+            // Auto enrich/market are writes. Skip them only for read-only
+            // shared items; a read/write sharee (or the owner) may run them.
+            val shared = item.userId != null && currentLoginName != null && item.userId != currentLoginName
+            if (shared && !networkCanWrite) {
                 return
             }
 

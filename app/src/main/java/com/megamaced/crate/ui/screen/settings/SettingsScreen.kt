@@ -643,7 +643,8 @@ private fun ShareSection(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(
-                text = "Share read-only with another Nextcloud user. Individual items and playlists are shared from the item itself.",
+                text = "Share with another Nextcloud user — read-only, or read/write so they can add and edit " +
+                    "items (but not delete or re-share). Individual items and playlists are shared from the item itself.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

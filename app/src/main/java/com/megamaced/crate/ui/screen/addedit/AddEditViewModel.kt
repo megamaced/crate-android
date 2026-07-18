@@ -54,6 +54,12 @@ val DEFAULT_CURRENCIES = listOf(
 data class AddEditUiState(
     val isEditing: Boolean = false,
     val editingItemId: Long? = null,
+    // Uid of the collection owner when adding into a shared library/category
+    // we can write to; null for a normal add into our own collection.
+    val owner: String? = null,
+    // True when the category is fixed (adding into a shared *category*), so the
+    // category picker is hidden and locked to the shared scope's category.
+    val categoryLocked: Boolean = false,
     val itemUpdatedAt: String? = null,
     val initialLoading: Boolean = false,
     val isSaving: Boolean = false,
@@ -140,11 +146,20 @@ class AddEditViewModel
                 ?.let { Category.fromApi(it) }
                 ?: Category.Music
 
+        // Owner uid to create the item under (shared-collection add); null for a
+        // normal add. A category-share add also pins the category (owner + an
+        // explicit category nav arg), so lock the picker in that case.
+        private val owner: String? = savedStateHandle.get<String>("owner")?.takeIf { it.isNotBlank() }
+        private val categoryLocked: Boolean =
+            owner != null && !savedStateHandle.get<String>("category").isNullOrBlank()
+
         private val _uiState =
             MutableStateFlow(
                 AddEditUiState(
                     isEditing = itemId != null,
                     editingItemId = itemId,
+                    owner = owner,
+                    categoryLocked = categoryLocked,
                     category = initialCategory,
                     initialLoading = itemId != null,
                 ),
@@ -515,6 +530,9 @@ private fun AddEditUiState.toDraft(): MediaItemDraft {
         country = country.trim().takeIf { it.isNotBlank() },
         purchasePrice = price,
         purchasePriceCurrency = if (price != null) purchasePriceCurrency else null,
+        // Non-null only for a shared-collection add — routes the create to the
+        // owner's collection (server verifies the read/write share).
+        owner = owner,
     )
 }
 

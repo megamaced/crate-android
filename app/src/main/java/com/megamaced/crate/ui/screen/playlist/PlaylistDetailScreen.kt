@@ -94,21 +94,32 @@ fun PlaylistDetailScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { shareOpen = true }, enabled = state.playlist != null) {
-                        Icon(Icons.Filled.Share, contentDescription = "Share")
+                    // Re-sharing is owner-only.
+                    if (state.isOwner) {
+                        IconButton(onClick = { shareOpen = true }, enabled = state.playlist != null) {
+                            Icon(Icons.Filled.Share, contentDescription = "Share")
+                        }
                     }
-                    IconButton(onClick = { renameOpen = true }) {
-                        Icon(Icons.Filled.Edit, contentDescription = "Rename")
+                    // Rename is available to anyone who can write.
+                    if (state.canWrite) {
+                        IconButton(onClick = { renameOpen = true }) {
+                            Icon(Icons.Filled.Edit, contentDescription = "Rename")
+                        }
                     }
-                    IconButton(onClick = { deleteOpen = true }) {
-                        Icon(Icons.Filled.Delete, contentDescription = "Delete")
+                    // Deleting the playlist is owner-only.
+                    if (state.isOwner) {
+                        IconButton(onClick = { deleteOpen = true }) {
+                            Icon(Icons.Filled.Delete, contentDescription = "Delete")
+                        }
                     }
                 },
             )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
-            if (state.playlist != null) {
+            // Adding tracks requires write access (own playlist or a
+            // read/write share).
+            if (state.playlist != null && state.canWrite) {
                 FloatingActionButton(onClick = { addOpen = true }) {
                     Icon(Icons.Filled.Add, contentDescription = "Add items")
                 }
@@ -138,6 +149,7 @@ fun PlaylistDetailScreen(
                     items(state.playlist!!.items, key = { it.id }) { item ->
                         PlaylistItemRow(
                             item = item,
+                            canWrite = state.canWrite,
                             onClick = { onItemClick(item.id) },
                             onRemove = { viewModel.removeItem(item.id) },
                         )
@@ -198,6 +210,7 @@ fun PlaylistDetailScreen(
 @Composable
 private fun PlaylistItemRow(
     item: MediaItem,
+    canWrite: Boolean,
     onClick: () -> Unit,
     onRemove: () -> Unit,
 ) {
@@ -246,8 +259,11 @@ private fun PlaylistItemRow(
             }
         }
         CategoryBadge(category = item.category, modifier = Modifier.padding(end = 4.dp))
-        IconButton(onClick = onRemove) {
-            Icon(Icons.Filled.Close, contentDescription = "Remove from playlist")
+        // Removing tracks requires write access.
+        if (canWrite) {
+            IconButton(onClick = onRemove) {
+                Icon(Icons.Filled.Close, contentDescription = "Remove from playlist")
+            }
         }
     }
 }

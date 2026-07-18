@@ -13,6 +13,7 @@ interface ShareRepository {
     suspend fun shareAlbum(
         albumId: Long,
         targetUserId: String,
+        canWrite: Boolean = false,
     ): ApiResult<Share>
 
     suspend fun listPlaylistShares(playlistId: Long): ApiResult<List<Share>>
@@ -20,17 +21,22 @@ interface ShareRepository {
     suspend fun sharePlaylist(
         playlistId: Long,
         targetUserId: String,
+        canWrite: Boolean = false,
     ): ApiResult<Share>
 
     suspend fun listLibraryShares(): ApiResult<List<Share>>
 
-    suspend fun shareLibrary(targetUserId: String): ApiResult<Share>
+    suspend fun shareLibrary(
+        targetUserId: String,
+        canWrite: Boolean = false,
+    ): ApiResult<Share>
 
     suspend fun listCategoryShares(category: String): ApiResult<List<Share>>
 
     suspend fun shareCategory(
         category: String,
         targetUserId: String,
+        canWrite: Boolean = false,
     ): ApiResult<Share>
 
     suspend fun sharedWithMe(): ApiResult<SharedWithMe>

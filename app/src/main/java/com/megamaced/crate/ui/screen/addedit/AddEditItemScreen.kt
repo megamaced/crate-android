@@ -197,7 +197,19 @@ private fun FormContent(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        if (!state.isEditing) {
+        // When adding into someone else's shared collection, make it explicit
+        // where the item is going.
+        state.owner?.let { owner ->
+            Text(
+                text = "Adding to $owner's collection",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        // Hide the category picker while editing, and when the category is
+        // locked to a shared-category scope.
+        if (!state.isEditing && !state.categoryLocked) {
             CategorySegmentedRow(
                 selected = state.category,
                 onCategorySelected = viewModel::onCategoryChange,

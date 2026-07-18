@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.megamaced.crate.data.api.ApiResult
+import com.megamaced.crate.data.auth.CurrentSession
 import com.megamaced.crate.domain.model.MediaItem
 import com.megamaced.crate.domain.model.Playlist
 import com.megamaced.crate.domain.repository.MediaRepository
@@ -24,6 +25,11 @@ data class PlaylistDetailUiState(
     val isLoading: Boolean = true,
     val errorMessage: String? = null,
     val deleted: Boolean = false,
+    // True for our own playlist — grants delete + re-share.
+    val isOwner: Boolean = false,
+    // True when we may rename/add/remove tracks — own playlist OR a
+    // read/write share. Delete + re-share stay owner-only (see [isOwner]).
+    val canWrite: Boolean = false,
 )
 
 @HiltViewModel
@@ -33,14 +39,21 @@ class PlaylistDetailViewModel
         savedStateHandle: SavedStateHandle,
         private val playlistRepository: PlaylistRepository,
         mediaRepository: MediaRepository,
+        currentSession: CurrentSession,
     ) : ViewModel() {
         private val playlistId: Long =
             checkNotNull(savedStateHandle["playlistId"]) {
                 "Playlist detail route requires a playlistId argument"
             }
 
+        private val currentLoginName: String? = currentSession.loginName()
+
         private val errorMessage = MutableStateFlow<String?>(null)
         private val deleted = MutableStateFlow(false)
+
+        // Write permission for a shared playlist, learned from the network
+        // refresh (not persisted through Room). Own playlists don't rely on it.
+        private val sharedCanWrite = MutableStateFlow(false)
 
         val uiState: StateFlow<PlaylistDetailUiState> =
             combine(
@@ -48,12 +61,16 @@ class PlaylistDetailViewModel
                 mediaRepository.observeAll(),
                 errorMessage,
                 deleted,
-            ) { playlist, allItems, err, isDeleted ->
+                sharedCanWrite,
+            ) { playlist, allItems, err, isDeleted, canWriteShare ->
                 val playlistItemIds = playlist
                     ?.items
                     ?.map { it.id }
                     ?.toSet()
                     .orEmpty()
+                val owner =
+                    playlist != null &&
+                        (playlist.userId == null || currentLoginName == null || playlist.userId == currentLoginName)
                 PlaylistDetailUiState(
                     playlistId = playlistId,
                     playlist = playlist,
@@ -61,6 +78,8 @@ class PlaylistDetailViewModel
                     isLoading = playlist == null && !isDeleted,
                     errorMessage = err,
                     deleted = isDeleted,
+                    isOwner = owner,
+                    canWrite = owner || canWriteShare,
                 )
             }.stateIn(
                 scope = viewModelScope,
@@ -69,7 +88,13 @@ class PlaylistDetailViewModel
             )
 
         init {
-            viewModelScope.launch { handle(playlistRepository.refresh(playlistId)) }
+            viewModelScope.launch {
+                val result = playlistRepository.refresh(playlistId)
+                if (result is ApiResult.Success) {
+                    sharedCanWrite.value = result.value.canWrite
+                }
+                handle(result)
+            }
         }
 
         fun rename(name: String) {

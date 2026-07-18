@@ -82,6 +82,8 @@ fun ShareDto.toDomain(): Share =
         resourceId = resourceId,
         shareableCategory = shareableCategory,
         createdAt = createdAt,
+        permission = permission,
+        canWrite = resolveCanWrite(canWrite, permission),
     )
 
 fun LibraryShareDto.toDomain(): LibraryShare =
@@ -89,7 +91,11 @@ fun LibraryShareDto.toDomain(): LibraryShare =
         shareId = shareId,
         sharedByUser = sharedByUser,
         createdAt = createdAt,
-        items = items.map { it.toDomain() },
+        canWrite = resolveCanWrite(canWrite, permission),
+        // Propagate the scope's access level onto each item so the detail
+        // screen can gate writes even though the items themselves don't
+        // carry a per-item permission within a whole-scope share.
+        items = items.map { it.toDomain().copy(canWrite = resolveCanWrite(canWrite, permission)) },
     )
 
 fun CategoryShareDto.toDomain(): CategoryShare =
@@ -98,8 +104,19 @@ fun CategoryShareDto.toDomain(): CategoryShare =
         sharedByUser = sharedByUser,
         category = Category.fromApi(category),
         createdAt = createdAt,
-        items = items.map { it.toDomain() },
+        canWrite = resolveCanWrite(canWrite, permission),
+        items = items.map { it.toDomain().copy(canWrite = resolveCanWrite(canWrite, permission)) },
     )
+
+/**
+ * The backend sends both a resolved `canWrite` boolean and the raw
+ * `permission` string; prefer the boolean, fall back to interpreting the
+ * string, and default to read-only when a legacy server omits both.
+ */
+internal fun resolveCanWrite(
+    canWrite: Boolean?,
+    permission: String?,
+): Boolean = canWrite ?: (permission == "readwrite")
 
 fun SharedWithMeDto.toDomain(): SharedWithMe =
     SharedWithMe(

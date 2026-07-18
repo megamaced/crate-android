@@ -46,6 +46,11 @@ data class MediaItemDto(
     val hasPhoto2: Boolean = false,
     val createdAt: String? = null,
     val updatedAt: String? = null,
+    // Present only when the item arrives via a share (share/with-me or a
+    // shared album fetch). "read"/"readwrite" plus the resolved boolean.
+    // Absent on own-collection payloads — defaults leave it null.
+    val permission: String? = null,
+    val canWrite: Boolean? = null,
 )
 
 @Serializable
@@ -133,4 +138,8 @@ data class CreateMediaItemRequest(
     val category: String? = null,
     val purchasePrice: Double? = null,
     val purchasePriceCurrency: String? = null,
+    // When set to another user's uid, the item is created in THAT user's
+    // collection — used by a read/write sharee adding into a shared library
+    // or category. Null (the default) creates in the caller's own collection.
+    val owner: String? = null,
 )

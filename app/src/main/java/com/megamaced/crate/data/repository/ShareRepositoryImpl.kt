@@ -27,7 +27,8 @@ class ShareRepositoryImpl
         override suspend fun shareAlbum(
             albumId: Long,
             targetUserId: String,
-        ): ApiResult<Share> = apiCall { api.shareAlbum(albumId, ShareRequest(targetUserId)).toDomain() }
+            canWrite: Boolean,
+        ): ApiResult<Share> = apiCall { api.shareAlbum(albumId, shareRequest(targetUserId, canWrite)).toDomain() }
 
         override suspend fun listPlaylistShares(playlistId: Long): ApiResult<List<Share>> =
             apiCall { api.listPlaylistShares(playlistId).map { it.toDomain() } }
@@ -35,12 +36,15 @@ class ShareRepositoryImpl
         override suspend fun sharePlaylist(
             playlistId: Long,
             targetUserId: String,
-        ): ApiResult<Share> = apiCall { api.sharePlaylist(playlistId, ShareRequest(targetUserId)).toDomain() }
+            canWrite: Boolean,
+        ): ApiResult<Share> = apiCall { api.sharePlaylist(playlistId, shareRequest(targetUserId, canWrite)).toDomain() }
 
         override suspend fun listLibraryShares(): ApiResult<List<Share>> = apiCall { api.listLibraryShares().map { it.toDomain() } }
 
-        override suspend fun shareLibrary(targetUserId: String): ApiResult<Share> =
-            apiCall { api.shareLibrary(ShareRequest(targetUserId)).toDomain() }
+        override suspend fun shareLibrary(
+            targetUserId: String,
+            canWrite: Boolean,
+        ): ApiResult<Share> = apiCall { api.shareLibrary(shareRequest(targetUserId, canWrite)).toDomain() }
 
         override suspend fun listCategoryShares(category: String): ApiResult<List<Share>> =
             apiCall { api.listCategoryShares(category).map { it.toDomain() } }
@@ -48,7 +52,17 @@ class ShareRepositoryImpl
         override suspend fun shareCategory(
             category: String,
             targetUserId: String,
-        ): ApiResult<Share> = apiCall { api.shareCategory(category, ShareRequest(targetUserId)).toDomain() }
+            canWrite: Boolean,
+        ): ApiResult<Share> = apiCall { api.shareCategory(category, shareRequest(targetUserId, canWrite)).toDomain() }
+
+        private fun shareRequest(
+            targetUserId: String,
+            canWrite: Boolean,
+        ): ShareRequest =
+            ShareRequest(
+                targetUserId = targetUserId,
+                permission = if (canWrite) ShareRequest.PERMISSION_READWRITE else ShareRequest.PERMISSION_READ,
+            )
 
         override suspend fun sharedWithMe(): ApiResult<SharedWithMe> = apiCall { api.sharedWithMe().toDomain() }
 

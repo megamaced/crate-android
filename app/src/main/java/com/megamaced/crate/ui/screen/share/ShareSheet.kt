@@ -20,6 +20,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -71,11 +72,31 @@ fun ShareSheet(
                     },
                 style = MaterialTheme.typography.titleLarge,
             )
-            if (target == ShareTarget.Library || target == ShareTarget.Category) {
-                Text(
-                    text = "Sharees can view items here. Read-only.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Allow editing",
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                    Text(
+                        text =
+                            if (state.grantCanWrite) {
+                                "Can add and edit items. Can't delete or re-share."
+                            } else {
+                                "Read-only — can view but not change anything."
+                            },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Switch(
+                    checked = state.grantCanWrite,
+                    onCheckedChange = viewModel::onPermissionChange,
+                    enabled = !state.isWorking,
                 )
             }
             OutlinedTextField(
@@ -209,6 +230,11 @@ private fun ExistingShareRow(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
+            Text(
+                text = if (share.canWrite) "Can edit" else "Read-only",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
         IconButton(onClick = onRevoke, enabled = enabled) {
             Icon(Icons.Filled.Close, contentDescription = "Revoke share")

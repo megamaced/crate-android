@@ -126,6 +126,11 @@ fun CrateNavHost(
                 onBack = { navController.popBackStack() },
                 onItemClick = { id -> navController.navigate(Destination.Detail(id)) },
                 onPlaylistClick = { id -> navController.navigate(Destination.PlaylistDetail(id)) },
+                onAddToSharedScope = { owner, category ->
+                    navController.navigate(
+                        Destination.AddEdit(category = category, owner = owner),
+                    )
+                },
             )
         }
     }

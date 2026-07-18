@@ -109,9 +109,9 @@ fun ItemDetailScreen(
                 },
                 actions = {
                     val item = uiState.item
-                    // Shared items are read-only — the server would 404 every
-                    // write call anyway, so we hide the kebab menu entirely.
-                    if (item != null && !uiState.isShared) {
+                    // Show the kebab whenever we can write (own item or a
+                    // read/write share). Purely read-only shares get no menu.
+                    if (item != null && uiState.canWrite) {
                         IconButton(onClick = { menuExpanded = true }) {
                             Icon(
                                 imageVector = Icons.Filled.MoreVert,
@@ -120,6 +120,7 @@ fun ItemDetailScreen(
                         }
                         DetailMenu(
                             item = item,
+                            isOwner = uiState.isOwner,
                             expanded = menuExpanded,
                             onDismiss = { menuExpanded = false },
                             onEdit = {
@@ -170,6 +171,7 @@ fun ItemDetailScreen(
                 item = item,
                 activeAction = uiState.activeAction,
                 sharedByUser = uiState.sharedByUser,
+                canWrite = uiState.canWrite,
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding),
@@ -207,6 +209,7 @@ fun ItemDetailScreen(
 @Composable
 private fun DetailMenu(
     item: MediaItem,
+    isOwner: Boolean,
     expanded: Boolean,
     onDismiss: () -> Unit,
     onEdit: () -> Unit,
@@ -222,14 +225,18 @@ private fun DetailMenu(
         item.category == Category.Comics
 
     DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
+        // Edit + enrichment + market are available to anyone who can write.
         DropdownMenuItem(
             text = { Text("Edit") },
             onClick = onEdit,
         )
-        DropdownMenuItem(
-            text = { Text("Share") },
-            onClick = onShare,
-        )
+        // Re-sharing is owner-only.
+        if (isOwner) {
+            DropdownMenuItem(
+                text = { Text("Share") },
+                onClick = onShare,
+            )
+        }
         DropdownMenuItem(
             text = { Text(if (isEnriched) "Re-enrich" else "Enrich") },
             onClick = onEnrich,
@@ -246,10 +253,13 @@ private fun DetailMenu(
                 onClick = onFetchMarketValue,
             )
         }
-        DropdownMenuItem(
-            text = { Text("Delete") },
-            onClick = onDelete,
-        )
+        // Deletion is owner-only — a sharee gets a 403 server-side anyway.
+        if (isOwner) {
+            DropdownMenuItem(
+                text = { Text("Delete") },
+                onClick = onDelete,
+            )
+        }
     }
 }
 
@@ -258,6 +268,7 @@ private fun ItemDetailContent(
     item: MediaItem,
     activeAction: DetailAction?,
     sharedByUser: String?,
+    canWrite: Boolean,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -292,7 +303,7 @@ private fun ItemDetailContent(
         ) {
             if (sharedByUser != null) {
                 Text(
-                    text = "Shared by $sharedByUser · read-only",
+                    text = "Shared by $sharedByUser · ${if (canWrite) "can edit" else "read-only"}",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

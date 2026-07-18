@@ -33,6 +33,12 @@ sealed interface Destination {
         val itemId: Long? = null,
         val category: String? = null,
         val prefillJson: String? = null,
+        // Uid of another user whose collection the new item should be created
+        // in — set when adding into a read/write shared library or category.
+        // Null (the default) creates in the caller's own collection. When set
+        // together with a non-null [category] (a category share), the category
+        // picker is locked to that category.
+        val owner: String? = null,
     ) : Destination
 
     @Serializable
