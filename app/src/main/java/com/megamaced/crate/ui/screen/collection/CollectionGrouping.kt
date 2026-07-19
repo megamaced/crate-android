@@ -95,7 +95,10 @@ internal fun comparatorForSort(sort: CollectionSort): Comparator<MediaItem> {
     val base: Comparator<MediaItem> =
         when (sort.axis) {
             SortField.CreatedAt -> compareBy { it.createdAt.orEmpty() }
-            SortField.Artist -> compareBy(String.CASE_INSENSITIVE_ORDER) { it.artist.orEmpty() }
+            // Artist strips a leading article so it sorts under the first real
+            // word ("The Beatles" → B), matching CollectionView.vue and keeping
+            // the sort consistent with the article-stripped group headers.
+            SortField.Artist -> compareBy(String.CASE_INSENSITIVE_ORDER) { stripArticle(it.artist.orEmpty()) }
             SortField.Title -> compareBy(String.CASE_INSENSITIVE_ORDER) { it.title }
             SortField.Year -> compareBy { it.year ?: Int.MIN_VALUE }
             SortField.Format -> compareBy(String.CASE_INSENSITIVE_ORDER) { it.format.orEmpty() }

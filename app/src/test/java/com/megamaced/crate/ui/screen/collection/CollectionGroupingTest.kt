@@ -1,9 +1,11 @@
 package com.megamaced.crate.ui.screen.collection
 
 import com.megamaced.crate.domain.model.Category
+import com.megamaced.crate.domain.model.CollectionSort
 import com.megamaced.crate.domain.model.MarketValue
 import com.megamaced.crate.domain.model.MediaItem
 import com.megamaced.crate.domain.model.PurchasePrice
+import com.megamaced.crate.domain.model.SortDirection
 import com.megamaced.crate.domain.model.SortField
 import com.megamaced.crate.domain.model.Status
 import org.junit.Assert.assertEquals
@@ -67,6 +69,20 @@ class CollectionGroupingTest {
         assertEquals(1, groups.size)
         assertNull(groups.single().header)
         assertEquals(2, groups.single().items.size)
+    }
+
+    @Test
+    fun `artist sort and grouping agree on article stripping`() {
+        val items = listOf(
+            item(1, "X", artist = "The Beatles"),
+            item(2, "Y", artist = "Adele"),
+            item(3, "Z", artist = "Cardigans"),
+        )
+        val sorted = items.sortedWith(comparatorForSort(CollectionSort(SortField.Artist, SortDirection.Asc)))
+        // "The Beatles" sorts under B, between Adele and Cardigans.
+        assertEquals(listOf("Adele", "The Beatles", "Cardigans"), sorted.map { it.artist })
+        val groups = groupItemsForSort(sorted, SortField.Artist, today)
+        assertEquals(listOf("A", "B", "C"), groups.map { it.header })
     }
 
     @Test
