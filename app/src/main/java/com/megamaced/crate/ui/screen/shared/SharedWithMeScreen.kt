@@ -11,65 +11,54 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
-import com.megamaced.crate.domain.model.MediaItem
 import com.megamaced.crate.domain.model.Playlist
-import com.megamaced.crate.ui.components.ArtworkImage
+import com.megamaced.crate.domain.model.SharedCategorySummary
 import com.megamaced.crate.ui.components.CategoryBadge
 import com.megamaced.crate.ui.components.EmptyState
 import com.megamaced.crate.ui.components.LoadingState
 
-private enum class SharedTab { Items, Playlists }
-
+/**
+ * "Shared with me" landing — a home-style overview. Each category shared with
+ * the viewer (whether via a whole-library, category, single-item or playlist
+ * share) gets a tile that opens a full [SharedCategoryScreen] subpage; shared
+ * playlists are listed below.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SharedWithMeScreen(
     onBack: () -> Unit,
-    onItemClick: (Long) -> Unit,
+    onOpenCategory: (categoryApiValue: String) -> Unit,
     onPlaylistClick: (Long) -> Unit,
-    // Add an item into a shared library/category we can write to. `category`
-    // is the shared category's apiValue for a category share, or null for a
-    // whole-library share (the user then picks the category).
-    onAddToSharedScope: (owner: String, category: String?) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: SharedWithMeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
-    var tab by rememberSaveable { mutableStateOf(SharedTab.Items) }
 
     LaunchedEffect(state.errorMessage) {
         state.errorMessage?.let { msg ->
@@ -99,186 +88,67 @@ fun SharedWithMeScreen(
                 .fillMaxSize()
                 .padding(innerPadding),
         ) {
-            Column(modifier = Modifier.fillMaxSize()) {
-                SharedTabRow(selected = tab, onSelected = { tab = it })
-                when {
-                    state.isLoading -> LoadingState()
-                    state.data == null ->
-                        EmptyState(title = "Nothing shared yet")
-                    else -> {
-                        val data = state.data!!
-                        val items =
-                            when (tab) {
-                                SharedTab.Items -> data.albums
-                                SharedTab.Playlists -> emptyList()
-                            }
-                        val playlists =
-                            when (tab) {
-                                SharedTab.Playlists -> data.playlists
-                                SharedTab.Items -> emptyList()
-                            }
-                        val itemsTabEmpty = data.albums.isEmpty() && data.libraries.isEmpty() && data.categories.isEmpty()
-                        when {
-                            tab == SharedTab.Items && itemsTabEmpty ->
-                                EmptyState(
-                                    title = "No items shared with you",
-                                    subtitle = "Ask a Nextcloud user to share something from their collection.",
+            when {
+                state.isLoading -> LoadingState()
+                state.isEmpty ->
+                    EmptyState(
+                        title = "Nothing shared with you",
+                        subtitle = "Ask a Nextcloud user to share something from their collection.",
+                    )
+                else ->
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(vertical = 8.dp),
+                    ) {
+                        if (state.categories.isNotEmpty()) {
+                            item(key = "hdr-categories") { SectionHeader("Categories") }
+                            items(state.categories, key = { "cat-${it.category.apiValue}" }) { summary ->
+                                CategoryTile(
+                                    summary = summary,
+                                    onClick = { onOpenCategory(summary.category.apiValue) },
                                 )
-                            tab == SharedTab.Playlists && data.playlists.isEmpty() ->
-                                EmptyState(
-                                    title = "No playlists shared with you",
+                                HorizontalDivider()
+                            }
+                        }
+                        if (state.playlists.isNotEmpty()) {
+                            item(key = "hdr-playlists") { SectionHeader("Playlists") }
+                            items(state.playlists, key = { "playlist-${it.id}" }) { playlist ->
+                                SharedPlaylistRow(
+                                    playlist = playlist,
+                                    onClick = { onPlaylistClick(playlist.id) },
                                 )
-                            else ->
-                                LazyColumn(
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentPadding = PaddingValues(vertical = 8.dp),
-                                ) {
-                                    items(items, key = { "item-${it.id}" }) { item ->
-                                        SharedItemRow(
-                                            item = item,
-                                            onClick = { onItemClick(item.id) },
-                                        )
-                                        HorizontalDivider()
-                                    }
-                                    if (tab == SharedTab.Items) {
-                                        data.libraries.forEach { lib ->
-                                            item(key = "lib-header-${lib.shareId}") {
-                                                ScopeHeader(
-                                                    text = "${lib.sharedByUser}'s library",
-                                                    sub = "${lib.items.size} item${if (lib.items.size == 1) "" else "s"}",
-                                                    // Whole-library RW share: user picks the category.
-                                                    onAdd = if (lib.canWrite) {
-                                                        { onAddToSharedScope(lib.sharedByUser, null) }
-                                                    } else {
-                                                        null
-                                                    },
-                                                )
-                                            }
-                                            items(lib.items, key = { "lib-${lib.shareId}-${it.id}" }) { item ->
-                                                SharedItemRow(item = item, onClick = { onItemClick(item.id) })
-                                                HorizontalDivider()
-                                            }
-                                        }
-                                        data.categories.forEach { cat ->
-                                            item(key = "cat-header-${cat.shareId}") {
-                                                ScopeHeader(
-                                                    text = "${cat.sharedByUser}'s ${cat.category?.label ?: "items"}",
-                                                    sub = "${cat.items.size} item${if (cat.items.size == 1) "" else "s"}",
-                                                    // Category RW share: lock the new item to this category.
-                                                    onAdd = if (cat.canWrite) {
-                                                        { onAddToSharedScope(cat.sharedByUser, cat.category?.apiValue) }
-                                                    } else {
-                                                        null
-                                                    },
-                                                )
-                                            }
-                                            items(cat.items, key = { "cat-${cat.shareId}-${it.id}" }) { item ->
-                                                SharedItemRow(item = item, onClick = { onItemClick(item.id) })
-                                                HorizontalDivider()
-                                            }
-                                        }
-                                    }
-                                    items(playlists, key = { "playlist-${it.id}" }) { playlist ->
-                                        SharedPlaylistRow(
-                                            playlist = playlist,
-                                            onClick = { onPlaylistClick(playlist.id) },
-                                        )
-                                        HorizontalDivider()
-                                    }
-                                }
+                                HorizontalDivider()
+                            }
                         }
                     }
-                }
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun SharedTabRow(
-    selected: SharedTab,
-    onSelected: (SharedTab) -> Unit,
-) {
-    val options = remember { SharedTab.entries }
-    SingleChoiceSegmentedButtonRow(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-    ) {
-        options.forEachIndexed { index, option ->
-            SegmentedButton(
-                selected = option == selected,
-                onClick = { onSelected(option) },
-                shape = SegmentedButtonDefaults.itemShape(index = index, count = options.size),
-            ) {
-                Text(option.name)
             }
         }
     }
 }
 
 @Composable
-private fun ScopeHeader(
-    text: String,
-    sub: String,
-    onAdd: (() -> Unit)? = null,
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(2.dp),
-        ) {
-            Text(
-                text = text,
-                style = MaterialTheme.typography.titleSmall,
-            )
-            Text(
-                text = sub,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        // Only present when the shared scope grants write access.
-        if (onAdd != null) {
-            TextButton(onClick = onAdd) {
-                Icon(
-                    imageVector = Icons.Filled.Add,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp),
-                )
-                Text("  Add item")
-            }
-        }
-    }
+private fun SectionHeader(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.titleSmall,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+    )
 }
 
 @Composable
-private fun SharedItemRow(
-    item: MediaItem,
+private fun CategoryTile(
+    summary: SharedCategorySummary,
     onClick: () -> Unit,
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        ArtworkImage(
-            itemId = item.id,
-            contentDescription = item.title,
-            updatedAt = item.updatedAt,
-            category = item.category,
-            modifier = Modifier
-                .size(48.dp)
-                .clip(RoundedCornerShape(6.dp)),
-        )
+        CategoryBadge(category = summary.category)
         Column(
             modifier = Modifier
                 .weight(1f)
@@ -286,29 +156,30 @@ private fun SharedItemRow(
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
             Text(
-                text = item.title,
-                style = MaterialTheme.typography.titleSmall,
+                text = summary.label,
+                style = MaterialTheme.typography.titleMedium,
+            )
+            val owners = summary.owners
+            val ownerText =
+                when (owners.size) {
+                    0 -> null
+                    1 -> "from ${owners.first()}"
+                    else -> "from ${owners.size} people"
+                }
+            val countText = "${summary.count} item${if (summary.count == 1) "" else "s"}"
+            Text(
+                text = listOfNotNull(countText, ownerText).joinToString(" · "),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            val sub =
-                listOfNotNull(
-                    item.artist?.takeIf { it.isNotBlank() },
-                    item.format?.takeIf { it.isNotBlank() },
-                    item.year?.toString(),
-                    item.userId,
-                ).joinToString(" · ").ifBlank { null }
-            if (sub != null) {
-                Text(
-                    text = sub,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
         }
-        CategoryBadge(category = item.category)
+        Icon(
+            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 

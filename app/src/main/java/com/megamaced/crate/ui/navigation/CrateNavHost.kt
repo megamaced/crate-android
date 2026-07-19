@@ -24,6 +24,7 @@ import com.megamaced.crate.ui.screen.playlist.PlaylistListScreen
 import com.megamaced.crate.ui.screen.scan.BarcodeScanScreen
 import com.megamaced.crate.ui.screen.search.SearchScreen
 import com.megamaced.crate.ui.screen.settings.SettingsScreen
+import com.megamaced.crate.ui.screen.shared.SharedCategoryScreen
 import com.megamaced.crate.ui.screen.shared.SharedWithMeScreen
 import kotlinx.serialization.json.Json
 
@@ -124,13 +125,20 @@ fun CrateNavHost(
         composable<Destination.SharedWithMe> {
             SharedWithMeScreen(
                 onBack = { navController.popBackStack() },
-                onItemClick = { id -> navController.navigate(Destination.Detail(id)) },
+                onOpenCategory = { category -> navController.navigate(Destination.SharedCategory(category)) },
                 onPlaylistClick = { id -> navController.navigate(Destination.PlaylistDetail(id)) },
-                onAddToSharedScope = { owner, category ->
+            )
+        }
+        composable<Destination.SharedCategory> {
+            SharedCategoryScreen(
+                onBack = { navController.popBackStack() },
+                onItemClick = { id -> navController.navigate(Destination.Detail(id)) },
+                onAddItem = { owner, category ->
                     navController.navigate(
                         Destination.AddEdit(category = category, owner = owner),
                     )
                 },
+                widthSizeClass = widthSizeClass,
             )
         }
     }

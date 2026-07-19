@@ -53,4 +53,10 @@ sealed interface Destination {
 
     @Serializable
     data object SharedWithMe : Destination
+
+    // A single shared category subpage (apiValue: music/film/book/game/comic).
+    @Serializable
+    data class SharedCategory(
+        val category: String,
+    ) : Destination
 }

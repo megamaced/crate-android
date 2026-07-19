@@ -1,0 +1,7 @@
+* Share a category or your whole library straight from the
+  category screen's new Share button (moved out of Settings).
+* "Shared with me" is now a browsable overview: each shared
+  category opens a full view that looks and works just like your
+  own — same filters, sorting and, on read/write shares, adding.
+* Collection lists now show section headers for every sort
+  (artist, title, year, format), not only newest/oldest.

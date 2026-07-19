@@ -21,6 +21,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ViewList
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.GridView
+import androidx.compose.material.icons.outlined.Share
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
@@ -38,7 +41,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -62,6 +67,8 @@ import com.megamaced.crate.ui.components.MediaCard
 import com.megamaced.crate.ui.components.SortMenuButton
 import com.megamaced.crate.ui.navigation.CategorySegmentedRow
 import com.megamaced.crate.ui.network.LocalIsOnline
+import com.megamaced.crate.ui.screen.share.ShareSheet
+import com.megamaced.crate.ui.screen.share.ShareTarget
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -75,6 +82,10 @@ fun CollectionScreen(
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val isOnline = LocalIsOnline.current
+    // Share-sheet state: ShareTarget plus optional category key. Opened from the
+    // toolbar Share button (category or whole-library sharing lives here now,
+    // not in Settings). Null = closed.
+    var shareSheet by remember { mutableStateOf<Pair<ShareTarget, String>?>(null) }
 
     LaunchedEffect(uiState.errorMessage) {
         uiState.errorMessage?.let { msg ->
@@ -98,6 +109,15 @@ fun CollectionScreen(
                         selected = uiState.sort,
                         onSelected = viewModel::selectSort,
                     )
+                    if (isOnline) {
+                        ShareCollectionMenu(
+                            category = uiState.category,
+                            onShareCategory = {
+                                shareSheet = ShareTarget.Category to uiState.category.apiValue
+                            },
+                            onShareLibrary = { shareSheet = ShareTarget.Library to "" },
+                        )
+                    }
                 },
             )
         },
@@ -146,10 +166,52 @@ fun CollectionScreen(
             }
         }
     }
+
+    shareSheet?.let { (target, category) ->
+        ShareSheet(
+            target = target,
+            category = category,
+            onDismiss = { shareSheet = null },
+        )
+    }
 }
 
 @Composable
-private fun ViewModeToggle(
+private fun ShareCollectionMenu(
+    category: Category,
+    onShareCategory: () -> Unit,
+    onShareLibrary: () -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    IconButton(onClick = { expanded = true }) {
+        Icon(
+            imageVector = Icons.Outlined.Share,
+            contentDescription = "Share",
+        )
+    }
+    DropdownMenu(
+        expanded = expanded,
+        onDismissRequest = { expanded = false },
+    ) {
+        DropdownMenuItem(
+            text = { Text("Share ${category.label}…") },
+            onClick = {
+                expanded = false
+                onShareCategory()
+            },
+        )
+        DropdownMenuItem(
+            text = { Text("Share whole library…") },
+            onClick = {
+                expanded = false
+                onShareLibrary()
+            },
+        )
+    }
+}
+
+@Composable
+internal fun ViewModeToggle(
     current: CollectionViewMode,
     onSelected: (CollectionViewMode) -> Unit,
 ) {
@@ -164,7 +226,7 @@ private fun ViewModeToggle(
 }
 
 @Composable
-private fun CollectionGrid(
+internal fun CollectionGrid(
     groups: List<ItemGroup>,
     onItemClick: (Long) -> Unit,
     widthSizeClass: WindowWidthSizeClass,
@@ -208,7 +270,7 @@ private fun CollectionGrid(
 }
 
 @Composable
-private fun CollectionList(
+internal fun CollectionList(
     groups: List<ItemGroup>,
     onItemClick: (Long) -> Unit,
     modifier: Modifier = Modifier,
