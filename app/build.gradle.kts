@@ -31,8 +31,8 @@ android {
         applicationId = "com.megamaced.crate"
         minSdk = 29
         targetSdk = 36
-        versionCode = 17
-        versionName = "1.7.0"
+        versionCode = 18
+        versionName = "1.8.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
@@ -151,6 +151,9 @@ dependencies {
 
     // Secure storage (Tink-backed)
     implementation(libs.androidx.security.crypto)
+
+    // EXIF (read orientation before stripping metadata via re-encode)
+    implementation(libs.androidx.exifinterface)
 
     // Hilt
     implementation(libs.hilt.android)

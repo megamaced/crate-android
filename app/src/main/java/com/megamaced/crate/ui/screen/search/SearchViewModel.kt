@@ -18,6 +18,7 @@ import com.megamaced.crate.ui.screen.addedit.ExternalSearchResult
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -122,6 +123,7 @@ class SearchViewModel
 
         fun selectCategory(value: Category) {
             if (externalCategory.value != value) {
+                externalSearchJob?.cancel()
                 externalCategory.value = value
                 externalResults.value = emptyList()
                 externalHasSearched.value = false
@@ -129,11 +131,16 @@ class SearchViewModel
             }
         }
 
+        // Cancels a prior in-flight external search so a slower older response
+        // can't overwrite newer results.
+        private var externalSearchJob: Job? = null
+
         fun runExternalSearch() {
             val q = query.value.trim()
             if (q.isBlank()) return
             val category = externalCategory.value
-            viewModelScope.launch {
+            externalSearchJob?.cancel()
+            externalSearchJob = viewModelScope.launch {
                 isExternalLoading.value = true
                 externalError.value = null
                 val result =

@@ -15,6 +15,7 @@ workManager = "2.11.2"
 dataStore = "1.2.1"
 room = "2.8.4"
 securityCrypto = "1.1.0"
+exifInterface = "1.4.1"
 
 # DI
 # Pinned below 2.59 — Hilt 2.59 requires AGP 9. Bump together with AGP 9.
@@ -88,6 +89,9 @@ androidx-room-testing = { group = "androidx.room", name = "room-testing", versio
 
 # Secure storage (Tink-backed)
 androidx-security-crypto = { group = "androidx.security", name = "security-crypto", version.ref = "securityCrypto" }
+
+# EXIF (read image orientation so it can be baked into the pixels before re-encode)
+androidx-exifinterface = { group = "androidx.exifinterface", name = "exifinterface", version.ref = "exifInterface" }
 
 # Hilt
 hilt-android = { group = "com.google.dagger", name = "hilt-android", version.ref = "hilt" }

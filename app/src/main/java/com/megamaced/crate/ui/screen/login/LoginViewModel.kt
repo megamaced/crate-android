@@ -46,7 +46,14 @@ class LoginViewModel
                 return
             }
 
-            val normalisedHost = if (!host.startsWith("http")) "https://$host" else host
+            // Force HTTPS: the Login Flow v2 exchange carries the app password,
+            // so never let a user-typed http:// scheme send it in cleartext.
+            val normalisedHost =
+                when {
+                    host.startsWith("https://") -> host
+                    host.startsWith("http://") -> "https://" + host.removePrefix("http://")
+                    else -> "https://$host"
+                }
 
             _uiState.update { it.copy(isLoading = true, error = null) }
 

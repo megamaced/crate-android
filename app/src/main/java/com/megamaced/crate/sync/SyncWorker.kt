@@ -44,7 +44,15 @@ class SyncWorker
                 }
                 is ApiResult.HttpError -> {
                     Timber.w("Sync HTTP %d: %s", result.code, result.message)
-                    Result.retry()
+                    // Only retry transient server-side failures. Permanent 4xx
+                    // (400/403/404/422, …) can never succeed on retry, so
+                    // retrying just burns battery/network with WorkManager's
+                    // exponential backoff until the constraints lapse.
+                    if (result.code in 500..599 || result.code == 408 || result.code == 429) {
+                        Result.retry()
+                    } else {
+                        Result.failure()
+                    }
                 }
                 ApiResult.Unauthorised -> {
                     Timber.w("Sync aborted: unauthorised")

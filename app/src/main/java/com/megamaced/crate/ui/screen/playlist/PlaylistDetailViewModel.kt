@@ -55,6 +55,11 @@ class PlaylistDetailViewModel
         // refresh (not persisted through Room). Own playlists don't rely on it.
         private val sharedCanWrite = MutableStateFlow(false)
 
+        // Guards against double-submit from rapid taps. Mutations are launched
+        // on the main dispatcher, so a plain flag flipped before the coroutine
+        // launches is a sufficient (single-threaded) gate.
+        private var isMutating = false
+
         val uiState: StateFlow<PlaylistDetailUiState> =
             combine(
                 playlistRepository.observe(playlistId),
@@ -68,9 +73,17 @@ class PlaylistDetailViewModel
                     ?.map { it.id }
                     ?.toSet()
                     .orEmpty()
+                // Fail closed: a null owner means the server attributed no
+                // separate owner (our own playlist); a known owner we can't
+                // positively match to ourselves is treated as not-owner so
+                // owner-only Delete/Re-share stay hidden.
                 val owner =
-                    playlist != null &&
-                        (playlist.userId == null || currentLoginName == null || playlist.userId == currentLoginName)
+                    when {
+                        playlist == null -> false
+                        playlist.userId == null -> true
+                        currentLoginName == null -> false
+                        else -> playlist.userId == currentLoginName
+                    }
                 PlaylistDetailUiState(
                     playlistId = playlistId,
                     playlist = playlist,
@@ -100,11 +113,11 @@ class PlaylistDetailViewModel
         fun rename(name: String) {
             val trimmed = name.trim()
             if (trimmed.isEmpty()) return
-            viewModelScope.launch { handle(playlistRepository.rename(playlistId, trimmed)) }
+            launchMutation { handle(playlistRepository.rename(playlistId, trimmed)) }
         }
 
         fun delete() {
-            viewModelScope.launch {
+            launchMutation {
                 when (val result = playlistRepository.delete(playlistId)) {
                     is ApiResult.Success -> deleted.value = true
                     ApiResult.NetworkError -> errorMessage.value = "Couldn't reach the server."
@@ -115,11 +128,23 @@ class PlaylistDetailViewModel
         }
 
         fun addItem(mediaItemId: Long) {
-            viewModelScope.launch { handle(playlistRepository.addItem(playlistId, mediaItemId)) }
+            launchMutation { handle(playlistRepository.addItem(playlistId, mediaItemId)) }
         }
 
         fun removeItem(mediaItemId: Long) {
-            viewModelScope.launch { handle(playlistRepository.removeItem(playlistId, mediaItemId)) }
+            launchMutation { handle(playlistRepository.removeItem(playlistId, mediaItemId)) }
+        }
+
+        private fun launchMutation(block: suspend () -> Unit) {
+            if (isMutating) return
+            isMutating = true
+            viewModelScope.launch {
+                try {
+                    block()
+                } finally {
+                    isMutating = false
+                }
+            }
         }
 
         fun dismissError() {

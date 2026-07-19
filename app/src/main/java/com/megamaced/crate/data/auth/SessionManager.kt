@@ -1,6 +1,10 @@
 package com.megamaced.crate.data.auth
 
+import android.content.Context
+import coil3.SingletonImageLoader
+import com.megamaced.crate.data.db.CrateDatabase
 import com.megamaced.crate.data.prefs.UserPreferences
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -23,8 +27,10 @@ sealed interface AuthState {
 class SessionManager
     @Inject
     constructor(
+        @ApplicationContext private val context: Context,
         private val tokenStore: TokenStore,
         private val userPreferences: UserPreferences,
+        private val database: CrateDatabase,
     ) {
         private val _authState = MutableStateFlow<AuthState>(AuthState.Unknown)
         val authState: StateFlow<AuthState> = _authState.asStateFlow()
@@ -48,6 +54,7 @@ class SessionManager
 
         fun logout() {
             tokenStore.clear()
+            _authState.value = AuthState.Unauthenticated
             // Clear per-user sync state so logging in as a different
             // Nextcloud account doesn't reuse the previous user's delta
             // cursor (flagged by the Phase 16 audit). Theme + collection
@@ -55,8 +62,18 @@ class SessionManager
             scope.launch {
                 userPreferences.setLastSyncCursor(null)
                 userPreferences.setLastSeenWipedAt(null)
+                // Drop all cached collection data: delta sync only wipes the
+                // local DB when the server reports a newer wipedAt, so without
+                // this a login as a different (never-wiped) account would merge
+                // the previous user's rows into the new one's collection.
+                database.clearAllTables()
+                // Coil caches are keyed by item id with no user/host scope, so
+                // evict them too — otherwise account B could be served account
+                // A's artwork/photos for a colliding id.
+                val loader = SingletonImageLoader.get(context)
+                loader.memoryCache?.clear()
+                loader.diskCache?.clear()
             }
-            _authState.value = AuthState.Unauthenticated
         }
 
         fun onLoginSuccess(

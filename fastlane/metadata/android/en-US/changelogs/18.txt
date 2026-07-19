@@ -1,0 +1,11 @@
+* Location and camera metadata is now stripped from every
+  uploaded image type (including HEIC and WebP from modern
+  phones), and photos are auto-rotated correctly.
+* Fixed items silently disappearing from playlists after a sync.
+* Logging out now clears all cached collection data and images,
+  so signing in as another account never shows the first
+  account's items.
+* Shared collections now refresh, so revoked shares stop showing.
+* Stability fixes: search result races, barcode scanner lock-ups,
+  duplicate playlist actions, upload timeouts, and clearer error
+  messages.

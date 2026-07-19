@@ -18,6 +18,7 @@ import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
+import java.util.concurrent.TimeUnit
 import javax.inject.Singleton
 
 @Module
@@ -40,6 +41,12 @@ object NetworkModule {
     ): OkHttpClient =
         OkHttpClient
             .Builder()
+            // OkHttp's 10s default read/write timeout is too tight for full-size
+            // artwork/photo uploads and collection exports over a slow mobile
+            // link, which would otherwise fail mid-transfer.
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(60, TimeUnit.SECONDS)
+            .writeTimeout(60, TimeUnit.SECONDS)
             .addInterceptor(hostInterceptor)
             .addInterceptor(authInterceptor)
             .apply {

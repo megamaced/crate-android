@@ -30,7 +30,9 @@ fun PhotoImage(
     contentDescription: String?,
     modifier: Modifier = Modifier,
     size: ArtworkSize = ArtworkSize.Thumb,
-    updatedAt: String? = null,
+    // Required (no default): the only cache-key input that changes when a photo
+    // is replaced. Keep it mandatory so a stale image can't be served.
+    updatedAt: String?,
     contentScale: ContentScale = ContentScale.Crop,
 ) {
     val context = LocalContext.current

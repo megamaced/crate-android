@@ -82,7 +82,19 @@ class ItemDetailViewModel
                 sharedCanWrite,
             ) { item, action, err, isDeleted, canWriteShare ->
                 val itemOwner = item?.userId
-                val shared = item != null && itemOwner != null && currentLoginName != null && itemOwner != currentLoginName
+                // Fail closed: an item carries an explicit owner only when it
+                // reached us via a share, so a known owner we can't positively
+                // match to ourselves (e.g. login name momentarily unavailable)
+                // is treated as shared/read-only rather than granting owner-only
+                // Delete/Re-share. A null owner means the server attributed no
+                // separate owner — that's our own item.
+                val shared =
+                    when {
+                        item == null -> false
+                        itemOwner == null -> false
+                        currentLoginName == null -> true
+                        else -> itemOwner != currentLoginName
+                    }
                 val owner = item != null && !shared
                 ItemDetailUiState(
                     itemId = itemId,

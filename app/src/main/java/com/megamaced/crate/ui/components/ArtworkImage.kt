@@ -40,7 +40,10 @@ fun ArtworkImage(
     contentDescription: String?,
     modifier: Modifier = Modifier,
     size: ArtworkSize = ArtworkSize.Thumb,
-    updatedAt: String? = null,
+    // Required (no default): it's the only thing that varies the cache key when
+    // artwork is replaced, so a call site that forgot it would serve a stale
+    // image until eviction. Keep it mandatory so that can't happen.
+    updatedAt: String?,
     contentScale: ContentScale = ContentScale.Crop,
     category: Category? = null,
 ) {

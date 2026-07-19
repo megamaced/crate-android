@@ -34,7 +34,11 @@ class NetworkMonitor
                 val callback =
                     object : ConnectivityManager.NetworkCallback() {
                         override fun onAvailable(network: Network) {
-                            trySend(true)
+                            // Availability alone doesn't mean the link actually
+                            // reaches the internet; re-evaluate against the
+                            // validated capability (onCapabilitiesChanged will
+                            // follow once validation completes).
+                            trySend(currentlyOnline())
                         }
 
                         override fun onLost(network: Network) {
@@ -45,7 +49,7 @@ class NetworkMonitor
                             network: Network,
                             capabilities: NetworkCapabilities,
                         ) {
-                            trySend(capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET))
+                            trySend(capabilities.isOnline())
                         }
                     }
 
@@ -67,6 +71,13 @@ class NetworkMonitor
         private fun currentlyOnline(): Boolean {
             val active = connectivityManager.activeNetwork ?: return false
             val caps = connectivityManager.getNetworkCapabilities(active) ?: return false
-            return caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+            return caps.isOnline()
         }
+
+        // Require validated internet, not merely a network that claims the
+        // INTERNET capability — otherwise a captive portal or a dead Wi-Fi link
+        // reports "online" and the offline banner never shows.
+        private fun NetworkCapabilities.isOnline(): Boolean =
+            hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+                hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
     }

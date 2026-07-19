@@ -29,8 +29,17 @@ class AuthInterceptor
         override fun intercept(chain: Interceptor.Chain): Response {
             val original = chain.request()
             val credentials = tokenStore.getCredentials()
-            val targetHost = credentials?.host?.toHttpUrlOrNull()?.host
-            val isUserHost = targetHost != null && original.url.host == targetHost
+            // Match the full origin (scheme + host + port), not just the
+            // hostname — the credential is bound to a specific origin, so the
+            // header should never ride along to the same host on a different
+            // scheme/port. HostInterceptor has already rewritten API requests
+            // to exactly this origin by the time we run.
+            val target = credentials?.host?.toHttpUrlOrNull()
+            val isUserHost =
+                target != null &&
+                    original.url.host == target.host &&
+                    original.url.port == target.port &&
+                    original.url.scheme == target.scheme
 
             val request = if (credentials != null && isUserHost) {
                 val basic = "${credentials.loginName}:${credentials.appPassword}"

@@ -12,6 +12,7 @@ import com.megamaced.crate.data.api.dto.RawgSearchResultDto
 import com.megamaced.crate.data.api.dto.TmdbSearchResultDto
 import com.megamaced.crate.domain.model.Category
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -37,8 +38,14 @@ class ExternalSearchViewModel
         private val _state = MutableStateFlow(ExternalSearchState())
         val state: StateFlow<ExternalSearchState> = _state.asStateFlow()
 
+        // Tracks the in-flight search so a new query (or category switch)
+        // cancels the previous request — otherwise a slower older response
+        // could land last and overwrite the newer results.
+        private var searchJob: Job? = null
+
         fun setCategory(value: Category) {
             if (value != _state.value.category) {
+                searchJob?.cancel()
                 _state.value =
                     ExternalSearchState(
                         category = value,
@@ -53,7 +60,8 @@ class ExternalSearchViewModel
             val current = _state.value
             val q = current.query.trim()
             if (q.isBlank()) return
-            viewModelScope.launch {
+            searchJob?.cancel()
+            searchJob = viewModelScope.launch {
                 _state.update { it.copy(isLoading = true, errorMessage = null) }
                 val result =
                     apiCall {

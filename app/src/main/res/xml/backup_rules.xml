@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <full-backup-content>
-    <!-- Exclude the encrypted credential store from auto-backup. -->
-    <exclude domain="sharedpref" path="crate_secure_prefs.xml" />
+    <!-- Exclude the encrypted credential store from auto-backup.
+         Path must match TokenStore.PREFS_FILE ("crate_auth") + ".xml". -->
+    <exclude domain="sharedpref" path="crate_auth.xml" />
 </full-backup-content>

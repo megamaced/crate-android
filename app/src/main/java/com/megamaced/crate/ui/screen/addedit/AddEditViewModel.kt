@@ -18,7 +18,6 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
@@ -171,7 +170,9 @@ class AddEditViewModel
             loadCurrencyOptions()
             if (itemId != null) loadExisting(itemId)
             applyInitialPrefill(savedStateHandle.get<String>("prefillJson"))
-            observeScanResults()
+            // NB: barcode-scan results (SCAN_RESULT_KEY) are consumed solely by
+            // AddEditItemScreen's LaunchedEffect + onScanResultConsumed. Do not
+            // also observe them here — two owners resetting the same key races.
         }
 
         /**
@@ -194,20 +195,6 @@ class AddEditViewModel
             runCatching { Json.decodeFromString<ExternalSearchResult>(prefillJson) }
                 .getOrNull()
                 ?.let(::applyExternalResult)
-        }
-
-        private fun observeScanResults() {
-            viewModelScope.launch {
-                savedStateHandle
-                    .getStateFlow<String?>(SCAN_RESULT_KEY, null)
-                    .filterNotNull()
-                    .collect { json ->
-                        runCatching { Json.decodeFromString<ExternalSearchResult>(json) }
-                            .getOrNull()
-                            ?.let(::applyExternalResult)
-                        savedStateHandle[SCAN_RESULT_KEY] = null
-                    }
-            }
         }
 
         private fun loadProfileDefaults() {
@@ -319,9 +306,23 @@ class AddEditViewModel
          */
         fun onPurchasePriceChange(value: String) =
             update {
-                val cleaned = value
-                    .replace(',', '.')
-                    .filter { ch -> ch.isDigit() || ch == '.' }
+                // Keep digits and a SINGLE decimal separator. Without the
+                // dedupe, "12.3.4" survives the filter but fails
+                // String.toDoubleOrNull(), so the price is silently dropped on
+                // save even though the field still shows a value.
+                val cleaned =
+                    buildString {
+                        var dotSeen = false
+                        for (ch in value.replace(',', '.')) {
+                            when {
+                                ch.isDigit() -> append(ch)
+                                ch == '.' && !dotSeen -> {
+                                    append(ch)
+                                    dotSeen = true
+                                }
+                            }
+                        }
+                    }
                 copy(purchasePrice = cleaned)
             }
 

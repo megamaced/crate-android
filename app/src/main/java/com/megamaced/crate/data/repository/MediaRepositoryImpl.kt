@@ -17,8 +17,11 @@ import com.megamaced.crate.domain.repository.MediaRepository
 import com.megamaced.crate.domain.repository.MediaRepository.RefreshResult
 import com.megamaced.crate.domain.repository.MediaRepository.SyncResult
 import com.megamaced.crate.util.ExifStrip
+import com.megamaced.crate.util.ServerTimestamps
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -120,7 +123,10 @@ class MediaRepositoryImpl
                 // Strip EXIF/GPS client-side before sending. The server also
                 // re-encodes through GD, but stripping here protects the bytes
                 // in transit (logs, proxies) and shields users on older servers.
-                val sanitised = ExifStrip.strip(bytes, mimeType)
+                // The decode/re-encode is CPU-bound, so keep it off the main
+                // thread (apiCall's block runs in the caller's context until
+                // the first real suspension).
+                val sanitised = withContext(Dispatchers.Default) { ExifStrip.strip(bytes, mimeType) }
                 val body = sanitised.toRequestBody(mimeType.toMediaType())
                 val part = MultipartBody.Part.createFormData("file", "artwork", body)
                 binary.uploadArtwork(id, part).close()
@@ -145,8 +151,9 @@ class MediaRepositoryImpl
             apiCall {
                 // Strip EXIF/GPS client-side. Photos are the "receipts and
                 // personal photos" slot — phone-gallery uploads commonly
-                // carry GPS, timestamps, camera serials.
-                val sanitised = ExifStrip.strip(bytes, mimeType)
+                // carry GPS, timestamps, camera serials. Decode/re-encode is
+                // CPU-bound; keep it off the main thread.
+                val sanitised = withContext(Dispatchers.Default) { ExifStrip.strip(bytes, mimeType) }
                 val body = sanitised.toRequestBody(mimeType.toMediaType())
                 val part = MultipartBody.Part.createFormData("file", "photo", body)
                 binary.uploadPhoto(id, slot, part).close()
@@ -180,7 +187,9 @@ class MediaRepositoryImpl
                 // rows are stale (re-import generates new IDs, so delta sync
                 // would just append duplicates). Drop the local DB and refetch.
                 val effectiveSince =
-                    if (serverWipedAt != null && (lastSeenWipedAt == null || serverWipedAt > lastSeenWipedAt)) {
+                    if (serverWipedAt != null &&
+                        (lastSeenWipedAt == null || ServerTimestamps.isNewer(serverWipedAt, lastSeenWipedAt))
+                    ) {
                         dao.deleteAll()
                         null
                     } else {
@@ -195,7 +204,8 @@ class MediaRepositoryImpl
                     dao.upsertAll(page.items.map { it.toEntity(codec) })
                     page.items.forEach { dto ->
                         val candidate = dto.updatedAt
-                        if (candidate != null && (maxUpdatedAt == null || candidate > maxUpdatedAt!!)) {
+                        val currentMax = maxUpdatedAt
+                        if (candidate != null && (currentMax == null || ServerTimestamps.isNewer(candidate, currentMax))) {
                             maxUpdatedAt = candidate
                         }
                     }

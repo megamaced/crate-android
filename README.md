@@ -19,9 +19,12 @@ Native Android companion for [Crate](https://github.com/megamaced/crate), a pers
 
 > Screenshots above were captured on the previous copper-themed build (v1.2 and earlier). The current build (v1.4.0+) uses Nextcloud's brand blue throughout to sit alongside the official Nextcloud client suite.
 
+<!-- When bumping the app version, update the Status line below to match app/build.gradle.kts versionName. -->
+
+
 ## Status
 
-Released — **v1.4.0**. Signed APKs are published on the [Releases page](https://github.com/megamaced/crate-android/releases/latest).
+Released — **v1.8.0**. Signed APKs are published on the [Releases page](https://github.com/megamaced/crate-android/releases/latest).
 
 There's a manual **Check for updates** button under *Settings → About* that polls GitHub for newer releases on demand and posts a notification linking to the release page if one is available. The app does *not* check for updates on launch — F-Droid policy forbids unsolicited third-party network calls at startup, and the app behaves the same way regardless of where you installed it from.
 

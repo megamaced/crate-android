@@ -11,6 +11,7 @@ import com.megamaced.crate.data.api.dto.OpenLibraryResultDto
 import com.megamaced.crate.domain.model.Category
 import com.megamaced.crate.ui.screen.addedit.ExternalSearchResult
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -42,18 +43,33 @@ class BarcodeScanViewModel
             )
         val uiState: StateFlow<BarcodeScanUiState> = _uiState.asStateFlow()
 
+        private var lookupJob: Job? = null
+
         fun onBarcodeDetected(raw: String) {
             val current = _uiState.value
             if (current.isLooking || current.barcode == raw) return
             _uiState.update {
                 it.copy(barcode = raw, isLooking = true, sheetOpen = true, errorMessage = null)
             }
-            viewModelScope.launch { lookup(raw, current.category) }
+            lookupJob = viewModelScope.launch { lookup(raw, current.category) }
         }
 
         fun dismissSheet() {
+            // Cancel any in-flight lookup and clear isLooking; otherwise the
+            // onBarcodeDetected guard would keep rejecting new scans until the
+            // orphaned lookup completed, and its result would land in the
+            // now-dismissed sheet. (apiCall propagates cancellation, so the
+            // cancelled lookup won't post stale state.)
+            lookupJob?.cancel()
+            lookupJob = null
             _uiState.update {
-                it.copy(sheetOpen = false, candidates = emptyList(), barcode = null, errorMessage = null)
+                it.copy(
+                    sheetOpen = false,
+                    isLooking = false,
+                    candidates = emptyList(),
+                    barcode = null,
+                    errorMessage = null,
+                )
             }
         }
 

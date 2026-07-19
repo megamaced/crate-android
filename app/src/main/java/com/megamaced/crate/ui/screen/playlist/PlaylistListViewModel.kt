@@ -29,6 +29,10 @@ class PlaylistListViewModel
         private val isRefreshing = MutableStateFlow(false)
         private val errorMessage = MutableStateFlow<String?>(null)
 
+        // Guards create/rename/delete against double-submit from rapid taps.
+        // Mutations launch on the main dispatcher, so a plain flag is enough.
+        private var isMutating = false
+
         val uiState: StateFlow<PlaylistListUiState> =
             combine(
                 playlistRepository.observeAll(),
@@ -62,7 +66,7 @@ class PlaylistListViewModel
         fun create(name: String) {
             val trimmed = name.trim()
             if (trimmed.isEmpty()) return
-            viewModelScope.launch { handle(playlistRepository.create(trimmed)) {} }
+            launchMutation { handle(playlistRepository.create(trimmed)) {} }
         }
 
         fun rename(
@@ -71,11 +75,23 @@ class PlaylistListViewModel
         ) {
             val trimmed = name.trim()
             if (trimmed.isEmpty()) return
-            viewModelScope.launch { handle(playlistRepository.rename(id, trimmed)) {} }
+            launchMutation { handle(playlistRepository.rename(id, trimmed)) {} }
         }
 
         fun delete(id: Long) {
-            viewModelScope.launch { handle(playlistRepository.delete(id)) {} }
+            launchMutation { handle(playlistRepository.delete(id)) {} }
+        }
+
+        private fun launchMutation(block: suspend () -> Unit) {
+            if (isMutating) return
+            isMutating = true
+            viewModelScope.launch {
+                try {
+                    block()
+                } finally {
+                    isMutating = false
+                }
+            }
         }
 
         fun dismissError() {

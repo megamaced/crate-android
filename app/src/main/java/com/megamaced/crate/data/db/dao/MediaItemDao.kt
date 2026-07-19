@@ -1,10 +1,9 @@
 package com.megamaced.crate.data.db.dao
 
 import androidx.room.Dao
-import androidx.room.Insert
-import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
+import androidx.room.Upsert
 import com.megamaced.crate.data.db.entity.MediaItemEntity
 import kotlinx.coroutines.flow.Flow
 
@@ -35,10 +34,16 @@ interface MediaItemDao {
     @Query("SELECT MAX(updatedAt) FROM media_items")
     suspend fun maxUpdatedAt(): String?
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    // @Upsert (INSERT-or-UPDATE), NOT @Insert(REPLACE): with REPLACE, Room
+    // emits INSERT OR REPLACE, which deletes-then-inserts a conflicting row and
+    // fires the ON DELETE CASCADE on playlist_items — so routinely re-syncing an
+    // existing item (SyncWorker runs on every app foreground) would silently
+    // drop it from every playlist it belongs to. @Upsert updates in place and
+    // leaves the cross-refs intact. Mirrors the same choice in PlaylistDao.
+    @Upsert
     suspend fun upsert(item: MediaItemEntity)
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Upsert
     suspend fun upsertAll(items: List<MediaItemEntity>)
 
     @Query("DELETE FROM media_items WHERE id = :id")

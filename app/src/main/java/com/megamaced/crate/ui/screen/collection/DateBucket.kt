@@ -23,7 +23,10 @@ internal object DateBucket {
             return "Unknown"
         }
         val diffDays = ChronoUnit.DAYS.between(itemDate, today)
-        if (diffDays == 0L) return "Today"
+        // Guard clock skew / server-vs-device timezone: a createdAt ahead of
+        // the device date yields a negative diff, which would otherwise fall
+        // through to "Earlier this week". Treat future dates as newest.
+        if (diffDays <= 0L) return "Today"
         if (diffDays == 1L) return "Yesterday"
         if (diffDays < 7L) return "Earlier this week"
         if (diffDays < 14L) return "Last week"

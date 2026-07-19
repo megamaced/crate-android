@@ -36,10 +36,20 @@ class SharedContentStore
 
         private val mutex = Mutex()
 
-        /** Fetch only if nothing is cached yet. */
+        // Wall-clock of the last successful fetch, so [load] can re-fetch a
+        // stale snapshot instead of serving a cached one for the whole process
+        // lifetime — otherwise a sharee keeps seeing revoked/downgraded shares
+        // (and their now-invalid Add affordance) until a manual pull-to-refresh.
+        private var lastLoadedAtMs: Long = 0L
+
+        /** Fetch if nothing is cached yet, or the cached snapshot is stale. */
         suspend fun load() {
-            if (_state.value.data != null) return
-            refresh()
+            mutex.withLock {
+                val fresh =
+                    _state.value.data != null &&
+                        (System.currentTimeMillis() - lastLoadedAtMs) < CACHE_TTL_MS
+                if (!fresh) refreshLocked()
+            }
         }
 
         /** Clear a surfaced error after the UI has shown it. */
@@ -48,20 +58,31 @@ class SharedContentStore
         }
 
         suspend fun refresh() {
-            mutex.withLock {
-                _state.update { it.copy(isLoading = true, error = null) }
-                when (val result = shareRepository.sharedWithMe()) {
-                    is ApiResult.Success ->
-                        _state.update { it.copy(data = result.value, isLoading = false, error = null) }
-                    ApiResult.NetworkError ->
-                        _state.update { it.copy(isLoading = false, error = "Couldn't reach the server.") }
-                    is ApiResult.HttpError ->
-                        _state.update {
-                            it.copy(isLoading = false, error = result.message ?: "Server error (${result.code}).")
-                        }
-                    ApiResult.Unauthorised ->
-                        _state.update { it.copy(isLoading = false) }
+            mutex.withLock { refreshLocked() }
+        }
+
+        // Caller must hold [mutex]. Keeping the check-and-fetch under one lock
+        // acquisition also prevents two concurrent load() callers (landing +
+        // subpage on first mount) from both issuing a full fetch.
+        private suspend fun refreshLocked() {
+            _state.update { it.copy(isLoading = true, error = null) }
+            when (val result = shareRepository.sharedWithMe()) {
+                is ApiResult.Success -> {
+                    _state.update { it.copy(data = result.value, isLoading = false, error = null) }
+                    lastLoadedAtMs = System.currentTimeMillis()
                 }
+                ApiResult.NetworkError ->
+                    _state.update { it.copy(isLoading = false, error = "Couldn't reach the server.") }
+                is ApiResult.HttpError ->
+                    _state.update {
+                        it.copy(isLoading = false, error = result.message ?: "Server error (${result.code}).")
+                    }
+                ApiResult.Unauthorised ->
+                    _state.update { it.copy(isLoading = false) }
             }
+        }
+
+        companion object {
+            private const val CACHE_TTL_MS = 30_000L
         }
     }

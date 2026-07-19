@@ -31,6 +31,16 @@ data class OcsMeta(
 
 annotation class OcsResponse
 
+/**
+ * Thrown when an OCS envelope arrives with HTTP 200 but a failure
+ * `meta.statuscode`. [apiCall] maps it to [ApiResult.HttpError]/[ApiResult.Unauthorised]
+ * so a 200-with-error body isn't mistaken for success.
+ */
+class OcsException(
+    val statusCode: Int,
+    override val message: String?,
+) : RuntimeException(message)
+
 class OcsConverterFactory(
     private val json: Json,
 ) : Converter.Factory() {
@@ -49,6 +59,14 @@ class OcsConverterFactory(
 
         return Converter<ResponseBody, Any?> { body ->
             val envelope = json.decodeFromString(serializer, body.string())
+            // OCS carries the real outcome in meta.statuscode (100 for v1
+            // success, 2xx for v2). A non-success code on an HTTP-200 envelope
+            // is a failure the transport layer didn't surface — reject it
+            // rather than hand callers empty/partial data as "success".
+            val code = envelope.ocs.meta?.statuscode
+            if (code != null && code != 100 && code !in 200..299) {
+                throw OcsException(code, envelope.ocs.meta?.message)
+            }
             envelope.ocs.data
         }
     }
