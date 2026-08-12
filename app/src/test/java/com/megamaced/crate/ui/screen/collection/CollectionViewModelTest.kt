@@ -1,5 +1,6 @@
 package com.megamaced.crate.ui.screen.collection
 
+import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
 import com.megamaced.crate.data.api.ApiResult
 import com.megamaced.crate.data.prefs.CollectionPrefs
@@ -57,7 +58,7 @@ class CollectionViewModelTest {
                     ),
                 )
             }
-            val vm = CollectionViewModel(repo, FakeCollectionPrefs(), StubSettingsRepository())
+            val vm = CollectionViewModel(SavedStateHandle(), repo, FakeCollectionPrefs(), StubSettingsRepository())
 
             vm.uiState.test {
                 // Skip the initial empty emission until items arrive.
@@ -85,7 +86,7 @@ class CollectionViewModelTest {
                     ),
                 )
             }
-            val vm = CollectionViewModel(repo, FakeCollectionPrefs(), StubSettingsRepository())
+            val vm = CollectionViewModel(SavedStateHandle(), repo, FakeCollectionPrefs(), StubSettingsRepository())
 
             vm.toggleFormat("LP")
 
@@ -112,7 +113,7 @@ class CollectionViewModelTest {
                     ),
                 )
             }
-            val vm = CollectionViewModel(repo, FakeCollectionPrefs(), StubSettingsRepository())
+            val vm = CollectionViewModel(SavedStateHandle(), repo, FakeCollectionPrefs(), StubSettingsRepository())
             vm.selectSort(CollectionSort(SortField.Title, SortDirection.Asc))
 
             vm.uiState.test {
@@ -126,12 +127,55 @@ class CollectionViewModelTest {
         }
 
     @Test
+    fun `genre nav arg pre-filters the list and pins the category`() =
+        runTest {
+            val repo = FakeMediaRepository().apply {
+                seed(
+                    listOf(
+                        item(1, "OK Computer", genres = "Alternative Rock, Art Rock"),
+                        item(2, "Blue Lines", genres = "Trip Hop"),
+                        item(3, "Kid A", genres = "art rock"),
+                    ),
+                )
+            }
+            val args = SavedStateHandle(mapOf("category" to "music", "genre" to "Art Rock"))
+            val vm = CollectionViewModel(args, repo, FakeCollectionPrefs(), StubSettingsRepository())
+
+            vm.uiState.test {
+                var current = awaitItem()
+                while (current.selectedGenre == null) current = awaitItem()
+                // Case-insensitive, and only the two items carrying that genre.
+                assertEquals(listOf(1L, 3L), current.items.map { it.id }.sorted())
+                assertEquals(Category.Music, current.category)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `a genre that no longer exists falls back to showing everything`() =
+        runTest {
+            val repo = FakeMediaRepository().apply {
+                seed(listOf(item(1, "OK Computer", genres = "Alternative Rock")))
+            }
+            val args = SavedStateHandle(mapOf("genre" to "Vaporwave"))
+            val vm = CollectionViewModel(args, repo, FakeCollectionPrefs(), StubSettingsRepository())
+
+            vm.uiState.test {
+                var current = awaitItem()
+                while (current.items.isEmpty()) current = awaitItem()
+                assertEquals(null, current.selectedGenre)
+                assertEquals(1, current.items.size)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
     fun `changing category clears format filter and triggers refresh`() =
         runTest {
             val repo = FakeMediaRepository().apply {
                 seed(listOf(item(1, "OK Computer", format = "LP", category = Category.Music)))
             }
-            val vm = CollectionViewModel(repo, FakeCollectionPrefs(), StubSettingsRepository())
+            val vm = CollectionViewModel(SavedStateHandle(), repo, FakeCollectionPrefs(), StubSettingsRepository())
             vm.toggleFormat("LP")
 
             repo.seed(
@@ -237,6 +281,7 @@ private fun item(
     year: Int? = 2000,
     updatedAt: String? = "2025-01-0$id",
     category: Category = Category.Music,
+    genres: String? = null,
 ) = MediaItem(
     id = id,
     userId = null,
@@ -252,7 +297,7 @@ private fun item(
     artworkPath = null,
     label = null,
     country = null,
-    genres = null,
+    genres = genres,
     tracklist = emptyList(),
     pressingNotes = null,
     discogsArtistId = null,

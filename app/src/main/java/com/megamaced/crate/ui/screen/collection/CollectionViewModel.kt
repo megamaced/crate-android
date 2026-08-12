@@ -1,5 +1,6 @@
 package com.megamaced.crate.ui.screen.collection
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.megamaced.crate.data.api.ApiResult
@@ -30,9 +31,15 @@ data class CollectionUiState(
     val category: Category = Category.Music,
     val sort: CollectionSort = CollectionSort.Default,
     val selectedFormats: Set<String> = emptySet(),
+    // Single-select, unlike formats: a dropdown per axis rather than chips,
+    // because an enriched collection carries far too many genres for a chip row.
+    val selectedGenre: String? = null,
+    val selectedDecade: String? = null,
     val items: List<MediaItem> = emptyList(),
     val groups: List<ItemGroup> = emptyList(),
     val availableFormats: List<FormatBucket> = emptyList(),
+    val availableGenres: List<FilterBucket> = emptyList(),
+    val availableDecades: List<FilterBucket> = emptyList(),
     val totalCount: Int = 0,
     val viewMode: CollectionViewMode = CollectionViewMode.Card,
     val visibleCategories: List<Category> = Category.entries,
@@ -53,6 +60,8 @@ private data class Filters(
     val category: Category,
     val sort: CollectionSort,
     val selectedFormats: Set<String>,
+    val genre: String?,
+    val decade: String?,
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -60,22 +69,33 @@ private data class Filters(
 class CollectionViewModel
     @Inject
     constructor(
+        savedStateHandle: SavedStateHandle,
         private val mediaRepository: MediaRepository,
         private val collectionPrefs: CollectionPrefs,
         private val settingsRepository: SettingsRepository,
     ) : ViewModel() {
+        // Nav args, set when arriving from a genre chip in the item detail view:
+        // the item's category plus the genre to narrow to. Absent for the
+        // bottom-bar tab, which restores the persisted category instead.
+        private val argCategory = savedStateHandle.get<String>("category")?.let { Category.fromApi(it) }
+
         // category is initialised optimistically to Music — the init block
         // resolves the persisted last category (if any) and updates it before
         // the first user interaction. If the persisted category is now hidden
         // we fall back to the first visible category instead.
-        private val category = MutableStateFlow(Category.Music)
+        private val category = MutableStateFlow(argCategory ?: Category.Music)
         private val sort = MutableStateFlow(CollectionSort.Default)
         private val selectedFormats = MutableStateFlow<Set<String>>(emptySet())
+        private val selectedGenre = MutableStateFlow(savedStateHandle.get<String>("genre"))
+        private val selectedDecade = MutableStateFlow<String?>(null)
         private val isRefreshing = MutableStateFlow(false)
         private val errorMessage = MutableStateFlow<String?>(null)
-        private var initialCategoryRestored = false
 
-        private val filters = combine(category, sort, selectedFormats, ::Filters)
+        // An explicit category arg is the user's choice for this screen, so the
+        // persisted-category restore must not overwrite it.
+        private var initialCategoryRestored = argCategory != null
+
+        private val filters = combine(category, sort, selectedFormats, selectedGenre, selectedDecade, ::Filters)
         private val itemsForCategory = category.flatMapLatest { mediaRepository.observeByCategory(it) }
         private val viewMode = collectionPrefs.collectionViewModeFlow
         private val hiddenCategories = settingsRepository.hiddenCategoriesFlow
@@ -105,8 +125,17 @@ class CollectionViewModel
                 val buckets = formatBuckets(items)
                 val availableSet = buckets.map { it.format }.toSet()
                 val activeFormats = f.selectedFormats.intersect(availableSet)
-                val filtered =
+                // Option lists are built from the unfiltered category so picking
+                // a genre doesn't reshuffle every other option's count. A
+                // selection that no longer exists (item deleted, category
+                // switched) drops back to "any" rather than hiding everything.
+                val genres = genreBuckets(items)
+                val decades = decadeBuckets(items)
+                val activeGenre = f.genre?.takeIf { g -> genres.any { it.value.equals(g, ignoreCase = true) } }
+                val activeDecade = f.decade?.takeIf { d -> decades.any { it.value == d } }
+                val byFormat =
                     if (activeFormats.isEmpty()) items else items.filter { it.format in activeFormats }
+                val filtered = applyValueFilters(byFormat, activeGenre, activeDecade)
                 val sorted = filtered.sortedWith(comparatorForSort(f.sort))
                 val groups = groupItemsForSort(sorted, f.sort.axis)
 
@@ -114,9 +143,13 @@ class CollectionViewModel
                     category = f.category,
                     sort = f.sort,
                     selectedFormats = activeFormats,
+                    selectedGenre = activeGenre,
+                    selectedDecade = activeDecade,
                     items = sorted,
                     groups = groups,
                     availableFormats = buckets,
+                    availableGenres = genres,
+                    availableDecades = decades,
                     totalCount = items.size,
                     viewMode = mode,
                     visibleCategories = Category.entries.filter { it !in hidden },
@@ -177,6 +210,8 @@ class CollectionViewModel
             if (value != category.value) {
                 category.value = value
                 selectedFormats.value = emptySet()
+                selectedGenre.value = null
+                selectedDecade.value = null
                 // If the active sort axis isn't supported by the new category
                 // (e.g. coming from Games' "Format" axis to Music), fall back
                 // to the default — mirrors CollectionView.vue's reset logic.
@@ -198,6 +233,16 @@ class CollectionViewModel
 
         fun clearFormats() {
             selectedFormats.value = emptySet()
+        }
+
+        /** Null clears the filter ("Any genre"). */
+        fun selectGenre(value: String?) {
+            selectedGenre.value = value
+        }
+
+        /** Null clears the filter ("Any year"). */
+        fun selectDecade(value: String?) {
+            selectedDecade.value = value
         }
 
         fun selectSort(value: CollectionSort) {

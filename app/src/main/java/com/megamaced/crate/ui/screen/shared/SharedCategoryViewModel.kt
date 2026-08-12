@@ -11,9 +11,13 @@ import com.megamaced.crate.domain.model.CollectionSort
 import com.megamaced.crate.domain.model.SharedCategorySummary
 import com.megamaced.crate.domain.model.sharedCategories
 import com.megamaced.crate.ui.components.FormatBucket
+import com.megamaced.crate.ui.screen.collection.FilterBucket
 import com.megamaced.crate.ui.screen.collection.ItemGroup
+import com.megamaced.crate.ui.screen.collection.applyValueFilters
 import com.megamaced.crate.ui.screen.collection.comparatorForSort
+import com.megamaced.crate.ui.screen.collection.decadeBuckets
 import com.megamaced.crate.ui.screen.collection.formatBuckets
+import com.megamaced.crate.ui.screen.collection.genreBuckets
 import com.megamaced.crate.ui.screen.collection.groupItemsForSort
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -30,8 +34,12 @@ data class SharedCategoryUiState(
     val label: String,
     val sort: CollectionSort = CollectionSort.Default,
     val selectedFormats: Set<String> = emptySet(),
+    val selectedGenre: String? = null,
+    val selectedDecade: String? = null,
     val groups: List<ItemGroup> = emptyList(),
     val availableFormats: List<FormatBucket> = emptyList(),
+    val availableGenres: List<FilterBucket> = emptyList(),
+    val availableDecades: List<FilterBucket> = emptyList(),
     val totalCount: Int = 0,
     val viewMode: CollectionViewMode = CollectionViewMode.Card,
     // First owner who granted write access covering this category — the target
@@ -65,6 +73,10 @@ class SharedCategoryViewModel
 
         private val sort = MutableStateFlow(CollectionSort.Default)
         private val selectedFormats = MutableStateFlow<Set<String>>(emptySet())
+
+        // Seeded from the nav arg when arriving via a genre chip in item detail.
+        private val selectedGenre = MutableStateFlow(savedStateHandle.get<String>("genre"))
+        private val selectedDecade = MutableStateFlow<String?>(null)
         private val isRefreshing = MutableStateFlow(false)
 
         val uiState: StateFlow<SharedCategoryUiState> =
@@ -72,26 +84,47 @@ class SharedCategoryViewModel
                 store.state,
                 sort,
                 selectedFormats,
+                combine(selectedGenre, selectedDecade, ::Pair),
                 collectionPrefs.collectionViewModeFlow,
                 isRefreshing,
-            ) { storeState, sortValue, formats, mode, refreshing ->
+            ) { args ->
+                @Suppress("UNCHECKED_CAST")
+                val storeState = args[0] as SharedContentStore.State
+                val sortValue = args[1] as CollectionSort
+
+                @Suppress("UNCHECKED_CAST")
+                val formats = args[2] as Set<String>
+
+                @Suppress("UNCHECKED_CAST")
+                val values = args[3] as Pair<String?, String?>
+                val mode = args[4] as CollectionViewMode
+                val refreshing = args[5] as Boolean
                 val summary: SharedCategorySummary? =
                     storeState.data?.sharedCategories()?.firstOrNull { it.category == category }
                 val items = summary?.items ?: emptyList()
                 val buckets = formatBuckets(items)
                 val availableSet = buckets.map { it.format }.toSet()
                 val activeFormats = formats.intersect(availableSet)
-                val filtered =
+                val genres = genreBuckets(items)
+                val decades = decadeBuckets(items)
+                val activeGenre = values.first?.takeIf { g -> genres.any { it.value.equals(g, ignoreCase = true) } }
+                val activeDecade = values.second?.takeIf { d -> decades.any { it.value == d } }
+                val byFormat =
                     if (activeFormats.isEmpty()) items else items.filter { it.format in activeFormats }
-                val sorted = filtered.sortedWith(comparatorForSort(sortValue))
+                val sorted = applyValueFilters(byFormat, activeGenre, activeDecade)
+                    .sortedWith(comparatorForSort(sortValue))
                 val owners = summary?.owners.orEmpty()
                 SharedCategoryUiState(
                     category = category,
                     label = category.label,
                     sort = sortValue,
                     selectedFormats = activeFormats,
+                    selectedGenre = activeGenre,
+                    selectedDecade = activeDecade,
                     groups = groupItemsForSort(sorted, sortValue.axis),
                     availableFormats = buckets,
+                    availableGenres = genres,
+                    availableDecades = decades,
                     totalCount = items.size,
                     viewMode = mode,
                     writeOwner = summary?.writeOwners?.firstOrNull(),
@@ -120,6 +153,16 @@ class SharedCategoryViewModel
 
         fun clearFormats() {
             selectedFormats.value = emptySet()
+        }
+
+        /** Null clears the filter ("Any genre"). */
+        fun selectGenre(value: String?) {
+            selectedGenre.value = value
+        }
+
+        /** Null clears the filter ("Any year"). */
+        fun selectDecade(value: String?) {
+            selectedDecade.value = value
         }
 
         fun setViewMode(mode: CollectionViewMode) {

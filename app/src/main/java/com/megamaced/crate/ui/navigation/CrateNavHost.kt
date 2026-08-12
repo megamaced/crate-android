@@ -90,6 +90,27 @@ fun CrateNavHost(
                 onEdit = { id, categoryApiValue ->
                     navController.navigate(Destination.AddEdit(itemId = id, category = categoryApiValue))
                 },
+                // A genre chip goes back to the list the item lives in — the
+                // shared-category page for a shared item, otherwise the
+                // collection — pre-filtered to that genre. popUpTo replaces the
+                // list we came from rather than stacking a second copy on top
+                // of the detail screen; when we arrived from Home or Search
+                // there is nothing to pop and it simply pushes.
+                onGenreClick = { categoryApiValue, genre, isShared ->
+                    if (isShared) {
+                        navController.navigate(
+                            Destination.SharedCategory(category = categoryApiValue, genre = genre),
+                        ) {
+                            popUpTo<Destination.SharedCategory> { inclusive = true }
+                        }
+                    } else {
+                        navController.navigate(
+                            Destination.Collection(category = categoryApiValue, genre = genre),
+                        ) {
+                            popUpTo<Destination.Collection> { inclusive = true }
+                        }
+                    }
+                },
             )
         }
         composable<Destination.AddEdit> { backStackEntry ->

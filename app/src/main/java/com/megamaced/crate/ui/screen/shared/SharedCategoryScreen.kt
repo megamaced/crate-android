@@ -29,6 +29,7 @@ import com.megamaced.crate.data.prefs.CollectionViewMode
 import com.megamaced.crate.domain.model.SortField
 import com.megamaced.crate.ui.components.FormatFilterChips
 import com.megamaced.crate.ui.components.SortMenuButton
+import com.megamaced.crate.ui.components.ValueFilterBar
 import com.megamaced.crate.ui.network.LocalIsOnline
 import com.megamaced.crate.ui.screen.collection.CollectionGrid
 import com.megamaced.crate.ui.screen.collection.CollectionList
@@ -119,6 +120,15 @@ fun SharedCategoryScreen(
                     selected = uiState.selectedFormats,
                     onToggle = viewModel::toggleFormat,
                     onClear = viewModel::clearFormats,
+                )
+                ValueFilterBar(
+                    decades = uiState.availableDecades,
+                    genres = uiState.availableGenres,
+                    selectedDecade = uiState.selectedDecade,
+                    selectedGenre = uiState.selectedGenre,
+                    totalCount = uiState.totalCount,
+                    onDecadeSelected = viewModel::selectDecade,
+                    onGenreSelected = viewModel::selectGenre,
                 )
                 val artistFirst = uiState.sort.axis == SortField.Artist
                 when (uiState.viewMode) {

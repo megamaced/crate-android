@@ -55,6 +55,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -65,6 +67,7 @@ import com.megamaced.crate.ui.components.ArtworkImage
 import com.megamaced.crate.ui.components.ArtworkSize
 import com.megamaced.crate.ui.components.LoadingState
 import com.megamaced.crate.ui.components.PhotoImage
+import com.megamaced.crate.ui.screen.collection.genreTokens
 import com.megamaced.crate.ui.screen.share.ShareSheet
 import com.megamaced.crate.ui.screen.share.ShareTarget
 
@@ -73,6 +76,8 @@ import com.megamaced.crate.ui.screen.share.ShareTarget
 fun ItemDetailScreen(
     onBack: () -> Unit,
     onEdit: (Long, String) -> Unit,
+    // category apiValue, genre, whether the item came from a share
+    onGenreClick: (String, String, Boolean) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: ItemDetailViewModel = hiltViewModel(),
 ) {
@@ -172,6 +177,9 @@ fun ItemDetailScreen(
                 activeAction = uiState.activeAction,
                 sharedByUser = uiState.sharedByUser,
                 canWrite = uiState.canWrite,
+                onGenreClick = { genre ->
+                    onGenreClick(item.category.apiValue, genre, uiState.isShared)
+                },
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding),
@@ -269,6 +277,7 @@ private fun ItemDetailContent(
     activeAction: DetailAction?,
     sharedByUser: String?,
     canWrite: Boolean,
+    onGenreClick: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -321,6 +330,8 @@ private fun ItemDetailContent(
             }
 
             ChipRow(item)
+
+            GenreChips(item = item, onGenreClick = onGenreClick)
 
             CategorySpecificFacts(item)
 
@@ -423,11 +434,47 @@ private fun ChipRow(item: MediaItem) {
     }
 }
 
+/**
+ * Genres as tappable chips: each one filters the collection (or the shared
+ * category, for a shared item) down to that genre. Providers store them as one
+ * comma-separated string, so they are split before rendering.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun GenreChips(
+    item: MediaItem,
+    onGenreClick: (String) -> Unit,
+) {
+    val genres = genreTokens(item)
+    if (genres.isEmpty()) return
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            text = "Genres",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            genres.forEach { genre ->
+                val a11y = stringResource(R.string.detail_genre_filter_a11y, genre)
+                AssistChip(
+                    onClick = { onGenreClick(genre) },
+                    label = { Text(text = genre, maxLines = 1, softWrap = false) },
+                    shape = AssistChipDefaults.shape,
+                    modifier = Modifier.semantics { contentDescription = a11y },
+                )
+            }
+        }
+    }
+}
+
 @Composable
 private fun CategorySpecificFacts(item: MediaItem) {
     val facts = buildList {
         item.barcode?.takeIf { it.isNotBlank() }?.let { add("Barcode" to it) }
-        item.genres?.takeIf { it.isNotBlank() }?.let { add("Genres" to it) }
         item.pressingNotes?.takeIf { it.isNotBlank() }?.let { add("Pressing notes" to it) }
     }
     if (facts.isEmpty()) return

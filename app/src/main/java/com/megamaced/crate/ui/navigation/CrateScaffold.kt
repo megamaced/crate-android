@@ -52,7 +52,7 @@ data class TopLevelRoute(
 
 val topLevelRoutes = listOf(
     TopLevelRoute("Home", Destination.Home, Icons.Filled.Home, Icons.Outlined.Home),
-    TopLevelRoute("Collection", Destination.Collection, Icons.Filled.Album, Icons.Outlined.Album),
+    TopLevelRoute("Collection", Destination.Collection(), Icons.Filled.Album, Icons.Outlined.Album),
     TopLevelRoute("Playlists", Destination.Playlists, Icons.AutoMirrored.Filled.QueueMusic, Icons.AutoMirrored.Outlined.QueueMusic),
     TopLevelRoute("Search", Destination.Search, Icons.Filled.Search, Icons.Outlined.Search),
     TopLevelRoute("Settings", Destination.Settings, Icons.Filled.Settings, Icons.Outlined.Settings),

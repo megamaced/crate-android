@@ -1,0 +1,4 @@
+* Filter your collection by year (grouped into decades) and by
+  genre, alongside the existing format filters.
+* Genres in the item view are now chips — tap one to jump
+  straight to everything you own in that genre.
