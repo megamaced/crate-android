@@ -50,7 +50,9 @@ import com.journeyapps.barcodescanner.BarcodeCallback
 import com.journeyapps.barcodescanner.BarcodeResult
 import com.journeyapps.barcodescanner.DecoratedBarcodeView
 import com.journeyapps.barcodescanner.DefaultDecoderFactory
+import com.megamaced.crate.ui.screen.addedit.ExternalResultRow
 import com.megamaced.crate.ui.screen.addedit.ExternalSearchResult
+import com.megamaced.crate.ui.screen.addedit.identityKey
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -225,7 +227,7 @@ private fun CandidateSheet(
                             contentPadding = PaddingValues(vertical = 4.dp),
                         ) {
                             items(state.candidates, key = { it.identityKey() }) { result ->
-                                CandidateRow(result, onClick = { onPick(result) })
+                                ExternalResultRow(result, onClick = { onPick(result) })
                                 HorizontalDivider()
                             }
                         }
@@ -253,44 +255,3 @@ private fun CandidateSheet(
         }
     }
 }
-
-@Composable
-private fun CandidateRow(
-    result: ExternalSearchResult,
-    onClick: () -> Unit,
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 12.dp, horizontal = 4.dp),
-        verticalArrangement = Arrangement.spacedBy(2.dp),
-    ) {
-        TextButton(onClick = onClick) {
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(
-                    text = result.title.ifBlank { "(untitled)" },
-                    style = MaterialTheme.typography.titleSmall,
-                )
-                val sub =
-                    listOfNotNull(
-                        result.artist?.takeIf { it.isNotBlank() },
-                        result.year?.toString(),
-                        result.format?.takeIf { it.isNotBlank() },
-                        result.label?.takeIf { it.isNotBlank() },
-                    ).joinToString(" · ").ifBlank { null }
-                if (sub != null) {
-                    Text(
-                        text = sub,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-        }
-    }
-}
-
-private fun ExternalSearchResult.identityKey(): String =
-    discogsId
-        ?: barcode
-        ?: "$title|${artist.orEmpty()}|${year ?: 0}"

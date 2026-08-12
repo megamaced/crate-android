@@ -17,11 +17,17 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.megamaced.crate.domain.model.MediaItem
 
+/**
+ * Collection card. [artistFirst] swaps the two text lines so the artist (or
+ * director / author / developer / writer) reads as the headline — used when the
+ * active sort is that axis, so scanning the grid matches what it's ordered by.
+ */
 @Composable
 fun MediaCard(
     item: MediaItem,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    artistFirst: Boolean = false,
 ) {
     Card(
         onClick = onClick,
@@ -46,13 +52,15 @@ fun MediaCard(
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
+                val artist = item.artist?.takeIf { it.isNotBlank() }
+                val headline = if (artistFirst) artist ?: item.title else item.title
+                val subtitle = if (artistFirst) item.title.takeIf { artist != null } else artist
                 Text(
-                    text = item.title,
+                    text = headline,
                     style = MaterialTheme.typography.titleSmall,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
-                val subtitle = item.artist?.takeIf { it.isNotBlank() }
                 if (subtitle != null) {
                     Text(
                         text = subtitle,

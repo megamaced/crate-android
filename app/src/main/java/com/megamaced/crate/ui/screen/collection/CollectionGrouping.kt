@@ -77,6 +77,20 @@ internal fun groupItemsForSort(
 }
 
 /**
+ * True when [item] repeats the artist of the row above it ([previous]), so the
+ * list can print the name once per run and let the rest read as one cluster.
+ * Items with no artist never count as a repeat.
+ */
+internal fun isArtistRepeat(
+    item: MediaItem,
+    previous: MediaItem?,
+): Boolean {
+    val artist = item.artist.orEmpty().trim()
+    if (artist.isEmpty() || previous == null) return false
+    return artist.equals(previous.artist.orEmpty().trim(), ignoreCase = true)
+}
+
+/**
  * Format buckets (name + count) for the filter chips, sorted alphabetically.
  * Counts are computed over the full [items] list, not the filtered subset, so
  * toggling one chip doesn't reshuffle every other chip's number — mirrors

@@ -16,6 +16,7 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ViewList
@@ -47,6 +48,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -60,6 +62,7 @@ import com.megamaced.crate.data.prefs.CollectionViewMode
 import com.megamaced.crate.domain.model.Category
 import com.megamaced.crate.domain.model.MarketValue
 import com.megamaced.crate.domain.model.MediaItem
+import com.megamaced.crate.domain.model.SortField
 import com.megamaced.crate.ui.components.ArtworkImage
 import com.megamaced.crate.ui.components.EmptyState
 import com.megamaced.crate.ui.components.FormatFilterChips
@@ -150,17 +153,20 @@ fun CollectionScreen(
                     onToggle = viewModel::toggleFormat,
                     onClear = viewModel::clearFormats,
                 )
+                val artistFirst = uiState.sort.axis == SortField.Artist
                 when (uiState.viewMode) {
                     CollectionViewMode.Card -> CollectionGrid(
                         groups = uiState.groups,
                         onItemClick = onItemClick,
                         widthSizeClass = widthSizeClass,
                         modifier = Modifier.fillMaxSize(),
+                        artistFirst = artistFirst,
                     )
                     CollectionViewMode.List -> CollectionList(
                         groups = uiState.groups,
                         onItemClick = onItemClick,
                         modifier = Modifier.fillMaxSize(),
+                        artistFirst = artistFirst,
                     )
                 }
             }
@@ -225,12 +231,17 @@ internal fun ViewModeToggle(
     }
 }
 
+/**
+ * [artistFirst] leads each card with the artist instead of the title, so a grid
+ * sorted by artist / director / author reads in the order it is sorted.
+ */
 @Composable
 internal fun CollectionGrid(
     groups: List<ItemGroup>,
     onItemClick: (Long) -> Unit,
     widthSizeClass: WindowWidthSizeClass,
     modifier: Modifier = Modifier,
+    artistFirst: Boolean = false,
 ) {
     if (groups.all { it.items.isEmpty() }) {
         EmptyCollection(modifier)
@@ -263,17 +274,24 @@ internal fun CollectionGrid(
                 MediaCard(
                     item = item,
                     onClick = { onItemClick(item.id) },
+                    artistFirst = artistFirst,
                 )
             }
         }
     }
 }
 
+/**
+ * [artistFirst] leads each row with the artist instead of the title. Runs of
+ * consecutive items by the same artist print the name once, so a list sorted by
+ * artist / director / author reads as one cluster per name.
+ */
 @Composable
 internal fun CollectionList(
     groups: List<ItemGroup>,
     onItemClick: (Long) -> Unit,
     modifier: Modifier = Modifier,
+    artistFirst: Boolean = false,
 ) {
     if (groups.all { it.items.isEmpty() }) {
         EmptyCollection(modifier)
@@ -290,8 +308,15 @@ internal fun CollectionList(
                     GroupHeader(text = group.header)
                 }
             }
-            items(group.items, key = { it.id }) { item ->
-                CollectionListRow(item = item, onClick = { onItemClick(item.id) })
+            itemsIndexed(group.items, key = { _, item -> item.id }) { index, item ->
+                CollectionListRow(
+                    item = item,
+                    onClick = { onItemClick(item.id) },
+                    artistFirst = artistFirst,
+                    // Repeats are only suppressed within a group; the first row
+                    // after a header always names its artist.
+                    hideArtist = artistFirst && isArtistRepeat(item, group.items.getOrNull(index - 1)),
+                )
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             }
         }
@@ -315,6 +340,8 @@ private fun GroupHeader(text: String) {
 private fun CollectionListRow(
     item: MediaItem,
     onClick: () -> Unit,
+    artistFirst: Boolean = false,
+    hideArtist: Boolean = false,
 ) {
     val rowLabel = stringResource(
         R.string.collection_row_a11y,
@@ -346,14 +373,28 @@ private fun CollectionListRow(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
+            val artist = item.artist?.takeIf { it.isNotBlank() }
+            // Artist leads only when there is one to lead with; an item without
+            // an artist keeps the title as its headline either way.
+            val artistLeads = artistFirst && artist != null
+            if (artistLeads && !hideArtist) {
+                Text(
+                    text = artist,
+                    style = MaterialTheme.typography.bodyLarge,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
             Text(
                 text = item.title,
-                style = MaterialTheme.typography.bodyLarge,
+                style = if (artistLeads) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodyLarge,
+                // Unspecified keeps the inherited content colour for the
+                // title-led layout, exactly as before.
+                color = if (artistLeads) MaterialTheme.colorScheme.onSurfaceVariant else Color.Unspecified,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            val artist = item.artist?.takeIf { it.isNotBlank() }
-            if (artist != null) {
+            if (!artistLeads && artist != null) {
                 Text(
                     text = artist,
                     style = MaterialTheme.typography.bodySmall,

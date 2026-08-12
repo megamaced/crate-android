@@ -26,6 +26,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.megamaced.crate.data.prefs.CollectionViewMode
+import com.megamaced.crate.domain.model.SortField
 import com.megamaced.crate.ui.components.FormatFilterChips
 import com.megamaced.crate.ui.components.SortMenuButton
 import com.megamaced.crate.ui.network.LocalIsOnline
@@ -119,17 +120,20 @@ fun SharedCategoryScreen(
                     onToggle = viewModel::toggleFormat,
                     onClear = viewModel::clearFormats,
                 )
+                val artistFirst = uiState.sort.axis == SortField.Artist
                 when (uiState.viewMode) {
                     CollectionViewMode.Card -> CollectionGrid(
                         groups = uiState.groups,
                         onItemClick = onItemClick,
                         widthSizeClass = widthSizeClass,
                         modifier = Modifier.fillMaxSize(),
+                        artistFirst = artistFirst,
                     )
                     CollectionViewMode.List -> CollectionList(
                         groups = uiState.groups,
                         onItemClick = onItemClick,
                         modifier = Modifier.fillMaxSize(),
+                        artistFirst = artistFirst,
                     )
                 }
             }

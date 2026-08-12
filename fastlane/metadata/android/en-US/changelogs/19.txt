@@ -1,0 +1,7 @@
+* Barcode scan results now show cover art, matching the
+  manual search results.
+* Sorting by artist (or director, author, developer, writer)
+  now leads each card and row with that name instead of the
+  title, so the list reads in the order it's sorted.
+* In list view, a run of items by the same artist prints the
+  name once, so everything by one artist reads as a cluster.

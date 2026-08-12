@@ -9,7 +9,9 @@ import com.megamaced.crate.domain.model.SortDirection
 import com.megamaced.crate.domain.model.SortField
 import com.megamaced.crate.domain.model.Status
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.LocalDate
 
@@ -93,6 +95,25 @@ class CollectionGroupingTest {
         )
         val groups = groupItemsForSort(items, SortField.CreatedAt, today)
         assertEquals(listOf("Today", "Yesterday"), groups.map { it.header })
+    }
+
+    @Test
+    fun `repeat detection ignores case and surrounding whitespace`() {
+        val first = item(1, "OK Computer", artist = "Radiohead")
+        val second = item(2, "Kid A", artist = " radiohead ")
+        val other = item(3, "Blue Lines", artist = "Massive Attack")
+        assertTrue(isArtistRepeat(second, first))
+        assertFalse(isArtistRepeat(other, second))
+    }
+
+    @Test
+    fun `first row of a group and blank artists are never repeats`() {
+        val blank = item(1, "Untitled", artist = " ")
+        val named = item(2, "OK Computer", artist = "Radiohead")
+        assertFalse(isArtistRepeat(named, null))
+        // Two artist-less items in a row still both render their (absent) name
+        // rather than collapsing into a nameless cluster.
+        assertFalse(isArtistRepeat(blank, item(3, "Other", artist = null)))
     }
 
     private fun item(
