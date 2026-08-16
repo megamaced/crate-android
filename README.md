@@ -24,7 +24,7 @@ Native Android companion for [Crate](https://github.com/megamaced/crate), a pers
 
 ## Status
 
-Released — **v1.10.0**. Signed APKs are published on the [Releases page](https://github.com/megamaced/crate-android/releases/latest).
+Released — **v1.10.1**. Signed APKs are published on the [Releases page](https://github.com/megamaced/crate-android/releases/latest).
 
 There's a manual **Check for updates** button under *Settings → About* that polls GitHub for newer releases on demand and posts a notification linking to the release page if one is available. The app does *not* check for updates on launch — F-Droid policy forbids unsolicited third-party network calls at startup, and the app behaves the same way regardless of where you installed it from.
 

@@ -1,0 +1,2 @@
+* The year, genre and format filters now share one row, leaving
+  more of the screen for your collection.
