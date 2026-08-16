@@ -27,9 +27,8 @@ import androidx.compose.ui.Modifier
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.megamaced.crate.data.prefs.CollectionViewMode
 import com.megamaced.crate.domain.model.SortField
-import com.megamaced.crate.ui.components.FormatFilterChips
+import com.megamaced.crate.ui.components.CollectionFilterBar
 import com.megamaced.crate.ui.components.SortMenuButton
-import com.megamaced.crate.ui.components.ValueFilterBar
 import com.megamaced.crate.ui.network.LocalIsOnline
 import com.megamaced.crate.ui.screen.collection.CollectionGrid
 import com.megamaced.crate.ui.screen.collection.CollectionList
@@ -114,19 +113,16 @@ fun SharedCategoryScreen(
                 .padding(innerPadding),
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
-                FormatFilterChips(
+                CollectionFilterBar(
                     formats = uiState.availableFormats,
                     totalCount = uiState.totalCount,
-                    selected = uiState.selectedFormats,
-                    onToggle = viewModel::toggleFormat,
-                    onClear = viewModel::clearFormats,
-                )
-                ValueFilterBar(
+                    selectedFormats = uiState.selectedFormats,
+                    onToggleFormat = viewModel::toggleFormat,
+                    onClearFormats = viewModel::clearFormats,
                     decades = uiState.availableDecades,
                     genres = uiState.availableGenres,
                     selectedDecade = uiState.selectedDecade,
                     selectedGenre = uiState.selectedGenre,
-                    totalCount = uiState.totalCount,
                     onDecadeSelected = viewModel::selectDecade,
                     onGenreSelected = viewModel::selectGenre,
                 )

@@ -20,35 +20,48 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.megamaced.crate.R
 import com.megamaced.crate.ui.screen.collection.FilterBucket
 
 /**
- * Year (decade) and genre filters, as dropdowns rather than chip rows: an
- * enriched collection carries far too many genres to lay out as chips. Each
- * dropdown lists only values present in the current category, with counts, and
- * is hidden entirely when there is nothing to choose between.
+ * Every collection filter on one scrolling row: year (by decade) and genre as
+ * dropdowns first, then the format chips. Dropdowns rather than chips for the
+ * first two because an enriched collection carries dozens of genres — and one
+ * shared row rather than three keeps the list itself on screen.
+ *
+ * Each control is dropped entirely when there is nothing to choose between, so
+ * a single-format category shows only what's useful.
  */
 @Composable
-fun ValueFilterBar(
+fun CollectionFilterBar(
+    formats: List<FilterBucket>,
+    totalCount: Int,
+    selectedFormats: Set<String>,
+    onToggleFormat: (String) -> Unit,
+    onClearFormats: () -> Unit,
     decades: List<FilterBucket>,
     genres: List<FilterBucket>,
     selectedDecade: String?,
     selectedGenre: String?,
-    totalCount: Int,
     onDecadeSelected: (String?) -> Unit,
     onGenreSelected: (String?) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    if (decades.size < 2 && genres.size < 2) return
+    val showFormats = formats.size >= 2
+    val showDecades = decades.size >= 2
+    val showGenres = genres.size >= 2
+    if (!showFormats && !showDecades && !showGenres) return
+
     Row(
         modifier = modifier
             .horizontalScroll(rememberScrollState())
             .padding(horizontal = 16.dp, vertical = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        if (decades.size >= 2) {
+        if (showDecades) {
             FilterDropdown(
                 label = selectedDecade ?: stringResource(R.string.collection_filter_any_year),
                 selected = selectedDecade != null,
@@ -57,7 +70,7 @@ fun ValueFilterBar(
                 onSelected = onDecadeSelected,
             )
         }
-        if (genres.size >= 2) {
+        if (showGenres) {
             FilterDropdown(
                 label = selectedGenre ?: stringResource(R.string.collection_filter_any_genre),
                 selected = selectedGenre != null,
@@ -65,6 +78,34 @@ fun ValueFilterBar(
                 options = genres,
                 onSelected = onGenreSelected,
             )
+        }
+        if (showFormats) {
+            val allLabel = stringResource(R.string.collection_filter_all_chip, totalCount)
+            val allA11y = stringResource(R.string.collection_chip_all_a11y, totalCount)
+            FilterChip(
+                selected = selectedFormats.isEmpty(),
+                onClick = onClearFormats,
+                label = { Text(allLabel) },
+                modifier = Modifier.semantics { contentDescription = allA11y },
+            )
+            formats.forEach { bucket ->
+                val label = stringResource(
+                    R.string.collection_filter_format_chip,
+                    bucket.value,
+                    bucket.count,
+                )
+                val a11y = stringResource(
+                    R.string.collection_chip_format_a11y,
+                    bucket.value,
+                    bucket.count,
+                )
+                FilterChip(
+                    selected = bucket.value in selectedFormats,
+                    onClick = { onToggleFormat(bucket.value) },
+                    label = { Text(label) },
+                    modifier = Modifier.semantics { contentDescription = a11y },
+                )
+            }
         }
     }
 }

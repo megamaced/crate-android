@@ -64,11 +64,10 @@ import com.megamaced.crate.domain.model.MarketValue
 import com.megamaced.crate.domain.model.MediaItem
 import com.megamaced.crate.domain.model.SortField
 import com.megamaced.crate.ui.components.ArtworkImage
+import com.megamaced.crate.ui.components.CollectionFilterBar
 import com.megamaced.crate.ui.components.EmptyState
-import com.megamaced.crate.ui.components.FormatFilterChips
 import com.megamaced.crate.ui.components.MediaCard
 import com.megamaced.crate.ui.components.SortMenuButton
-import com.megamaced.crate.ui.components.ValueFilterBar
 import com.megamaced.crate.ui.navigation.CategorySegmentedRow
 import com.megamaced.crate.ui.network.LocalIsOnline
 import com.megamaced.crate.ui.screen.share.ShareSheet
@@ -147,19 +146,16 @@ fun CollectionScreen(
                     onCategorySelected = viewModel::selectCategory,
                     visible = uiState.visibleCategories,
                 )
-                FormatFilterChips(
+                CollectionFilterBar(
                     formats = uiState.availableFormats,
                     totalCount = uiState.totalCount,
-                    selected = uiState.selectedFormats,
-                    onToggle = viewModel::toggleFormat,
-                    onClear = viewModel::clearFormats,
-                )
-                ValueFilterBar(
+                    selectedFormats = uiState.selectedFormats,
+                    onToggleFormat = viewModel::toggleFormat,
+                    onClearFormats = viewModel::clearFormats,
                     decades = uiState.availableDecades,
                     genres = uiState.availableGenres,
                     selectedDecade = uiState.selectedDecade,
                     selectedGenre = uiState.selectedGenre,
-                    totalCount = uiState.totalCount,
                     onDecadeSelected = viewModel::selectDecade,
                     onGenreSelected = viewModel::selectGenre,
                 )

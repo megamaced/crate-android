@@ -10,7 +10,6 @@ import com.megamaced.crate.domain.model.Category
 import com.megamaced.crate.domain.model.CollectionSort
 import com.megamaced.crate.domain.model.SharedCategorySummary
 import com.megamaced.crate.domain.model.sharedCategories
-import com.megamaced.crate.ui.components.FormatBucket
 import com.megamaced.crate.ui.screen.collection.FilterBucket
 import com.megamaced.crate.ui.screen.collection.ItemGroup
 import com.megamaced.crate.ui.screen.collection.applyValueFilters
@@ -37,7 +36,7 @@ data class SharedCategoryUiState(
     val selectedGenre: String? = null,
     val selectedDecade: String? = null,
     val groups: List<ItemGroup> = emptyList(),
-    val availableFormats: List<FormatBucket> = emptyList(),
+    val availableFormats: List<FilterBucket> = emptyList(),
     val availableGenres: List<FilterBucket> = emptyList(),
     val availableDecades: List<FilterBucket> = emptyList(),
     val totalCount: Int = 0,
@@ -103,7 +102,7 @@ class SharedCategoryViewModel
                     storeState.data?.sharedCategories()?.firstOrNull { it.category == category }
                 val items = summary?.items ?: emptyList()
                 val buckets = formatBuckets(items)
-                val availableSet = buckets.map { it.format }.toSet()
+                val availableSet = buckets.map { it.value }.toSet()
                 val activeFormats = formats.intersect(availableSet)
                 val genres = genreBuckets(items)
                 val decades = decadeBuckets(items)

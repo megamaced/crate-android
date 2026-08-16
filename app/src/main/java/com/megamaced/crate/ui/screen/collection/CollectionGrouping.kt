@@ -4,7 +4,6 @@ import com.megamaced.crate.domain.model.CollectionSort
 import com.megamaced.crate.domain.model.MediaItem
 import com.megamaced.crate.domain.model.SortDirection
 import com.megamaced.crate.domain.model.SortField
-import com.megamaced.crate.ui.components.FormatBucket
 import java.time.LocalDate
 
 // Group headers for the collection views, mirroring getGroupKey(item, field) in
@@ -96,13 +95,13 @@ internal fun isArtistRepeat(
  * toggling one chip doesn't reshuffle every other chip's number — mirrors
  * CollectionView.vue.
  */
-internal fun formatBuckets(items: List<MediaItem>): List<FormatBucket> =
+internal fun formatBuckets(items: List<MediaItem>): List<FilterBucket> =
     items
         .mapNotNull { it.format?.takeIf { v -> v.isNotBlank() } }
         .groupingBy { it }
         .eachCount()
         .toSortedMap()
-        .map { (fmt, count) -> FormatBucket(fmt, count) }
+        .map { (fmt, count) -> FilterBucket(fmt, count) }
 
 /** Comparator for the active [sort], matching CollectionView.vue's sort order. */
 internal fun comparatorForSort(sort: CollectionSort): Comparator<MediaItem> {

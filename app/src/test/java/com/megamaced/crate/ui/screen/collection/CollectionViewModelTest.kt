@@ -16,7 +16,6 @@ import com.megamaced.crate.domain.model.SortField
 import com.megamaced.crate.domain.model.Status
 import com.megamaced.crate.domain.repository.MediaRepository
 import com.megamaced.crate.domain.repository.MediaRepository.RefreshResult
-import com.megamaced.crate.ui.components.FormatBucket
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -66,7 +65,7 @@ class CollectionViewModelTest {
                 while (current.items.isEmpty()) current = awaitItem()
                 assertEquals(3, current.items.size)
                 assertEquals(
-                    listOf(FormatBucket("CD", 1), FormatBucket("LP", 2)),
+                    listOf(FilterBucket("CD", 1), FilterBucket("LP", 2)),
                     current.availableFormats,
                 )
                 assertEquals(3, current.totalCount)

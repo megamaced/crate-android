@@ -12,7 +12,6 @@ import com.megamaced.crate.domain.model.CollectionSort
 import com.megamaced.crate.domain.model.MediaItem
 import com.megamaced.crate.domain.repository.MediaRepository
 import com.megamaced.crate.domain.repository.SettingsRepository
-import com.megamaced.crate.ui.components.FormatBucket
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -37,7 +36,7 @@ data class CollectionUiState(
     val selectedDecade: String? = null,
     val items: List<MediaItem> = emptyList(),
     val groups: List<ItemGroup> = emptyList(),
-    val availableFormats: List<FormatBucket> = emptyList(),
+    val availableFormats: List<FilterBucket> = emptyList(),
     val availableGenres: List<FilterBucket> = emptyList(),
     val availableDecades: List<FilterBucket> = emptyList(),
     val totalCount: Int = 0,
@@ -123,7 +122,7 @@ class CollectionViewModel
                 @Suppress("UNCHECKED_CAST")
                 val hidden = args[5] as Set<Category>
                 val buckets = formatBuckets(items)
-                val availableSet = buckets.map { it.format }.toSet()
+                val availableSet = buckets.map { it.value }.toSet()
                 val activeFormats = f.selectedFormats.intersect(availableSet)
                 // Option lists are built from the unfiltered category so picking
                 // a genre doesn't reshuffle every other option's count. A
