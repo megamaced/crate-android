@@ -122,6 +122,116 @@ class MediaRepositoryImplTest {
             assertEquals(listOf(0, 0, pageSize, pageSize * 2), api.getMediaCalls.map { it.second })
         }
 
+    @Test
+    fun `full sweep prunes rows deleted on the server`() =
+        runTest {
+            // Local DB holds three rows; the server now only has two of them, as
+            // happens after a clean-up in the web UI. A sweep only ever upserts,
+            // so without reconciliation row 3 would linger for good.
+            dao.seed(
+                listOf(
+                    entity(1, "Kept", category = "music", userId = OWNER),
+                    entity(2, "Also kept", category = "music", userId = OWNER),
+                    entity(3, "Deleted on server", category = "music", userId = OWNER),
+                ),
+            )
+            api.pagesByOffset[0] =
+                PaginatedMediaDto(
+                    items = listOf(
+                        mediaDto(1, "Kept", category = "music", userId = OWNER),
+                        mediaDto(2, "Also kept", category = "music", userId = OWNER),
+                    ),
+                    total = 2,
+                    limit = 200,
+                    offset = 0,
+                )
+
+            val result = repo.syncDelta(updatedSince = "2026-01-01 00:00:00", lastSeenWipedAt = null)
+
+            assertTrue(result is ApiResult.Success)
+            assertEquals(listOf(1L, 2L), dao.snapshot().map { it.id }.sorted())
+        }
+
+    @Test
+    fun `a shared item cached locally survives a sweep of our own collection`() =
+        runTest {
+            // Opening a shared item's detail view caches the owner's row here. A
+            // sweep of our items says nothing about it, so it must not be pruned.
+            dao.seed(
+                listOf(
+                    entity(1, "Mine", category = "music", userId = OWNER),
+                    entity(99, "Shared with me", category = "music", userId = "someone@else"),
+                ),
+            )
+            api.pagesByOffset[0] =
+                PaginatedMediaDto(
+                    items = listOf(mediaDto(1, "Mine", category = "music", userId = OWNER)),
+                    total = 1,
+                    limit = 200,
+                    offset = 0,
+                )
+
+            repo.syncDelta(updatedSince = null, lastSeenWipedAt = null)
+
+            assertEquals(listOf(1L, 99L), dao.snapshot().map { it.id }.sorted())
+        }
+
+    @Test
+    fun `an incomplete sweep prunes nothing`() =
+        runTest {
+            // Server claims 500 items but pagination only yields one page of 2.
+            // Those 498 unseen rows were skipped, not deleted — pruning here would
+            // destroy the collection.
+            dao.seed(
+                listOf(
+                    entity(1, "One", category = "music", userId = OWNER),
+                    entity(2, "Two", category = "music", userId = OWNER),
+                    entity(3, "Three", category = "music", userId = OWNER),
+                ),
+            )
+            api.pagesByOffset[0] =
+                PaginatedMediaDto(
+                    items = listOf(
+                        mediaDto(1, "One", category = "music", userId = OWNER),
+                        mediaDto(2, "Two", category = "music", userId = OWNER),
+                    ),
+                    total = 500,
+                    limit = 200,
+                    offset = 0,
+                )
+
+            repo.syncDelta(updatedSince = null, lastSeenWipedAt = null)
+
+            assertEquals(3, dao.snapshot().size)
+        }
+
+    @Test
+    fun `count drift escalates a delta sync to a full sweep`() =
+        runTest {
+            // A cursor is supplied, so this would normally be a delta sync. The
+            // local count disagrees with the server's, which only a full sweep can
+            // reconcile — so the sweep must run unfiltered.
+            dao.seed(
+                listOf(
+                    entity(1, "One", category = "music", userId = OWNER),
+                    entity(2, "Stale", category = "music", userId = OWNER),
+                ),
+            )
+            api.pagesByOffset[0] =
+                PaginatedMediaDto(
+                    items = listOf(mediaDto(1, "One", category = "music", userId = OWNER)),
+                    total = 1,
+                    limit = 200,
+                    offset = 0,
+                )
+
+            repo.syncDelta(updatedSince = "2026-01-01 00:00:00", lastSeenWipedAt = null)
+
+            // Sweep ran with no updatedSince, and the stale row is gone.
+            assertEquals(listOf(null, null), api.getMediaUpdatedSince)
+            assertEquals(listOf(1L), dao.snapshot().map { it.id })
+        }
+
     private fun page(
         offset: Int,
         ids: LongRange,
@@ -137,8 +247,10 @@ class MediaRepositoryImplTest {
         id: Long,
         title: String,
         category: String,
+        userId: String? = null,
     ) = MediaItemDto(
         id = id,
+        userId = userId,
         title = title,
         artist = "test",
         format = "LP",
@@ -150,14 +262,20 @@ class MediaRepositoryImplTest {
         id: Long,
         title: String,
         category: String,
+        userId: String? = null,
     ) = MediaItemEntity(
         id = id,
+        userId = userId,
         title = title,
         artist = "test",
         format = "LP",
         status = Status.Owned.apiValue,
         category = category,
     )
+
+    private companion object {
+        const val OWNER = "david@macemail.co.uk"
+    }
 }
 
 private class FakeMediaItemDao : MediaItemDao {
@@ -200,6 +318,16 @@ private class FakeMediaItemDao : MediaItemDao {
     override suspend fun deleteAll() {
         rows.value = emptyList()
     }
+
+    override suspend fun countOwnedBy(ownerId: String): Int = ownedBy(ownerId).size
+
+    override suspend fun idsOwnedBy(ownerId: String): List<Long> = ownedBy(ownerId).map { it.id }
+
+    override suspend fun deleteByIds(ids: List<Long>) {
+        rows.value = rows.value.filterNot { it.id in ids }
+    }
+
+    private fun ownedBy(ownerId: String) = rows.value.filter { it.userId == null || it.userId == ownerId }
 }
 
 private class NoopBinaryService : CrateBinaryService {

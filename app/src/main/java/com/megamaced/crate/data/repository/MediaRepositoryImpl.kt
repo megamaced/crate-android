@@ -179,23 +179,40 @@ class MediaRepositoryImpl
             lastSeenWipedAt: String?,
         ): ApiResult<SyncResult> =
             apiCall {
-                // Probe with a 1-item page to learn the server's current wipedAt
-                // before committing to a delta vs. full resync.
-                val probe = api.getMedia(updatedSince = updatedSince, limit = 1, offset = 0)
+                // Deliberately probed WITHOUT updatedSince: one 1-item request then
+                // reports the whole collection, giving us the server's wipe marker,
+                // its authoritative item count, and the id of the owning user.
+                val probe = api.getMedia(limit = 1, offset = 0)
                 val serverWipedAt = probe.wipedAt
+                // Every row a sweep of our own collection returns belongs to us, so
+                // the probe row identifies the owner without a second request.
+                val ownerId = probe.items.firstOrNull()?.userId
 
                 // If the server has been wiped since our last sync, our local
                 // rows are stale (re-import generates new IDs, so delta sync
                 // would just append duplicates). Drop the local DB and refetch.
-                val effectiveSince =
-                    if (serverWipedAt != null &&
+                val wiped =
+                    serverWipedAt != null &&
                         (lastSeenWipedAt == null || ServerTimestamps.isNewer(serverWipedAt, lastSeenWipedAt))
-                    ) {
-                        dao.deleteAll()
-                        null
-                    } else {
-                        updatedSince
-                    }
+                if (wiped) dao.deleteAll()
+
+                // A delta sweep only adds and updates. It cannot discover that an
+                // item was deleted — on the web UI, on another device, or by a
+                // bulk clean-up — because a deleted row simply stops being
+                // returned, and `updatedSince` filters out everything unchanged.
+                // Comparing counts is the cheap way to notice, and a full sweep is
+                // the only thing that can reconcile a deletion, so escalate to one.
+                val localCount = ownerId?.let { dao.countOwnedBy(it) }
+                val drifted = localCount != null && localCount != probe.total
+                if (drifted) {
+                    Timber.i(
+                        "Sync drift: %d local items vs %d on the server — falling back to a full sweep",
+                        localCount,
+                        probe.total,
+                    )
+                }
+
+                val effectiveSince = if (wiped || drifted) null else updatedSince
 
                 var offset = 0
                 var maxUpdatedAt: String? = effectiveSince
@@ -222,7 +239,8 @@ class MediaRepositoryImpl
                     if (page.items.size < SYNC_PAGE_SIZE) break
                     offset += SYNC_PAGE_SIZE
                 }
-                if (seenIds.size < reportedTotal) {
+                val sweptEverything = seenIds.size >= reportedTotal
+                if (!sweptEverything) {
                     Timber.w(
                         "Sync incomplete: server reported %d items, pagination yielded %d distinct. " +
                             "Server sort is likely non-deterministic; upgrade the Crate server app.",
@@ -230,10 +248,31 @@ class MediaRepositoryImpl
                         seenIds.size,
                     )
                 }
+
+                // A full sweep enumerates everything the server holds for us, so
+                // anything local and absent from it has been deleted server-side.
+                // Three guards, because getting this wrong deletes the user's data:
+                // only a full sweep is authoritative (a delta says nothing about
+                // rows it filtered out); an incomplete sweep would prune rows that
+                // pagination merely skipped; and an empty response must not empty
+                // the database — a genuine wipe arrives via wipedAt instead.
+                if (effectiveSince == null && ownerId != null && sweptEverything && seenIds.isNotEmpty()) {
+                    val stale = dao.idsOwnedBy(ownerId).filterNot { it in seenIds }
+                    if (stale.isNotEmpty()) {
+                        // Chunked: one bound parameter per id would blow SQLite's
+                        // variable ceiling on a large clean-up.
+                        stale.chunked(DELETE_CHUNK).forEach { dao.deleteByIds(it) }
+                        Timber.i("Sync pruned %d items deleted on the server", stale.size)
+                    }
+                }
+
                 SyncResult(cursor = maxUpdatedAt, wipedAt = serverWipedAt)
             }
 
         companion object {
             private const val SYNC_PAGE_SIZE = 200
+
+            /** Ids per DELETE, kept well under SQLite's bound-variable ceiling. */
+            private const val DELETE_CHUNK = 400
         }
     }

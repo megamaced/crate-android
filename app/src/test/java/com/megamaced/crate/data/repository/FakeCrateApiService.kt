@@ -54,6 +54,9 @@ class FakeCrateApiService : CrateApiService {
     /** Every (limit, offset) pair getMedia was called with, in call order. */
     val getMediaCalls = mutableListOf<Pair<Int, Int>>()
 
+    /** The `updatedSince` argument of each getMedia call, in call order. */
+    val getMediaUpdatedSince = mutableListOf<String?>()
+
     override suspend fun getMedia(
         status: String?,
         category: String?,
@@ -63,6 +66,7 @@ class FakeCrateApiService : CrateApiService {
         paginated: Boolean,
     ): PaginatedMediaDto {
         getMediaCalls += limit to offset
+        getMediaUpdatedSince += updatedSince
         if (pagesByOffset.isNotEmpty()) {
             val total = pagesByOffset.values.sumOf { it.items.size }
             return pagesByOffset[offset]

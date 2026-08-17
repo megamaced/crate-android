@@ -49,6 +49,23 @@ interface MediaItemDao {
     @Query("DELETE FROM media_items WHERE id = :id")
     suspend fun delete(id: Long)
 
+    // -- Reconciliation against a full server sweep ---------------------------
+    //
+    // Both queries scope to rows the signed-in user owns. Opening a shared item's
+    // detail view caches the owner's row here too, and a sweep of *your* items
+    // says nothing about whether that row still exists — so it must be neither
+    // counted nor pruned. A null userId predates the column being carried
+    // through the mapper and is treated as own.
+
+    @Query("SELECT COUNT(*) FROM media_items WHERE userId IS NULL OR userId = :ownerId")
+    suspend fun countOwnedBy(ownerId: String): Int
+
+    @Query("SELECT id FROM media_items WHERE userId IS NULL OR userId = :ownerId")
+    suspend fun idsOwnedBy(ownerId: String): List<Long>
+
+    @Query("DELETE FROM media_items WHERE id IN (:ids)")
+    suspend fun deleteByIds(ids: List<Long>)
+
     @Query("DELETE FROM media_items")
     suspend fun deleteAll()
 
