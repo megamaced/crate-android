@@ -25,6 +25,7 @@ import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.toRequestBody
+import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -198,11 +199,20 @@ class MediaRepositoryImpl
 
                 var offset = 0
                 var maxUpdatedAt: String? = effectiveSince
+                var reportedTotal = 0
+                // Offset pagination is only lossless while the server's sort is
+                // total. When it is not, pages overlap and rows go missing, and
+                // the cursor below still advances past them — so the gap becomes
+                // permanent. Track distinct ids so that failure is loud instead
+                // of showing up months later as a short collection count.
+                val seenIds = mutableSetOf<Long>()
                 while (true) {
                     val page = api.getMedia(updatedSince = effectiveSince, limit = SYNC_PAGE_SIZE, offset = offset)
                     if (page.items.isEmpty()) break
+                    reportedTotal = page.total
                     dao.upsertAll(page.items.map { it.toEntity(codec) })
                     page.items.forEach { dto ->
+                        seenIds += dto.id
                         val candidate = dto.updatedAt
                         val currentMax = maxUpdatedAt
                         if (candidate != null && (currentMax == null || ServerTimestamps.isNewer(candidate, currentMax))) {
@@ -211,6 +221,14 @@ class MediaRepositoryImpl
                     }
                     if (page.items.size < SYNC_PAGE_SIZE) break
                     offset += SYNC_PAGE_SIZE
+                }
+                if (seenIds.size < reportedTotal) {
+                    Timber.w(
+                        "Sync incomplete: server reported %d items, pagination yielded %d distinct. " +
+                            "Server sort is likely non-deterministic; upgrade the Crate server app.",
+                        reportedTotal,
+                        seenIds.size,
+                    )
                 }
                 SyncResult(cursor = maxUpdatedAt, wipedAt = serverWipedAt)
             }

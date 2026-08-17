@@ -44,6 +44,16 @@ class FakeCrateApiService : CrateApiService {
     var nextItem: MediaItemDto? = null
     val deletedIds = mutableListOf<Long>()
 
+    /**
+     * Offset-keyed pages, for exercising the multi-page sync sweep. Takes
+     * precedence over [nextPage]; an offset with no entry serves an empty page,
+     * which is how the real API signals the end of the collection.
+     */
+    val pagesByOffset = mutableMapOf<Int, PaginatedMediaDto>()
+
+    /** Every (limit, offset) pair getMedia was called with, in call order. */
+    val getMediaCalls = mutableListOf<Pair<Int, Int>>()
+
     override suspend fun getMedia(
         status: String?,
         category: String?,
@@ -51,7 +61,15 @@ class FakeCrateApiService : CrateApiService {
         limit: Int,
         offset: Int,
         paginated: Boolean,
-    ): PaginatedMediaDto = requireNotNull(nextPage) { "FakeCrateApiService.nextPage was not set" }
+    ): PaginatedMediaDto {
+        getMediaCalls += limit to offset
+        if (pagesByOffset.isNotEmpty()) {
+            val total = pagesByOffset.values.sumOf { it.items.size }
+            return pagesByOffset[offset]
+                ?: PaginatedMediaDto(items = emptyList(), total = total, limit = limit, offset = offset)
+        }
+        return requireNotNull(nextPage) { "FakeCrateApiService.nextPage was not set" }
+    }
 
     override suspend fun createMedia(body: CreateMediaItemRequest): MediaItemDto =
         requireNotNull(nextCreated) { "FakeCrateApiService.nextCreated was not set" }

@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
@@ -127,6 +128,29 @@ class UserPreferences
             ds.edit { it[Keys.UPDATE_LAST_NOTIFIED_VERSION] = version }
         }
 
+        /**
+         * One-shot hook for healing a local collection that a past sync bug left
+         * incomplete. Returns true the first time it runs after
+         * [CURRENT_SYNC_REPAIR_VERSION] is raised, and marks the repair done in
+         * the same edit so a crash mid-sync retries rather than skips it.
+         *
+         * Callers should treat a true return as "ignore the stored cursor and do
+         * a full sweep this run". A full sweep only upserts, so it costs one
+         * extra pass over the collection and never drops local rows.
+         */
+        suspend fun consumeSyncRepair(): Boolean {
+            var repair = false
+            ds.edit { prefs ->
+                val done = prefs[Keys.SYNC_REPAIR_VERSION] ?: 0
+                if (done < CURRENT_SYNC_REPAIR_VERSION) {
+                    repair = true
+                    prefs[Keys.SYNC_REPAIR_VERSION] = CURRENT_SYNC_REPAIR_VERSION
+                    prefs.remove(Keys.LAST_SYNC_CURSOR)
+                }
+            }
+            return repair
+        }
+
         private fun parseThemeMode(value: String): ThemeMode = runCatching { ThemeMode.valueOf(value) }.getOrDefault(ThemeMode.System)
 
         private fun parseCollectionViewMode(value: String): CollectionViewMode =
@@ -148,6 +172,19 @@ class UserPreferences
             val LAST_CATEGORY = stringPreferencesKey("last_category")
             val UPDATE_LAST_CHECKED_AT = longPreferencesKey("update_last_checked_at")
             val UPDATE_LAST_NOTIFIED_VERSION = stringPreferencesKey("update_last_notified_version")
+            val SYNC_REPAIR_VERSION = intPreferencesKey("sync_repair_version")
+        }
+
+        companion object {
+            /**
+             * Raise this to force every existing install into one full resync on
+             * the next sync. Currently 1: the server paginated on `created_at`
+             * alone, which is not unique — bulk imports stamp hundreds of rows
+             * with the same second — so LIMIT/OFFSET silently skipped rows that
+             * the local DB then never learned about. The delta cursor had already
+             * advanced past them, so no amount of pull-to-refresh recovered them.
+             */
+            const val CURRENT_SYNC_REPAIR_VERSION = 1
         }
     }
 

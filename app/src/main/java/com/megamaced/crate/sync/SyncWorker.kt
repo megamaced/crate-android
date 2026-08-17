@@ -22,8 +22,14 @@ class SyncWorker
         private val userPreferences: UserPreferences,
     ) : CoroutineWorker(appContext, params) {
         override suspend fun doWork(): Result {
+            // Must run before reading the cursor — it clears a stale one.
+            val repair = userPreferences.consumeSyncRepair()
             val prefs = userPreferences.flow.first()
-            val cursor = prefs.lastSyncCursor
+            // A repair run deliberately ignores the stored cursor so the sweep
+            // re-reads the whole collection and back-fills rows an earlier,
+            // lossy pagination pass never delivered.
+            val cursor = if (repair) null else prefs.lastSyncCursor
+            if (repair) Timber.i("Sync repair: forcing full resync to back-fill missing rows")
             val seenWipedAt = prefs.lastSeenWipedAt
             return when (val result = mediaRepository.syncDelta(cursor, seenWipedAt)) {
                 is ApiResult.Success -> {

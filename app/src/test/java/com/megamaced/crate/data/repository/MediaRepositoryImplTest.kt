@@ -95,6 +95,37 @@ class MediaRepositoryImplTest {
             assertEquals(7L, api.deletedIds.single())
         }
 
+    @Test
+    fun `syncDelta pages through the whole collection and stores every row`() =
+        runTest {
+            // Three pages: two full, one short to terminate the sweep. The sweep
+            // must land all 450 rows — a paging bug that drops or repeats rows
+            // between pages shows up here as a short DAO snapshot.
+            val pageSize = 200
+            api.pagesByOffset[0] = page(offset = 0, ids = 1L..200L, total = 450)
+            api.pagesByOffset[pageSize] = page(offset = pageSize, ids = 201L..400L, total = 450)
+            api.pagesByOffset[pageSize * 2] = page(offset = pageSize * 2, ids = 401L..450L, total = 450)
+
+            val result = repo.syncDelta(updatedSince = null, lastSeenWipedAt = null)
+
+            assertTrue(result is ApiResult.Success)
+            assertEquals(450, dao.snapshot().size)
+            assertEquals(450, dao.snapshot().map { it.id }.distinct().size)
+            // Short final page ends the sweep; no wasted request past the end.
+            assertEquals(listOf(0, 0, pageSize, pageSize * 2), api.getMediaCalls.map { it.second })
+        }
+
+    private fun page(
+        offset: Int,
+        ids: LongRange,
+        total: Int,
+    ) = PaginatedMediaDto(
+        items = ids.map { mediaDto(it, "Item $it", category = "music") },
+        total = total,
+        limit = 200,
+        offset = offset,
+    )
+
     private fun mediaDto(
         id: Long,
         title: String,
