@@ -1,0 +1,5 @@
+* Items you delete on the server now disappear from the app.
+  Deletions made in the web app or on another device used to be
+  invisible here, so removed items lingered as duplicates.
+* The app now notices when its copy of the collection has drifted
+  from the server and re-reads the whole collection to fix it.
