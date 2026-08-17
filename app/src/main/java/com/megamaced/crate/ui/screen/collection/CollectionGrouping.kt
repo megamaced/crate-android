@@ -103,19 +103,75 @@ internal fun formatBuckets(items: List<MediaItem>): List<FilterBucket> =
         .toSortedMap()
         .map { (fmt, count) -> FilterBucket(fmt, count) }
 
-/** Comparator for the active [sort], matching CollectionView.vue's sort order. */
+// -- Sort keys ---------------------------------------------------------------
+//
+// One accessor per axis so the primary comparator and the tiebreak chain below
+// can't drift apart. Mirrored by crate/src/utils/sortItems.js.
+
+// Artist strips a leading article so it sorts under the first real word ("The
+// Beatles" → B), keeping the sort consistent with the article-stripped group
+// headers. Title deliberately keeps its article, matching groupKeyFor().
+private fun artistKey(item: MediaItem): String = stripArticle(item.artist.orEmpty().trim())
+
+private fun titleKey(item: MediaItem): String = item.title.trim()
+
+private fun formatKey(item: MediaItem): String = item.format.orEmpty().trim()
+
+/** Absent and zero years both read as "unknown", as they do in [groupKeyFor]. */
+private fun yearKey(item: MediaItem): Int = item.year?.takeIf { it != 0 } ?: Int.MIN_VALUE
+
+private fun valueKey(item: MediaItem): Double = item.marketValue.main ?: Double.NEGATIVE_INFINITY
+
+private val ByArtist: Comparator<MediaItem> = compareBy(String.CASE_INSENSITIVE_ORDER) { artistKey(it) }
+private val ByTitle: Comparator<MediaItem> = compareBy(String.CASE_INSENSITIVE_ORDER) { titleKey(it) }
+private val ByFormat: Comparator<MediaItem> = compareBy(String.CASE_INSENSITIVE_ORDER) { formatKey(it) }
+private val ByYear: Comparator<MediaItem> = compareBy { yearKey(it) }
+private val ByCreatedAt: Comparator<MediaItem> = compareBy { it.createdAt.orEmpty() }
+private val ByValue: Comparator<MediaItem> = compareBy { valueKey(it) }
+
+// Final tiebreak. Every key above can tie — a bulk import stamps one createdAt
+// across hundreds of rows, and two pressings of one album share artist, title
+// and year — so without this the order of tied rows is left to the sort's
+// discretion and can differ between two renders of the same list.
+private val ById: Comparator<MediaItem> = compareBy { it.id }
+
+private fun primaryFor(axis: SortField): Comparator<MediaItem> =
+    when (axis) {
+        SortField.Artist -> ByArtist
+        SortField.Title -> ByTitle
+        SortField.Year -> ByYear
+        SortField.CreatedAt -> ByCreatedAt
+        SortField.Format -> ByFormat
+        SortField.MarketValue -> ByValue
+    }
+
+/**
+ * How rows that tie on the primary axis are ordered. Each chain omits its own
+ * primary and ends on [ById] so the result is a total order.
+ *
+ * Artist leads with title, because within one artist the album name is what you
+ * scan for; every other axis leads with artist then title, so a year, format or
+ * value bucket reads as an alphabetical list rather than an arbitrary one.
+ */
+private fun tiebreaksFor(axis: SortField): Comparator<MediaItem> =
+    when (axis) {
+        SortField.Artist -> ByTitle.then(ByYear).then(ByFormat)
+        SortField.Title -> ByArtist.then(ByYear).then(ByFormat)
+        SortField.Year -> ByArtist.then(ByTitle).then(ByFormat)
+        SortField.CreatedAt -> ByArtist.then(ByTitle).then(ByYear)
+        SortField.Format -> ByArtist.then(ByTitle).then(ByYear)
+        SortField.MarketValue -> ByArtist.then(ByTitle).then(ByYear)
+    }.then(ById)
+
+/**
+ * Comparator for the active [sort], matching CollectionView.vue's sort order.
+ *
+ * Only the primary axis follows [CollectionSort.direction]; the tiebreaks stay
+ * ascending. "Year (Newest)" therefore counts years down while keeping each
+ * year's contents in A–Z order, which is how you'd read a shelf.
+ */
 internal fun comparatorForSort(sort: CollectionSort): Comparator<MediaItem> {
-    val base: Comparator<MediaItem> =
-        when (sort.axis) {
-            SortField.CreatedAt -> compareBy { it.createdAt.orEmpty() }
-            // Artist strips a leading article so it sorts under the first real
-            // word ("The Beatles" → B), matching CollectionView.vue and keeping
-            // the sort consistent with the article-stripped group headers.
-            SortField.Artist -> compareBy(String.CASE_INSENSITIVE_ORDER) { stripArticle(it.artist.orEmpty()) }
-            SortField.Title -> compareBy(String.CASE_INSENSITIVE_ORDER) { it.title }
-            SortField.Year -> compareBy { it.year ?: Int.MIN_VALUE }
-            SortField.Format -> compareBy(String.CASE_INSENSITIVE_ORDER) { it.format.orEmpty() }
-            SortField.MarketValue -> compareBy { it.marketValue.main ?: Double.NEGATIVE_INFINITY }
-        }
-    return if (sort.direction == SortDirection.Desc) base.reversed() else base
+    val primary = primaryFor(sort.axis)
+    val directed = if (sort.direction == SortDirection.Desc) primary.reversed() else primary
+    return directed.then(tiebreaksFor(sort.axis))
 }

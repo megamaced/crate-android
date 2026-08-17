@@ -116,6 +116,81 @@ class CollectionGroupingTest {
         assertFalse(isArtistRepeat(blank, item(3, "Other", artist = null)))
     }
 
+    @Test
+    fun `artist sort orders titles within each artist`() {
+        val items = listOf(
+            item(1, "Wish You Were Here", artist = "Pink Floyd"),
+            item(2, "OK Computer", artist = "Radiohead"),
+            item(3, "Animals", artist = "Pink Floyd"),
+            item(4, "Kid A", artist = "Radiohead"),
+        )
+        val sorted = items.sortedWith(comparatorForSort(CollectionSort(SortField.Artist, SortDirection.Asc)))
+        assertEquals(
+            listOf("Animals", "Wish You Were Here", "Kid A", "OK Computer"),
+            sorted.map { it.title },
+        )
+    }
+
+    @Test
+    fun `year sort orders artist then title within each year`() {
+        val items = listOf(
+            item(1, "Zoolook", artist = "Jarre", year = 1984),
+            item(2, "Hounds of Love", artist = "Kate Bush", year = 1985),
+            item(3, "Automatic", artist = "Jarre", year = 1984),
+            item(4, "Alpha", artist = "Bush", year = 1984),
+        )
+        val sorted = items.sortedWith(comparatorForSort(CollectionSort(SortField.Year, SortDirection.Asc)))
+        // 1984 first, and inside it Bush before Jarre, then Jarre's two by title.
+        assertEquals(listOf("Alpha", "Automatic", "Zoolook", "Hounds of Love"), sorted.map { it.title })
+    }
+
+    @Test
+    fun `descending flips only the primary axis and leaves tiebreaks ascending`() {
+        val items = listOf(
+            item(1, "Wish", artist = "Pink Floyd", year = 1975),
+            item(2, "Alpha", artist = "Zappa", year = 1975),
+            item(3, "Beta", artist = "Zappa", year = 1975),
+            item(4, "Newer", artist = "Someone", year = 1990),
+        )
+        val sorted = items.sortedWith(comparatorForSort(CollectionSort(SortField.Year, SortDirection.Desc)))
+        // 1990 leads because years count down, but 1975 still reads A–Z inside.
+        assertEquals(listOf("Newer", "Wish", "Alpha", "Beta"), sorted.map { it.title })
+    }
+
+    @Test
+    fun `items sharing a bulk-import timestamp fall back to artist and title`() {
+        val stamp = "2026-05-10 13:33:07"
+        val items = listOf(
+            item(1, "Zoo", artist = "Radiohead", createdAt = stamp),
+            item(2, "Amnesiac", artist = "Radiohead", createdAt = stamp),
+            item(3, "Blue Lines", artist = "Massive Attack", createdAt = stamp),
+        )
+        val sorted = items.sortedWith(comparatorForSort(CollectionSort(SortField.CreatedAt, SortDirection.Asc)))
+        assertEquals(listOf("Blue Lines", "Amnesiac", "Zoo"), sorted.map { it.title })
+    }
+
+    @Test
+    fun `two pressings of one album keep a stable order`() {
+        // Same artist, title, year and format — only the id differs, as with two
+        // copies of one record. Ties must not reorder between renders.
+        val a = item(3674, "The Back Room", artist = "Editors", year = 2005)
+        val b = item(3499, "The Back Room", artist = "Editors", year = 2005)
+        val sort = CollectionSort(SortField.Artist, SortDirection.Asc)
+        assertEquals(listOf(3499L, 3674L), listOf(a, b).sortedWith(comparatorForSort(sort)).map { it.id })
+        assertEquals(listOf(3499L, 3674L), listOf(b, a).sortedWith(comparatorForSort(sort)).map { it.id })
+    }
+
+    @Test
+    fun `unknown years sort together ahead of known ones`() {
+        val items = listOf(
+            item(1, "Known", artist = "A", year = 1999),
+            item(2, "NoYear", artist = "B", year = null),
+            item(3, "ZeroYear", artist = "C", year = 0),
+        )
+        val sorted = items.sortedWith(comparatorForSort(CollectionSort(SortField.Year, SortDirection.Asc)))
+        assertEquals(listOf("NoYear", "ZeroYear", "Known"), sorted.map { it.title })
+    }
+
     private fun item(
         id: Long,
         title: String,
