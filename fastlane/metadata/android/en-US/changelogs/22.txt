@@ -1,0 +1,5 @@
+* Sorting now orders items fully. Sorting by artist puts each
+  artist's albums in title order, and sorting by year orders
+  artist and title within each year.
+* Fixed a sync bug that could leave items out of your collection
+  and hide them from the app until a full resync.
