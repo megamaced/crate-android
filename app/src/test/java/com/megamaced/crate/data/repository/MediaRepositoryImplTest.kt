@@ -110,7 +110,14 @@ class MediaRepositoryImplTest {
 
             assertTrue(result is ApiResult.Success)
             assertEquals(450, dao.snapshot().size)
-            assertEquals(450, dao.snapshot().map { it.id }.distinct().size)
+            assertEquals(
+                450,
+                dao
+                    .snapshot()
+                    .map { it.id }
+                    .distinct()
+                    .size,
+            )
             // Short final page ends the sweep; no wasted request past the end.
             assertEquals(listOf(0, 0, pageSize, pageSize * 2), api.getMediaCalls.map { it.second })
         }
