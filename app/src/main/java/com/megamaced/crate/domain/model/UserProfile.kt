@@ -10,6 +10,7 @@ data class UserProfile(
     val autoEnrichOnClick: Boolean,
     val autoEnrichOnImport: Boolean,
     val hiddenCategories: Set<Category>,
+    val onlineRecommendations: Boolean,
     val crateVersion: String?,
 )
 

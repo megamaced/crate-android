@@ -53,4 +53,13 @@ interface SettingsRepository {
      * remains visible; on success the cache mirrors the server state.
      */
     suspend fun setHiddenCategories(categories: Set<Category>): ApiResult<Unit>
+
+    /**
+     * Locally-cached opt-in for provider-backed recommendations. Only gates the
+     * online row: the local "more from your crate" row is computed on-device
+     * and needs no opt-in.
+     */
+    val onlineRecommendationsFlow: Flow<Boolean>
+
+    suspend fun setOnlineRecommendations(enabled: Boolean): ApiResult<Unit>
 }

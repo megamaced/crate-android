@@ -51,6 +51,7 @@ data class SettingsUiState(
     val enrichAllProgress: RefreshAllProgress? = null,
     val themeMode: ThemeMode = ThemeMode.System,
     val hiddenCategories: Set<Category> = emptySet(),
+    val onlineRecommendations: Boolean = false,
     val updateCheck: UpdateCheckState = UpdateCheckState.Idle,
     val errorMessage: String? = null,
 )
@@ -101,9 +102,13 @@ class SettingsViewModel
                 tokens,
                 userPreferences.flow.map { it.themeMode },
                 combine(refreshProgress, enrichProgress, errorMessage) { r, e, err -> Triple(r, e, err) },
-                combine(updateCheck, userPreferences.hiddenCategoriesFlow) { u, h -> u to h },
-            ) { (p, m), t, theme, (progress, enrichProg, err), updateAndHidden ->
-                val (update, hidden) = updateAndHidden
+                combine(
+                    updateCheck,
+                    userPreferences.hiddenCategoriesFlow,
+                    userPreferences.onlineRecommendationsFlow,
+                ) { u, h, r -> Triple(u, h, r) },
+            ) { (p, m), t, theme, (progress, enrichProg, err), updateHiddenRecs ->
+                val (update, hidden, onlineRecs) = updateHiddenRecs
                 SettingsUiState(
                     profile = p.profile,
                     isProfileLoading = p.isLoading,
@@ -119,6 +124,7 @@ class SettingsViewModel
                     enrichAllProgress = enrichProg,
                     themeMode = theme,
                     hiddenCategories = hidden,
+                    onlineRecommendations = onlineRecs,
                     updateCheck = update,
                     errorMessage = err,
                 )
@@ -274,6 +280,14 @@ class SettingsViewModel
         fun setAutoEnrichOnImport(enabled: Boolean) {
             val current = market.value.settings ?: return
             updateMarket(current.copy(autoEnrichOnImport = enabled))
+        }
+
+        fun setOnlineRecommendations(enabled: Boolean) {
+            viewModelScope.launch {
+                if (settingsRepository.setOnlineRecommendations(enabled) !is ApiResult.Success) {
+                    errorMessage.value = "Couldn't save the recommendations setting."
+                }
+            }
         }
 
         fun enrichAll() {

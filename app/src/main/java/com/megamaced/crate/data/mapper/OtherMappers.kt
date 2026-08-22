@@ -53,6 +53,7 @@ fun MeDto.toDomain(): UserProfile =
         autoEnrichOnClick = autoEnrichOnClick,
         autoEnrichOnImport = autoEnrichOnImport,
         hiddenCategories = hiddenCategories.mapNotNull { Category.fromApi(it) }.toSet(),
+        onlineRecommendations = onlineRecommendations,
         crateVersion = crateVersion,
     )
 

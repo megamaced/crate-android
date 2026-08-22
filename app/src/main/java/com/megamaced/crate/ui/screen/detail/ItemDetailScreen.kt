@@ -63,7 +63,11 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.megamaced.crate.R
 import com.megamaced.crate.domain.model.Category
 import com.megamaced.crate.domain.model.MediaItem
+import com.megamaced.crate.data.api.dto.SuggestionDto
 import com.megamaced.crate.ui.components.ArtworkImage
+import com.megamaced.crate.ui.components.RecommendationRow
+import com.megamaced.crate.ui.components.SuggestionArt
+import com.megamaced.crate.ui.components.SuggestionEntry
 import com.megamaced.crate.ui.components.ArtworkSize
 import com.megamaced.crate.ui.components.LoadingState
 import com.megamaced.crate.ui.components.PhotoImage
@@ -78,10 +82,13 @@ fun ItemDetailScreen(
     onEdit: (Long, String) -> Unit,
     // category apiValue, genre, whether the item came from a share
     onGenreClick: (String, String, Boolean) -> Unit,
+    onOpenItem: (Long) -> Unit,
+    onAddSuggestion: (Category, SuggestionDto) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: ItemDetailViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val recommendations by viewModel.recommendations.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(uiState.errorMessage) {
@@ -179,6 +186,11 @@ fun ItemDetailScreen(
                 canWrite = uiState.canWrite,
                 onGenreClick = { genre ->
                     onGenreClick(item.category.apiValue, genre, uiState.isShared)
+                },
+                recommendations = recommendations,
+                onOpenItem = onOpenItem,
+                onAddSuggestion = { suggestion ->
+                    onAddSuggestion(item.category, suggestion)
                 },
                 modifier = Modifier
                     .fillMaxSize()
@@ -278,6 +290,9 @@ private fun ItemDetailContent(
     sharedByUser: String?,
     canWrite: Boolean,
     onGenreClick: (String) -> Unit,
+    recommendations: RecommendationsUiState,
+    onOpenItem: (Long) -> Unit,
+    onAddSuggestion: (SuggestionDto) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -400,6 +415,51 @@ private fun ItemDetailContent(
 
             Spacer(Modifier.height(24.dp))
         }
+
+        // Outside the padded column: RecommendationRow manages its own
+        // horizontal padding so its LazyRow can scroll edge to edge.
+        RecommendationRow(
+            title = "More from your crate",
+            entries = recommendations.local.map { suggestion ->
+                SuggestionEntry(
+                    key = "local-${suggestion.id}",
+                    title = suggestion.title,
+                    subtitle = listOfNotNull(suggestion.artist, suggestion.year?.toString())
+                        .joinToString(" · ")
+                        .ifBlank { null },
+                    art = SuggestionArt.Owned(
+                        itemId = suggestion.id,
+                        updatedAt = suggestion.updatedAt,
+                        category = suggestion.category,
+                    ),
+                )
+            },
+            onClick = { entry ->
+                entry.key.removePrefix("local-").toLongOrNull()?.let(onOpenItem)
+            },
+        )
+
+        RecommendationRow(
+            title = "If you like this…",
+            source = recommendations.onlineSource,
+            entries = recommendations.online.mapIndexed { index, suggestion ->
+                SuggestionEntry(
+                    key = "online-$index",
+                    title = suggestion.title,
+                    subtitle = listOfNotNull(suggestion.artist, suggestion.year?.toString())
+                        .joinToString(" · ")
+                        .ifBlank { null },
+                    art = SuggestionArt.Remote(suggestion.thumb ?: suggestion.artworkUrl),
+                )
+            },
+            onClick = { entry ->
+                entry.key.removePrefix("online-").toIntOrNull()
+                    ?.let { recommendations.online.getOrNull(it) }
+                    ?.let(onAddSuggestion)
+            },
+        )
+
+        Spacer(Modifier.height(24.dp))
     }
 }
 

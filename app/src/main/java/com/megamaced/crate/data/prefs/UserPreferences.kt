@@ -2,6 +2,7 @@ package com.megamaced.crate.data.prefs
 
 import android.content.Context
 import androidx.datastore.preferences.core.MutablePreferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
@@ -53,6 +54,10 @@ data class UserPrefs(
     val collectionViewMode: CollectionViewMode = CollectionViewMode.Card,
     val hiddenCategories: Set<Category> = emptySet(),
     val lastCategory: Category? = null,
+    // Off by default: when on, opening an item asks the server for
+    // provider-backed suggestions, which the server turns into an outbound
+    // call. The local "more from your crate" row needs no opt-in.
+    val onlineRecommendations: Boolean = false,
 )
 
 @Singleton
@@ -78,6 +83,7 @@ class UserPreferences
                             ?.toSet()
                             .orEmpty(),
                     lastCategory = prefs[Keys.LAST_CATEGORY]?.let(Category::fromApi),
+                    onlineRecommendations = prefs[Keys.ONLINE_RECOMMENDATIONS] ?: false,
                 )
             }
 
@@ -85,6 +91,12 @@ class UserPreferences
 
         suspend fun setHiddenCategories(categories: Set<Category>) {
             ds.edit { it[Keys.HIDDEN_CATEGORIES] = categories.map { c -> c.apiValue }.toSet() }
+        }
+
+        val onlineRecommendationsFlow: Flow<Boolean> = flow.map { it.onlineRecommendations }
+
+        suspend fun setOnlineRecommendations(enabled: Boolean) {
+            ds.edit { it[Keys.ONLINE_RECOMMENDATIONS] = enabled }
         }
 
         suspend fun setLastSyncCursor(cursor: String?) {
@@ -169,6 +181,7 @@ class UserPreferences
             val THEME_MODE = stringPreferencesKey("theme_mode")
             val COLLECTION_VIEW_MODE = stringPreferencesKey("collection_view_mode")
             val HIDDEN_CATEGORIES = stringSetPreferencesKey("hidden_categories")
+            val ONLINE_RECOMMENDATIONS = booleanPreferencesKey("online_recommendations")
             val LAST_CATEGORY = stringPreferencesKey("last_category")
             val UPDATE_LAST_CHECKED_AT = longPreferencesKey("update_last_checked_at")
             val UPDATE_LAST_NOTIFIED_VERSION = stringPreferencesKey("update_last_notified_version")

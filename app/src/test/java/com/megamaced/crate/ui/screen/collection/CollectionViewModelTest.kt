@@ -335,6 +335,12 @@ private class StubSettingsRepository : com.megamaced.crate.domain.repository.Set
         com.megamaced.crate.data.api.ApiResult
             .Success(Unit)
 
+    override val onlineRecommendationsFlow: Flow<Boolean> = kotlinx.coroutines.flow.flowOf(false)
+
+    override suspend fun setOnlineRecommendations(enabled: Boolean) =
+        com.megamaced.crate.data.api.ApiResult
+            .Success(Unit)
+
     override suspend fun getMe() = error("not used")
 
     override suspend fun hasDiscogsToken() = error("not used")

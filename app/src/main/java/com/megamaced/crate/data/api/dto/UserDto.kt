@@ -13,6 +13,7 @@ data class MeDto(
     val autoEnrichOnClick: Boolean = false,
     val autoEnrichOnImport: Boolean = false,
     val hiddenCategories: List<String> = emptyList(),
+    val onlineRecommendations: Boolean = false,
     val crateVersion: String? = null,
 )
 
@@ -24,6 +25,16 @@ data class HiddenCategoriesRequest(
 @Serializable
 data class HiddenCategoriesResponse(
     val hiddenCategories: List<String> = emptyList(),
+)
+
+@Serializable
+data class OnlineRecommendationsRequest(
+    val enabled: Boolean,
+)
+
+@Serializable
+data class OnlineRecommendationsResponse(
+    val onlineRecommendations: Boolean = false,
 )
 
 @Serializable

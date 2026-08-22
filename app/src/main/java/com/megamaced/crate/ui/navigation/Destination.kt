@@ -45,6 +45,10 @@ sealed interface Destination {
         // together with a non-null [category] (a category share), the category
         // picker is locked to that category.
         val owner: String? = null,
+        // Seeds the status picker to "wanted" instead of "owned". Set when the
+        // form was opened from an "If you like this…" suggestion, which is by
+        // definition something the user doesn't own yet.
+        val defaultWanted: Boolean = false,
     ) : Destination
 
     @Serializable

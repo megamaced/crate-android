@@ -169,6 +169,10 @@ class AddEditViewModel
             loadProfileDefaults()
             loadCurrencyOptions()
             if (itemId != null) loadExisting(itemId)
+            // Before the prefill, so an existing item's own status still wins.
+            if (itemId == null && savedStateHandle.get<Boolean>("defaultWanted") == true) {
+                _uiState.update { it.copy(status = Status.Wanted) }
+            }
             applyInitialPrefill(savedStateHandle.get<String>("prefillJson"))
             // NB: barcode-scan results (SCAN_RESULT_KEY) are consumed solely by
             // AddEditItemScreen's LaunchedEffect + onScanResultConsumed. Do not

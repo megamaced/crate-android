@@ -26,6 +26,7 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import com.megamaced.crate.data.repository.FakeCrateApiService
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -87,6 +88,7 @@ class ItemDetailViewModelTest {
             media,
             enrichment,
             FakeSettingsRepository(),
+            FakeCrateApiService(),
             FakeCurrentSession(),
         )
 }
@@ -234,6 +236,7 @@ private class FakeSettingsRepository : SettingsRepository {
                 autoEnrichOnClick = false,
                 autoEnrichOnImport = false,
                 hiddenCategories = emptySet(),
+                onlineRecommendations = false,
                 crateVersion = "0.4.2",
             ),
         )
@@ -270,4 +273,10 @@ private class FakeSettingsRepository : SettingsRepository {
         kotlinx.coroutines.flow.flowOf(emptySet())
 
     override suspend fun setHiddenCategories(categories: Set<com.megamaced.crate.domain.model.Category>) = ApiResult.Success(Unit)
+
+    // Off, so the ViewModel never reaches for the online row in these tests.
+    override val onlineRecommendationsFlow: kotlinx.coroutines.flow.Flow<Boolean> =
+        kotlinx.coroutines.flow.flowOf(false)
+
+    override suspend fun setOnlineRecommendations(enabled: Boolean) = ApiResult.Success(Unit)
 }

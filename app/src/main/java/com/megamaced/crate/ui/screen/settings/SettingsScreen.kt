@@ -146,6 +146,12 @@ fun SettingsScreen(
                 onSetVisible = viewModel::setCategoryVisible,
             )
 
+            SectionHeader("Recommendations")
+            RecommendationsSection(
+                onlineEnabled = state.onlineRecommendations,
+                onOnlineChange = viewModel::setOnlineRecommendations,
+            )
+
             SectionHeader("Account")
             Button(
                 onClick = { confirmLogout = true },
@@ -556,6 +562,53 @@ private fun ThemeSection(
                         Text(mode.name)
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RecommendationsSection(
+    onlineEnabled: Boolean,
+    onOnlineChange: (Boolean) -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(
+                text =
+                    "Items show a \"More from your crate\" row, suggesting similar things you " +
+                        "already own or want. That's worked out on this device from your own " +
+                        "collection, so it works offline.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
+            HorizontalDivider()
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Enable online recommendations",
+                        style = MaterialTheme.typography.titleSmall,
+                    )
+                    Text(
+                        text =
+                            "Also suggest things you don't own yet, from the service that " +
+                                "enriched the item — music, films, books and games. Only " +
+                                "enriched items can have these, and they need a connection to " +
+                                "your server. Comics aren't covered: ComicVine publishes no " +
+                                "similarity data.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Switch(
+                    checked = onlineEnabled,
+                    onCheckedChange = onOnlineChange,
+                )
             }
         }
     }

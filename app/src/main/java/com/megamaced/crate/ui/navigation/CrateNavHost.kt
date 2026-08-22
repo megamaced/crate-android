@@ -16,6 +16,7 @@ import com.megamaced.crate.ui.screen.addedit.AddEditItemScreen
 import com.megamaced.crate.ui.screen.addedit.ExternalSearchResult
 import com.megamaced.crate.ui.screen.addedit.SCAN_RESULT_KEY
 import com.megamaced.crate.ui.screen.collection.CollectionScreen
+import com.megamaced.crate.data.api.dto.SuggestionDto
 import com.megamaced.crate.ui.screen.detail.ItemDetailScreen
 import com.megamaced.crate.ui.screen.home.HomeScreen
 import com.megamaced.crate.ui.screen.login.LoginScreen
@@ -27,6 +28,25 @@ import com.megamaced.crate.ui.screen.settings.SettingsScreen
 import com.megamaced.crate.ui.screen.shared.SharedCategoryScreen
 import com.megamaced.crate.ui.screen.shared.SharedWithMeScreen
 import kotlinx.serialization.json.Json
+
+/**
+ * A provider suggestion in the shape the add form already understands. The
+ * server returns each suggestion in its provider's search-result shape, so
+ * exactly one id field is set; they all land in `discogsId`, which is the
+ * generic enrichment-id field on both the form and the server's schema.
+ */
+private fun SuggestionDto.toExternalSearchResult(): ExternalSearchResult =
+    ExternalSearchResult(
+        title = title,
+        artist = artist,
+        format = format,
+        year = year,
+        barcode = barcode,
+        label = label,
+        discogsId = discogsId ?: tmdbId ?: workKey ?: rawgId ?: comicVineId,
+        subtitle = genres,
+        coverUrl = thumb ?: artworkUrl,
+    )
 
 @Composable
 fun CrateNavHost(
@@ -110,6 +130,24 @@ fun CrateNavHost(
                             popUpTo<Destination.Collection> { inclusive = true }
                         }
                     }
+                },
+                onOpenItem = { id -> navController.navigate(Destination.Detail(id)) },
+                // An "If you like this…" suggestion is something the user
+                // doesn't own, so it goes to the add form pre-filled and
+                // defaulted to the wishlist rather than straight into the
+                // collection.
+                onAddSuggestion = { category, suggestion ->
+                    val prefill = Json.encodeToString(
+                        ExternalSearchResult.serializer(),
+                        suggestion.toExternalSearchResult(),
+                    )
+                    navController.navigate(
+                        Destination.AddEdit(
+                            category = category.apiValue,
+                            prefillJson = prefill,
+                            defaultWanted = true,
+                        ),
+                    )
                 },
             )
         }

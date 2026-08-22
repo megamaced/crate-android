@@ -25,6 +25,9 @@ import com.megamaced.crate.data.api.dto.RawgSearchResultDto
 import com.megamaced.crate.data.api.dto.RefreshAllDto
 import com.megamaced.crate.data.api.dto.ShareDto
 import com.megamaced.crate.data.api.dto.ShareRequest
+import com.megamaced.crate.data.api.dto.OnlineRecommendationsRequest
+import com.megamaced.crate.data.api.dto.OnlineRecommendationsResponse
+import com.megamaced.crate.data.api.dto.RecommendationsDto
 import com.megamaced.crate.data.api.dto.SharedWithMeDto
 import com.megamaced.crate.data.api.dto.TmdbMovieDto
 import com.megamaced.crate.data.api.dto.TmdbSearchResultDto
@@ -127,6 +130,12 @@ interface CrateApiService {
         @Body body: HiddenCategoriesRequest,
     ): HiddenCategoriesResponse
 
+    @OcsResponse
+    @PUT(API_BASE + "settings/online-recommendations")
+    suspend fun setOnlineRecommendations(
+        @Body body: OnlineRecommendationsRequest,
+    ): OnlineRecommendationsResponse
+
     // -- Media (always paginated; pass updatedSince for delta sync) -----------
 
     @OcsResponse
@@ -194,6 +203,18 @@ interface CrateApiService {
     @OcsResponse
     @POST(API_BASE + "market-value/refresh-all")
     suspend fun listRefreshableMarketValues(): RefreshAllDto
+
+    /**
+     * Provider-backed suggestions for an item. Asks for the online half only:
+     * the "more from your crate" row is computed on-device from the Room cache
+     * so it survives having no connection, which a server call could not.
+     */
+    @OcsResponse
+    @GET(API_BASE + "media/{id}/recommendations")
+    suspend fun getRecommendations(
+        @Path("id") id: Long,
+        @Query("include") include: String = "online",
+    ): RecommendationsDto
 
     // -- Home -----------------------------------------------------------------
 

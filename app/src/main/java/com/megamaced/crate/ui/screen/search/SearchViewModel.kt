@@ -95,7 +95,10 @@ class SearchViewModel
                     query = q,
                     tab = t,
                     externalCategory = c,
-                    collectionResults = coll,
+                    // Hidden categories are excluded here rather than in
+                    // collectionResults so the filter re-applies immediately when
+                    // the user unhides a category, without re-running the query.
+                    collectionResults = coll.filter { it.category !in hidden },
                     externalResults = ext,
                     isExternalLoading = loading,
                     externalError = err,
@@ -107,6 +110,19 @@ class SearchViewModel
                 started = SharingStarted.WhileSubscribed(5_000),
                 initialValue = SearchUiState(),
             )
+
+        init {
+            // The external-provider chip row only renders visible categories, so a
+            // hidden selection would leave no chip selected while still searching
+            // that provider. Snap to the first visible category instead.
+            viewModelScope.launch {
+                hiddenCategories.collect { hidden ->
+                    if (externalCategory.value in hidden) {
+                        Category.entries.firstOrNull { it !in hidden }?.let { selectCategory(it) }
+                    }
+                }
+            }
+        }
 
         fun onQueryChange(value: String) {
             query.value = value

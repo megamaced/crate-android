@@ -1,0 +1,7 @@
+* Items now suggest similar things from your own collection, worked
+  out on your device so the row still appears with no connection.
+* Optionally, items can also suggest things you don't own yet, from
+  the service that enriched them. Off by default; turn it on under
+  Settings, Recommendations.
+* Hiding a category now hides its items from search too, instead of
+  leaving them to turn up there anyway.

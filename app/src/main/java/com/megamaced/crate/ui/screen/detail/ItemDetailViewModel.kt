@@ -4,7 +4,11 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.megamaced.crate.data.api.ApiResult
+import com.megamaced.crate.data.api.dto.SuggestionDto
 import com.megamaced.crate.data.auth.CurrentSession
+import com.megamaced.crate.data.api.CrateApiService
+import com.megamaced.crate.data.api.apiCall
+import com.megamaced.crate.domain.LocalSimilarity
 import com.megamaced.crate.domain.model.Category
 import com.megamaced.crate.domain.model.MediaItem
 import com.megamaced.crate.domain.repository.EnrichmentRepository
@@ -15,7 +19,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -39,6 +46,20 @@ data class ItemDetailUiState(
     val sharedByUser: String? = null,
 )
 
+/**
+ * The two suggestion rows, kept separate from [ItemDetailUiState] because they
+ * load on different schedules and neither should hold up the item itself.
+ *
+ * [local] is derived from the Room cache, so it is available offline. [online]
+ * comes from the server (which in turn calls the enrichment provider), so with
+ * no connection it stays empty and the row is simply not rendered.
+ */
+data class RecommendationsUiState(
+    val local: List<MediaItem> = emptyList(),
+    val online: List<SuggestionDto> = emptyList(),
+    val onlineSource: String? = null,
+)
+
 enum class DetailAction {
     Enrich,
     Strip,
@@ -54,6 +75,7 @@ class ItemDetailViewModel
         private val mediaRepository: MediaRepository,
         private val enrichmentRepository: EnrichmentRepository,
         private val settingsRepository: SettingsRepository,
+        private val api: CrateApiService,
         currentSession: CurrentSession,
     ) : ViewModel() {
         private val itemId: Long = checkNotNull(savedStateHandle["itemId"]) {
@@ -114,7 +136,50 @@ class ItemDetailViewModel
                 initialValue = ItemDetailUiState(itemId = itemId),
             )
 
+        private val onlineSuggestions = MutableStateFlow(RecommendationsUiState())
+
+        /**
+         * "More from your crate", derived from the Room cache so it works with
+         * no connection, plus the provider row when one was fetched.
+         *
+         * Ranking rules live in [LocalSimilarity] and mirror the server's
+         * scorer, which computes the same row for the web client.
+         */
+        val recommendations: StateFlow<RecommendationsUiState> =
+            combine(
+                mediaRepository.observe(itemId).filterNotNull(),
+                mediaRepository.observeAll(),
+                onlineSuggestions,
+            ) { item, all, online ->
+                online.copy(local = LocalSimilarity.rank(item, all))
+            }.stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5_000),
+                initialValue = RecommendationsUiState(),
+            )
+
+        /**
+         * Fetches the provider row, but only when the user has opted in.
+         * Failure is silent by design — offline, or a provider being down,
+         * should leave the row absent rather than show an error on a detail
+         * screen that is otherwise complete.
+         */
+        private suspend fun loadOnlineSuggestions() {
+            if (!settingsRepository.onlineRecommendationsFlow.first()) return
+            val result = apiCall { api.getRecommendations(itemId) }
+            if (result is ApiResult.Success) {
+                onlineSuggestions.value =
+                    RecommendationsUiState(
+                        online = result.value.online,
+                        onlineSource = result.value.onlineSource,
+                    )
+            }
+        }
+
         init {
+            viewModelScope.launch {
+                loadOnlineSuggestions()
+            }
             viewModelScope.launch {
                 val refreshed = mediaRepository.refreshSingle(itemId)
                 // Capture the per-item write permission from the network fetch;

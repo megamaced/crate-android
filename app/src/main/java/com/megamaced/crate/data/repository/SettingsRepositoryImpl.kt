@@ -5,6 +5,7 @@ import com.megamaced.crate.data.api.CrateApiService
 import com.megamaced.crate.data.api.apiCall
 import com.megamaced.crate.data.api.dto.CurrencyRequest
 import com.megamaced.crate.data.api.dto.HiddenCategoriesRequest
+import com.megamaced.crate.data.api.dto.OnlineRecommendationsRequest
 import com.megamaced.crate.data.api.dto.KeyRequest
 import com.megamaced.crate.data.api.dto.TokenRequest
 import com.megamaced.crate.data.mapper.toDomain
@@ -31,6 +32,7 @@ class SettingsRepositoryImpl
             // so navigation / home / search can read it synchronously next launch.
             if (result is ApiResult.Success) {
                 userPreferences.setHiddenCategories(result.value.hiddenCategories)
+                userPreferences.setOnlineRecommendations(result.value.onlineRecommendations)
             }
             return result
         }
@@ -77,6 +79,20 @@ class SettingsRepositoryImpl
                 }
             if (result is ApiResult.Success) {
                 userPreferences.setHiddenCategories(categories)
+            }
+            return result
+        }
+
+        override val onlineRecommendationsFlow: Flow<Boolean> = userPreferences.onlineRecommendationsFlow
+
+        override suspend fun setOnlineRecommendations(enabled: Boolean): ApiResult<Unit> {
+            val result =
+                apiCall {
+                    api.setOnlineRecommendations(OnlineRecommendationsRequest(enabled))
+                    Unit
+                }
+            if (result is ApiResult.Success) {
+                userPreferences.setOnlineRecommendations(enabled)
             }
             return result
         }
