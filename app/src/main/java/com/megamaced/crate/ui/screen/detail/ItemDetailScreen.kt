@@ -61,16 +61,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.megamaced.crate.R
+import com.megamaced.crate.data.api.dto.SuggestionDto
 import com.megamaced.crate.domain.model.Category
 import com.megamaced.crate.domain.model.MediaItem
-import com.megamaced.crate.data.api.dto.SuggestionDto
 import com.megamaced.crate.ui.components.ArtworkImage
-import com.megamaced.crate.ui.components.RecommendationRow
-import com.megamaced.crate.ui.components.SuggestionArt
-import com.megamaced.crate.ui.components.SuggestionEntry
 import com.megamaced.crate.ui.components.ArtworkSize
 import com.megamaced.crate.ui.components.LoadingState
 import com.megamaced.crate.ui.components.PhotoImage
+import com.megamaced.crate.ui.components.RecommendationRow
+import com.megamaced.crate.ui.components.SuggestionArt
+import com.megamaced.crate.ui.components.SuggestionEntry
 import com.megamaced.crate.ui.screen.collection.genreTokens
 import com.megamaced.crate.ui.screen.share.ShareSheet
 import com.megamaced.crate.ui.screen.share.ShareTarget
@@ -435,7 +435,10 @@ private fun ItemDetailContent(
                 )
             },
             onClick = { entry ->
-                entry.key.removePrefix("local-").toLongOrNull()?.let(onOpenItem)
+                entry.key
+                    .removePrefix("local-")
+                    .toLongOrNull()
+                    ?.let(onOpenItem)
             },
         )
 
@@ -453,7 +456,9 @@ private fun ItemDetailContent(
                 )
             },
             onClick = { entry ->
-                entry.key.removePrefix("online-").toIntOrNull()
+                entry.key
+                    .removePrefix("online-")
+                    .toIntOrNull()
                     ?.let { recommendations.online.getOrNull(it) }
                     ?.let(onAddSuggestion)
             },

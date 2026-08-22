@@ -3,6 +3,7 @@ package com.megamaced.crate.ui.screen.detail
 import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
 import com.megamaced.crate.data.api.ApiResult
+import com.megamaced.crate.data.repository.FakeCrateApiService
 import com.megamaced.crate.domain.model.Category
 import com.megamaced.crate.domain.model.MarketSettings
 import com.megamaced.crate.domain.model.MarketValue
@@ -26,7 +27,6 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
-import com.megamaced.crate.data.repository.FakeCrateApiService
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue

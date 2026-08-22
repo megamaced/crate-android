@@ -5,8 +5,8 @@ import com.megamaced.crate.data.api.CrateApiService
 import com.megamaced.crate.data.api.apiCall
 import com.megamaced.crate.data.api.dto.CurrencyRequest
 import com.megamaced.crate.data.api.dto.HiddenCategoriesRequest
-import com.megamaced.crate.data.api.dto.OnlineRecommendationsRequest
 import com.megamaced.crate.data.api.dto.KeyRequest
+import com.megamaced.crate.data.api.dto.OnlineRecommendationsRequest
 import com.megamaced.crate.data.api.dto.TokenRequest
 import com.megamaced.crate.data.mapper.toDomain
 import com.megamaced.crate.data.mapper.toDto

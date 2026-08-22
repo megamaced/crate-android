@@ -12,11 +12,11 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import com.megamaced.crate.data.api.dto.SuggestionDto
 import com.megamaced.crate.ui.screen.addedit.AddEditItemScreen
 import com.megamaced.crate.ui.screen.addedit.ExternalSearchResult
 import com.megamaced.crate.ui.screen.addedit.SCAN_RESULT_KEY
 import com.megamaced.crate.ui.screen.collection.CollectionScreen
-import com.megamaced.crate.data.api.dto.SuggestionDto
 import com.megamaced.crate.ui.screen.detail.ItemDetailScreen
 import com.megamaced.crate.ui.screen.home.HomeScreen
 import com.megamaced.crate.ui.screen.login.LoginScreen

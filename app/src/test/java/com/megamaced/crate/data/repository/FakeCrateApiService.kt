@@ -12,20 +12,20 @@ import com.megamaced.crate.data.api.dto.DiscogsSearchResultDto
 import com.megamaced.crate.data.api.dto.HasKeyDto
 import com.megamaced.crate.data.api.dto.HasTokenDto
 import com.megamaced.crate.data.api.dto.HiddenCategoriesRequest
-import com.megamaced.crate.data.api.dto.OnlineRecommendationsRequest
-import com.megamaced.crate.data.api.dto.OnlineRecommendationsResponse
-import com.megamaced.crate.data.api.dto.RecommendationsDto
 import com.megamaced.crate.data.api.dto.HiddenCategoriesResponse
 import com.megamaced.crate.data.api.dto.HomeFeedDto
 import com.megamaced.crate.data.api.dto.KeyRequest
 import com.megamaced.crate.data.api.dto.MarketSettingsDto
 import com.megamaced.crate.data.api.dto.MeDto
 import com.megamaced.crate.data.api.dto.MediaItemDto
+import com.megamaced.crate.data.api.dto.OnlineRecommendationsRequest
+import com.megamaced.crate.data.api.dto.OnlineRecommendationsResponse
 import com.megamaced.crate.data.api.dto.OpenLibraryResultDto
 import com.megamaced.crate.data.api.dto.PaginatedMediaDto
 import com.megamaced.crate.data.api.dto.PlaylistDto
 import com.megamaced.crate.data.api.dto.RawgGameDto
 import com.megamaced.crate.data.api.dto.RawgSearchResultDto
+import com.megamaced.crate.data.api.dto.RecommendationsDto
 import com.megamaced.crate.data.api.dto.RefreshAllDto
 import com.megamaced.crate.data.api.dto.ShareDto
 import com.megamaced.crate.data.api.dto.ShareRequest
@@ -214,9 +214,7 @@ class FakeCrateApiService : CrateApiService {
 
     override suspend fun setHiddenCategories(body: HiddenCategoriesRequest): HiddenCategoriesResponse = unsupported()
 
-    override suspend fun setOnlineRecommendations(
-        body: OnlineRecommendationsRequest,
-    ): OnlineRecommendationsResponse = unsupported()
+    override suspend fun setOnlineRecommendations(body: OnlineRecommendationsRequest): OnlineRecommendationsResponse = unsupported()
 
     override suspend fun getRecommendations(
         id: Long,

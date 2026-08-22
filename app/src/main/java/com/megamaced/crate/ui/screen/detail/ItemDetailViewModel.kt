@@ -4,10 +4,10 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.megamaced.crate.data.api.ApiResult
-import com.megamaced.crate.data.api.dto.SuggestionDto
-import com.megamaced.crate.data.auth.CurrentSession
 import com.megamaced.crate.data.api.CrateApiService
 import com.megamaced.crate.data.api.apiCall
+import com.megamaced.crate.data.api.dto.SuggestionDto
+import com.megamaced.crate.data.auth.CurrentSession
 import com.megamaced.crate.domain.LocalSimilarity
 import com.megamaced.crate.domain.model.Category
 import com.megamaced.crate.domain.model.MediaItem
@@ -19,10 +19,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
-import kotlinx.coroutines.flow.filterNotNull
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
