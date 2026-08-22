@@ -96,6 +96,31 @@ fun SettingsScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             ProfileCard(state = state, onOpenSharedWithMe = onOpenSharedWithMe)
+            SectionHeader("Appearance")
+            ThemeSection(
+                themeMode = state.themeMode,
+                onThemeChange = viewModel::setThemeMode,
+            )
+
+            SectionHeader("Categories")
+            CategoriesSection(
+                hidden = state.hiddenCategories,
+                onSetVisible = viewModel::setCategoryVisible,
+            )
+
+            SectionHeader("Enrichment")
+            EnrichmentSection(state = state, viewModel = viewModel)
+
+            SectionHeader("Recommendations")
+            RecommendationsSection(
+                state = state,
+                onlineEnabled = state.onlineRecommendations,
+                onOnlineChange = viewModel::setOnlineRecommendations,
+            )
+
+            SectionHeader("Market")
+            MarketSection(state = state, viewModel = viewModel)
+
             SectionHeader("Tokens")
             TokenEditor(
                 label = "Discogs token",
@@ -126,30 +151,6 @@ fun SettingsScreen(
                 placeholder = "API token",
                 state = state.priceCharting,
                 onSave = viewModel::setPriceChartingToken,
-            )
-
-            SectionHeader("Enrichment")
-            EnrichmentSection(state = state, viewModel = viewModel)
-
-            SectionHeader("Market")
-            MarketSection(state = state, viewModel = viewModel)
-
-            SectionHeader("Appearance")
-            ThemeSection(
-                themeMode = state.themeMode,
-                onThemeChange = viewModel::setThemeMode,
-            )
-
-            SectionHeader("Categories")
-            CategoriesSection(
-                hidden = state.hiddenCategories,
-                onSetVisible = viewModel::setCategoryVisible,
-            )
-
-            SectionHeader("Recommendations")
-            RecommendationsSection(
-                onlineEnabled = state.onlineRecommendations,
-                onOnlineChange = viewModel::setOnlineRecommendations,
             )
 
             SectionHeader("Account")
@@ -352,6 +353,23 @@ private fun TokenEditor(
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
+/**
+ * Points at the Tokens section from the sections that depend on it.
+ *
+ * Tokens sit below these deliberately — they're configured once and never
+ * touched again — which only works if the sections that need one say so.
+ * Rendered only when the relevant token is genuinely absent, and never while
+ * the token state is still loading, so it doesn't flash on every open.
+ */
+@Composable
+private fun MissingTokenHint(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
 @Composable
 private fun MarketSection(
     state: SettingsUiState,
@@ -367,6 +385,16 @@ private fun MarketSection(
                     CircularProgressIndicator()
                 }
                 return@Card
+            }
+
+            if (!state.discogs.hasValue &&
+                !state.priceCharting.hasValue &&
+                !state.discogs.isLoading &&
+                !state.priceCharting.isLoading
+            ) {
+                MissingTokenHint(
+                    "Add a Discogs or PriceCharting token below to enable market values.",
+                )
             }
 
             CurrencyPicker(
@@ -439,6 +467,14 @@ private fun EnrichmentSection(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            val enrichTokens = listOf(state.discogs, state.tmdb, state.rawg, state.comicVine)
+            if (enrichTokens.none { it.hasValue } && enrichTokens.none { it.isLoading }) {
+                MissingTokenHint(
+                    "Add tokens below to enrich music, films, games and comics. Books use " +
+                        "Open Library, which needs no token.",
+                )
+            }
+
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
@@ -569,6 +605,7 @@ private fun ThemeSection(
 
 @Composable
 private fun RecommendationsSection(
+    state: SettingsUiState,
     onlineEnabled: Boolean,
     onOnlineChange: (Boolean) -> Unit,
 ) {
@@ -608,6 +645,14 @@ private fun RecommendationsSection(
                 Switch(
                     checked = onlineEnabled,
                     onCheckedChange = onOnlineChange,
+                )
+            }
+
+            val recTokens = listOf(state.discogs, state.tmdb, state.rawg)
+            if (onlineEnabled && recTokens.none { it.hasValue } && recTokens.none { it.isLoading }) {
+                MissingTokenHint(
+                    "No provider tokens are set, so online suggestions will only appear for " +
+                        "books. Add tokens below for music, films and games.",
                 )
             }
         }
