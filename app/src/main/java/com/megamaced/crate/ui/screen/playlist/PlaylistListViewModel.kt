@@ -103,9 +103,18 @@ class PlaylistListViewModel
             onSuccess: (T) -> Unit,
         ) {
             when (result) {
-                is ApiResult.Success -> onSuccess(result.value)
-                ApiResult.NetworkError -> errorMessage.value = "Couldn't reach the server."
-                is ApiResult.HttpError -> errorMessage.value = result.message ?: "Server error (${result.code})."
+                is ApiResult.Success -> {
+                    onSuccess(result.value)
+                }
+
+                ApiResult.NetworkError -> {
+                    errorMessage.value = "Couldn't reach the server."
+                }
+
+                is ApiResult.HttpError -> {
+                    errorMessage.value = result.message ?: "Server error (${result.code})."
+                }
+
                 ApiResult.Unauthorised -> { /* SessionManager handles */ }
             }
         }

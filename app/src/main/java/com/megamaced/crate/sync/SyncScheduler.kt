@@ -8,6 +8,7 @@ import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
+import com.megamaced.crate.data.auth.SessionManager
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
@@ -33,9 +34,12 @@ class SyncScheduler
                 PeriodicWorkRequestBuilder<SyncWorker>(PERIODIC_INTERVAL_HOURS, TimeUnit.HOURS)
                     .setConstraints(connectedConstraints)
                     .build()
+            // UPDATE rather than KEEP: with KEEP, a later change to the
+            // interval or the constraints would never reach installs that
+            // already have the work enqueued.
             workManager.enqueueUniquePeriodicWork(
                 PERIODIC_NAME,
-                ExistingPeriodicWorkPolicy.KEEP,
+                ExistingPeriodicWorkPolicy.UPDATE,
                 periodic,
             )
         }
@@ -46,11 +50,21 @@ class SyncScheduler
                 OneTimeWorkRequestBuilder<SyncWorker>()
                     .setConstraints(connectedConstraints)
                     .build()
+            // REPLACE rather than KEEP: KEEP silently discards this request
+            // whenever an earlier one is still sitting in exponential backoff
+            // after a failure, so a user returning to a working connection
+            // could wait minutes for fresh data with no way to force a sync.
             workManager.enqueueUniqueWork(
                 ONE_SHOT_NAME,
-                ExistingWorkPolicy.KEEP,
+                ExistingWorkPolicy.REPLACE,
                 oneShot,
             )
+        }
+
+        /** Cancels all sync work. Called on logout — see [SessionManager]. */
+        fun cancelSync() {
+            workManager.cancelUniqueWork(PERIODIC_NAME)
+            workManager.cancelUniqueWork(ONE_SHOT_NAME)
         }
 
         companion object {

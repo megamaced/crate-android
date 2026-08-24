@@ -35,6 +35,27 @@ import java.io.ByteArrayOutputStream
  */
 object ExifStrip {
     /**
+     * Result of a strip. [mimeType] is the type of [bytes] as they now stand,
+     * which is not necessarily what came in — a HEIC/HEIF or WebP source is
+     * re-encoded to JPEG. Callers must label the upload with this, not the
+     * source type, or the server is handed JPEG bytes claiming to be HEIC.
+     */
+    data class Stripped(
+        val bytes: ByteArray,
+        val mimeType: String,
+    ) {
+        // ByteArray uses identity equals/hashCode, so the generated data-class
+        // implementations would be misleading. Compare contents instead.
+        override fun equals(other: Any?): Boolean {
+            if (this === other) return true
+            if (other !is Stripped) return false
+            return mimeType == other.mimeType && bytes.contentEquals(other.bytes)
+        }
+
+        override fun hashCode(): Int = 31 * bytes.contentHashCode() + mimeType.hashCode()
+    }
+
+    /**
      * Longest-edge cap for the re-encoded upload. Keeps peak memory bounded
      * and upload sizes sane; the server downscales further for thumbnails.
      */
@@ -43,15 +64,16 @@ object ExifStrip {
     fun strip(
         bytes: ByteArray,
         mimeType: String,
-    ): ByteArray {
+    ): Stripped {
         // PNG stays PNG (lossless, may carry transparency); everything else —
         // JPEG, HEIC/HEIF, WebP, and unknown/`image/*` — is normalised to JPEG.
+        val isPng = mimeType == "image/png"
         val outFormat =
-            if (mimeType == "image/png") {
-                Bitmap.CompressFormat.PNG
-            } else {
-                Bitmap.CompressFormat.JPEG
-            }
+            if (isPng) Bitmap.CompressFormat.PNG else Bitmap.CompressFormat.JPEG
+        val outMime = if (isPng) "image/png" else "image/jpeg"
+        // The un-re-encoded fallbacks below keep the source type, since the
+        // bytes are returned exactly as they arrived.
+        val unchanged = Stripped(bytes, mimeType)
         return try {
             // 1. Bounds-only pass to size the downsample factor without
             //    allocating the full bitmap.
@@ -60,14 +82,15 @@ object ExifStrip {
             if (boundsOpts.outWidth <= 0 || boundsOpts.outHeight <= 0) {
                 // Not a decodable raster (or an unsupported codec). Fall back
                 // to the original bytes rather than fail the upload.
-                return bytes
+                return unchanged
             }
 
             val decodeOpts =
                 BitmapFactory.Options().apply {
                     inSampleSize = sampleSize(boundsOpts.outWidth, boundsOpts.outHeight, MAX_DIMENSION)
                 }
-            val decoded = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, decodeOpts) ?: return bytes
+            val decoded = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, decodeOpts)
+                ?: return unchanged
 
             // 2. Bake in the source orientation (the tag is lost on re-encode).
             val oriented = applyOrientation(decoded, readOrientation(bytes))
@@ -77,10 +100,10 @@ object ExifStrip {
             val ok = oriented.compress(outFormat, quality, out)
             if (oriented !== decoded) decoded.recycle()
             oriented.recycle()
-            if (ok) out.toByteArray() else bytes
+            if (ok) Stripped(out.toByteArray(), outMime) else unchanged
         } catch (t: Throwable) {
             Timber.w(t, "EXIF strip failed; uploading original bytes")
-            bytes
+            unchanged
         }
     }
 
@@ -119,20 +142,39 @@ object ExifStrip {
     ): Bitmap {
         val matrix = Matrix()
         when (orientation) {
-            ExifInterface.ORIENTATION_ROTATE_90 -> matrix.postRotate(90f)
-            ExifInterface.ORIENTATION_ROTATE_180 -> matrix.postRotate(180f)
-            ExifInterface.ORIENTATION_ROTATE_270 -> matrix.postRotate(270f)
-            ExifInterface.ORIENTATION_FLIP_HORIZONTAL -> matrix.postScale(-1f, 1f)
-            ExifInterface.ORIENTATION_FLIP_VERTICAL -> matrix.postScale(1f, -1f)
+            ExifInterface.ORIENTATION_ROTATE_90 -> {
+                matrix.postRotate(90f)
+            }
+
+            ExifInterface.ORIENTATION_ROTATE_180 -> {
+                matrix.postRotate(180f)
+            }
+
+            ExifInterface.ORIENTATION_ROTATE_270 -> {
+                matrix.postRotate(270f)
+            }
+
+            ExifInterface.ORIENTATION_FLIP_HORIZONTAL -> {
+                matrix.postScale(-1f, 1f)
+            }
+
+            ExifInterface.ORIENTATION_FLIP_VERTICAL -> {
+                matrix.postScale(1f, -1f)
+            }
+
             ExifInterface.ORIENTATION_TRANSPOSE -> {
                 matrix.postRotate(90f)
                 matrix.postScale(-1f, 1f)
             }
+
             ExifInterface.ORIENTATION_TRANSVERSE -> {
                 matrix.postRotate(270f)
                 matrix.postScale(-1f, 1f)
             }
-            else -> return bitmap
+
+            else -> {
+                return bitmap
+            }
         }
         return Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
     }

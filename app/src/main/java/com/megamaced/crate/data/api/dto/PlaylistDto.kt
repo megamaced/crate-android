@@ -6,6 +6,7 @@ import kotlinx.serialization.Serializable
 data class PlaylistDto(
     val id: Long,
     val name: String,
+    val description: String? = null,
     val userId: String? = null,
     val items: List<MediaItemDto>? = null,
     val itemCount: Int? = null,
@@ -21,6 +22,9 @@ data class PlaylistDto(
 @Serializable
 data class CreatePlaylistRequest(
     val name: String,
+    // PlaylistController::update() writes the description unconditionally, so a
+    // rename has to resend the one already stored or the server clears it.
+    val description: String? = null,
 )
 
 @Serializable

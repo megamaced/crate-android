@@ -13,7 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.google.zxing.ResultPoint
 import com.journeyapps.barcodescanner.BarcodeCallback
 import com.journeyapps.barcodescanner.BarcodeResult
@@ -52,7 +53,7 @@ import com.journeyapps.barcodescanner.DecoratedBarcodeView
 import com.journeyapps.barcodescanner.DefaultDecoderFactory
 import com.megamaced.crate.ui.screen.addedit.ExternalResultRow
 import com.megamaced.crate.ui.screen.addedit.ExternalSearchResult
-import com.megamaced.crate.ui.screen.addedit.identityKey
+import com.megamaced.crate.ui.screen.addedit.listKey
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -99,12 +100,16 @@ fun BarcodeScanScreen(
                 .padding(innerPadding),
         ) {
             when {
-                hasPermission ->
+                hasPermission -> {
                     CameraPreview(
                         paused = state.sheetOpen,
                         onBarcode = viewModel::onBarcodeDetected,
                     )
-                else -> PermissionPrompt(onRequest = { permissionLauncher.launch(Manifest.permission.CAMERA) })
+                }
+
+                else -> {
+                    PermissionPrompt(onRequest = { permissionLauncher.launch(Manifest.permission.CAMERA) })
+                }
             }
         }
     }
@@ -151,12 +156,32 @@ private fun CameraPreview(
                 override fun possibleResultPoints(resultPoints: MutableList<ResultPoint>?) = Unit
             }
         barcodeView.decodeContinuous(callback)
-        barcodeView.resume()
-        onDispose { barcodeView.pause() }
+        onDispose { barcodeView.barcodeView.stopDecoding() }
     }
 
+    // The camera follows the host lifecycle, not just composition: releasing it
+    // only on removal leaves the device held (and the privacy indicator lit)
+    // while the app is in the background, and other camera apps can't acquire
+    // it. This effect owns the initial resume too.
+    LifecycleResumeEffect(barcodeView) {
+        barcodeView.resume()
+        onPauseOrDispose { barcodeView.pause() }
+    }
+
+    // The candidate sheet pauses the preview while it is up. Skipped on the
+    // first pass so it can't double-resume over the lifecycle effect above.
+    var sheetHasOpened by remember { mutableStateOf(false) }
     LaunchedEffect(paused) {
-        if (paused) barcodeView.pause() else barcodeView.resume()
+        when {
+            paused -> {
+                sheetHasOpened = true
+                barcodeView.pause()
+            }
+
+            sheetHasOpened -> {
+                barcodeView.resume()
+            }
+        }
     }
 
     AndroidView(
@@ -214,29 +239,40 @@ private fun CandidateSheet(
                 contentAlignment = Alignment.Center,
             ) {
                 when {
-                    state.isLooking -> CircularProgressIndicator()
-                    state.errorMessage != null ->
+                    state.isLooking -> {
+                        CircularProgressIndicator()
+                    }
+
+                    state.errorMessage != null -> {
                         Text(
                             text = state.errorMessage,
                             color = MaterialTheme.colorScheme.error,
                             style = MaterialTheme.typography.bodyMedium,
                         )
-                    state.candidates.isNotEmpty() ->
+                    }
+
+                    state.candidates.isNotEmpty() -> {
                         LazyColumn(
                             modifier = Modifier.fillMaxWidth(),
                             contentPadding = PaddingValues(vertical = 4.dp),
                         ) {
-                            items(state.candidates, key = { it.identityKey() }) { result ->
+                            itemsIndexed(
+                                state.candidates,
+                                key = { index, result -> result.listKey(index) },
+                            ) { _, result ->
                                 ExternalResultRow(result, onClick = { onPick(result) })
                                 HorizontalDivider()
                             }
                         }
-                    else ->
+                    }
+
+                    else -> {
                         Text(
                             text = "No matches. Use the raw barcode and fill the form manually.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                    }
                 }
             }
             if (!state.isLooking && state.barcode != null) {

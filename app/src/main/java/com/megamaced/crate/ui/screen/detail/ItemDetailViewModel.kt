@@ -14,7 +14,11 @@ import com.megamaced.crate.domain.model.MediaItem
 import com.megamaced.crate.domain.repository.EnrichmentRepository
 import com.megamaced.crate.domain.repository.MediaRepository
 import com.megamaced.crate.domain.repository.SettingsRepository
+import com.megamaced.crate.ui.components.SuggestionArt
+import com.megamaced.crate.ui.components.SuggestionEntry
+import com.megamaced.crate.ui.components.SuggestionTarget
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -22,6 +26,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -49,13 +54,17 @@ data class ItemDetailUiState(
  * The two suggestion rows, kept separate from [ItemDetailUiState] because they
  * load on different schedules and neither should hold up the item itself.
  *
+ * Both are already in render shape: mapping them here rather than in
+ * composition keeps the work off the recomposition path and out of a subtree
+ * that recomposes on every action.
+ *
  * [local] is derived from the Room cache, so it is available offline. [online]
  * comes from the server (which in turn calls the enrichment provider), so with
  * no connection it stays empty and the row is simply not rendered.
  */
 data class RecommendationsUiState(
-    val local: List<MediaItem> = emptyList(),
-    val online: List<SuggestionDto> = emptyList(),
+    val local: List<SuggestionEntry> = emptyList(),
+    val online: List<SuggestionEntry> = emptyList(),
     val onlineSource: String? = null,
 )
 
@@ -135,7 +144,13 @@ class ItemDetailViewModel
                 initialValue = ItemDetailUiState(itemId = itemId),
             )
 
-        private val onlineSuggestions = MutableStateFlow(RecommendationsUiState())
+        private val onlineSuggestions = MutableStateFlow<List<SuggestionDto>>(emptyList())
+        private val onlineSource = MutableStateFlow<String?>(null)
+
+        // The server prices in GBP when no currency is sent, so the user's own
+        // currency is captured from /me and passed on every fetch — otherwise a
+        // collection ends up with whatever the last client to refresh used.
+        private val marketCurrency = MutableStateFlow(DEFAULT_MARKET_CURRENCY)
 
         /**
          * "More from your crate", derived from the Room cache so it works with
@@ -149,9 +164,18 @@ class ItemDetailViewModel
                 mediaRepository.observe(itemId).filterNotNull(),
                 mediaRepository.observeAll(),
                 onlineSuggestions,
-            ) { item, all, online ->
-                online.copy(local = LocalSimilarity.rank(item, all))
-            }.stateIn(
+                onlineSource,
+            ) { item, all, online, source ->
+                RecommendationsUiState(
+                    local = LocalSimilarity.rank(item, all).map(MediaItem::toSuggestionEntry),
+                    online = online.mapIndexed { index, dto -> dto.toSuggestionEntry(index) },
+                    onlineSource = source,
+                )
+            }.flowOn(
+                // Ranking tokenises and sorts the whole collection; viewModelScope
+                // is Main.immediate, so without this it all runs on the UI thread.
+                Dispatchers.Default,
+            ).stateIn(
                 scope = viewModelScope,
                 started = SharingStarted.WhileSubscribed(5_000),
                 initialValue = RecommendationsUiState(),
@@ -167,11 +191,8 @@ class ItemDetailViewModel
             if (!settingsRepository.onlineRecommendationsFlow.first()) return
             val result = apiCall { api.getRecommendations(itemId) }
             if (result is ApiResult.Success) {
-                onlineSuggestions.value =
-                    RecommendationsUiState(
-                        online = result.value.online,
-                        onlineSource = result.value.onlineSource,
-                    )
+                onlineSuggestions.value = result.value.online
+                onlineSource.value = result.value.onlineSource
             }
         }
 
@@ -191,6 +212,7 @@ class ItemDetailViewModel
 
         private suspend fun runAutoBackgroundFetches(networkCanWrite: Boolean) {
             val me = (settingsRepository.getMe() as? ApiResult.Success)?.value ?: return
+            me.marketCurrency?.takeIf { it.isNotBlank() }?.let { marketCurrency.value = it }
             var item = mediaRepository.observe(itemId).firstOrNull() ?: return
 
             // Auto enrich/market are writes. Skip them only for read-only
@@ -206,7 +228,7 @@ class ItemDetailViewModel
             }
 
             if (me.autoFetchMarketRates && !item.marketValue.isPresent && shouldAutoFetchMarket(item)) {
-                enrichmentRepository.fetchMarketValue(itemId)
+                enrichmentRepository.fetchMarketValue(itemId, marketCurrency.value)
             }
         }
 
@@ -229,7 +251,9 @@ class ItemDetailViewModel
         }
 
         fun fetchMarketValue() {
-            run(DetailAction.FetchMarketValue) { enrichmentRepository.fetchMarketValue(itemId) }
+            run(DetailAction.FetchMarketValue) {
+                enrichmentRepository.fetchMarketValue(itemId, marketCurrency.value)
+            }
         }
 
         fun delete() {
@@ -237,9 +261,18 @@ class ItemDetailViewModel
                 activeAction.value = DetailAction.Delete
                 errorMessage.value = null
                 when (val result = mediaRepository.delete(itemId)) {
-                    is ApiResult.Success -> deleted.value = true
-                    ApiResult.NetworkError -> errorMessage.value = "Couldn't reach the server."
-                    is ApiResult.HttpError -> errorMessage.value = result.message ?: "Server error (${result.code})."
+                    is ApiResult.Success -> {
+                        deleted.value = true
+                    }
+
+                    ApiResult.NetworkError -> {
+                        errorMessage.value = "Couldn't reach the server."
+                    }
+
+                    is ApiResult.HttpError -> {
+                        errorMessage.value = result.message ?: "Server error (${result.code})."
+                    }
+
                     ApiResult.Unauthorised -> { /* SessionManager already handled */ }
                 }
                 activeAction.value = null
@@ -259,11 +292,41 @@ class ItemDetailViewModel
                 errorMessage.value = null
                 when (val result = block()) {
                     is ApiResult.Success -> { /* Repository writes through to Room */ }
-                    ApiResult.NetworkError -> errorMessage.value = "Couldn't reach the server."
-                    is ApiResult.HttpError -> errorMessage.value = result.message ?: "Server error (${result.code})."
+
+                    ApiResult.NetworkError -> {
+                        errorMessage.value = "Couldn't reach the server."
+                    }
+
+                    is ApiResult.HttpError -> {
+                        errorMessage.value = result.message ?: "Server error (${result.code})."
+                    }
+
                     ApiResult.Unauthorised -> { /* SessionManager already handled */ }
                 }
                 activeAction.value = null
             }
         }
     }
+
+/** Fallback currency, matching the server's own default for the endpoint. */
+private const val DEFAULT_MARKET_CURRENCY = "GBP"
+
+private fun MediaItem.toSuggestionEntry(): SuggestionEntry =
+    SuggestionEntry(
+        key = "local-$id",
+        title = title,
+        subtitle = listOfNotNull(artist, year?.toString()).joinToString(" · ").ifBlank { null },
+        art = SuggestionArt.Owned(itemId = id, updatedAt = updatedAt, category = category),
+        target = SuggestionTarget.Owned(itemId = id),
+    )
+
+private fun SuggestionDto.toSuggestionEntry(index: Int): SuggestionEntry =
+    SuggestionEntry(
+        // Provider rows carry no stable id of their own, and the list is
+        // replaced wholesale, so position is the identity.
+        key = "online-$index",
+        title = title,
+        subtitle = listOfNotNull(artist, year?.toString()).joinToString(" · ").ifBlank { null },
+        art = SuggestionArt.Remote(thumb ?: artworkUrl),
+        target = SuggestionTarget.Provider(suggestion = this),
+    )

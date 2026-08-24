@@ -25,6 +25,8 @@ class NextcloudLoginFlowTest {
         server.shutdown()
     }
 
+    private fun origin() = server.url("/").toString()
+
     @Test
     fun `initiate returns login URL and poll endpoint on success`() {
         val pollUrl = server.url("/login/v2/poll")
@@ -42,7 +44,7 @@ class NextcloudLoginFlowTest {
 
         server.enqueue(MockResponse().setBody(responseBody).setResponseCode(200))
 
-        val result = loginFlow.initiate(server.url("/").toString())
+        val result = loginFlow.initiate(origin())
 
         assertTrue(result.isSuccess)
         val initResponse = result.getOrThrow()
@@ -54,7 +56,50 @@ class NextcloudLoginFlowTest {
     fun `initiate returns failure on server error`() {
         server.enqueue(MockResponse().setResponseCode(500))
 
-        val result = loginFlow.initiate(server.url("/").toString())
+        val result = loginFlow.initiate(origin())
+
+        assertTrue(result.isFailure)
+    }
+
+    @Test
+    fun `initiate rejects a poll endpoint on a different origin`() {
+        val responseBody =
+            """
+            {
+                "poll": {
+                    "token": "test-token-123",
+                    "endpoint": "https://attacker.example/poll"
+                },
+                "login": "${server.url("/login/v2/flow")}"
+            }
+            """.trimIndent()
+
+        server.enqueue(MockResponse().setBody(responseBody).setResponseCode(200))
+
+        val result = loginFlow.initiate(origin())
+
+        assertTrue(result.isFailure)
+        assertTrue(
+            result.exceptionOrNull()?.message?.contains("different host") == true,
+        )
+    }
+
+    @Test
+    fun `initiate rejects a login URL on a different origin`() {
+        val responseBody =
+            """
+            {
+                "poll": {
+                    "token": "test-token-123",
+                    "endpoint": "${server.url("/login/v2/poll")}"
+                },
+                "login": "https://attacker.example/flow"
+            }
+            """.trimIndent()
+
+        server.enqueue(MockResponse().setBody(responseBody).setResponseCode(200))
+
+        val result = loginFlow.initiate(origin())
 
         assertTrue(result.isFailure)
     }
@@ -65,7 +110,7 @@ class NextcloudLoginFlowTest {
             val responseBody =
                 """
                 {
-                    "server": "https://cloud.example.com",
+                    "server": "${origin().trimEnd('/')}",
                     "loginName": "testuser",
                     "appPassword": "secret-app-password"
                 }
@@ -76,11 +121,11 @@ class NextcloudLoginFlowTest {
             val status = loginFlow.poll(
                 endpoint = server.url("/login/v2/poll").toString(),
                 token = "test-token",
+                expectedOrigin = origin(),
             )
 
             assertTrue(status is LoginFlowStatus.Success)
             val success = status as LoginFlowStatus.Success
-            assertEquals("https://cloud.example.com", success.result.server)
             assertEquals("testuser", success.result.loginName)
             assertEquals("secret-app-password", success.result.appPassword)
         }
@@ -97,7 +142,7 @@ class NextcloudLoginFlowTest {
                     .setBody(
                         """
                         {
-                            "server": "https://cloud.example.com",
+                            "server": "${origin().trimEnd('/')}",
                             "loginName": "user",
                             "appPassword": "pass"
                         }
@@ -108,6 +153,7 @@ class NextcloudLoginFlowTest {
             val status = loginFlow.poll(
                 endpoint = server.url("/login/v2/poll").toString(),
                 token = "test-token",
+                expectedOrigin = origin(),
             )
 
             assertTrue(status is LoginFlowStatus.Success)
@@ -121,8 +167,48 @@ class NextcloudLoginFlowTest {
             val status = loginFlow.poll(
                 endpoint = server.url("/login/v2/poll").toString(),
                 token = "test-token",
+                expectedOrigin = origin(),
             )
 
             assertTrue(status is LoginFlowStatus.Error)
+        }
+
+    @Test
+    fun `poll rejects credentials scoped to a different server`() =
+        runTest {
+            val responseBody =
+                """
+                {
+                    "server": "https://attacker.example",
+                    "loginName": "testuser",
+                    "appPassword": "secret-app-password"
+                }
+                """.trimIndent()
+
+            server.enqueue(MockResponse().setBody(responseBody).setResponseCode(200))
+
+            val status = loginFlow.poll(
+                endpoint = server.url("/login/v2/poll").toString(),
+                token = "test-token",
+                expectedOrigin = origin(),
+            )
+
+            assertTrue(status is LoginFlowStatus.Error)
+            assertTrue(
+                (status as LoginFlowStatus.Error).message.contains("different host"),
+            )
+        }
+
+    @Test
+    fun `poll refuses an endpoint on a different origin without making a request`() =
+        runTest {
+            val status = loginFlow.poll(
+                endpoint = "https://attacker.example/poll",
+                token = "test-token",
+                expectedOrigin = origin(),
+            )
+
+            assertTrue(status is LoginFlowStatus.Error)
+            assertEquals(0, server.requestCount)
         }
 }

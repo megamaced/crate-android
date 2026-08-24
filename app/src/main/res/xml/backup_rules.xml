@@ -3,4 +3,14 @@
     <!-- Exclude the encrypted credential store from auto-backup.
          Path must match TokenStore.PREFS_FILE ("crate_auth") + ".xml". -->
     <exclude domain="sharedpref" path="crate_auth.xml" />
+    <!-- The Room DB is a pure cache of server state, but it holds the user's
+         whole collection — titles, notes, purchase prices, market values.
+         A self-hosted user does not expect that in Google's backup service,
+         and nothing is lost: the next sync re-imports it from the server. -->
+    <exclude domain="database" path="crate.db" />
+    <exclude domain="database" path="crate.db-wal" />
+    <exclude domain="database" path="crate.db-shm" />
+    <!-- Sync cursors and hidden categories; per-device state, not worth
+         restoring, and a stale cursor would skip a delta. -->
+    <exclude domain="file" path="datastore/" />
 </full-backup-content>

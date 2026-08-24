@@ -11,21 +11,6 @@ data class TmdbSearchResultDto(
 )
 
 @Serializable
-data class TmdbMovieDto(
-    val tmdbId: String,
-    val title: String,
-    val artist: String? = null,
-    val directorId: String? = null,
-    val year: Int? = null,
-    val genres: String? = null,
-    val label: String? = null,
-    val country: String? = null,
-    val overview: String? = null,
-    val artworkUrl: String? = null,
-    val thumb: String? = null,
-)
-
-@Serializable
 data class OpenLibraryResultDto(
     val workKey: String,
     val title: String,
@@ -48,19 +33,10 @@ data class RawgSearchResultDto(
     val year: Int? = null,
     val thumb: String? = null,
     val genres: String? = null,
-)
-
-@Serializable
-data class RawgGameDto(
-    val rawgId: String,
-    val title: String,
-    val artist: String? = null,
-    val year: Int? = null,
-    val label: String? = null,
-    val genres: String? = null,
-    val overview: String? = null,
-    val artworkUrl: String? = null,
-    val thumb: String? = null,
+    // RAWG reports platforms, which RawgService maps to a Crate format value.
+    // Carried through so picking a game fills Platform in — enrichment matches
+    // on format server-side, so leaving it empty also degrades enrichment.
+    val format: String? = null,
 )
 
 @Serializable
@@ -70,18 +46,6 @@ data class ComicVineSearchResultDto(
     val year: Int? = null,
     val label: String? = null,
     val genres: String? = null,
-    val thumb: String? = null,
-)
-
-@Serializable
-data class ComicVineVolumeDto(
-    val comicVineId: String,
-    val title: String,
-    val year: Int? = null,
-    val label: String? = null,
-    val genres: String? = null,
-    val overview: String? = null,
-    val artworkUrl: String? = null,
     val thumb: String? = null,
 )
 

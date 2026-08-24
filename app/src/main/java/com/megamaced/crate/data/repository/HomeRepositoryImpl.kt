@@ -2,6 +2,7 @@ package com.megamaced.crate.data.repository
 
 import com.megamaced.crate.data.api.ApiResult
 import com.megamaced.crate.data.api.CrateApiService
+import com.megamaced.crate.data.api.PARSE_FAILURE_CODE
 import com.megamaced.crate.data.api.apiCall
 import com.megamaced.crate.data.db.dao.HomeFeedDao
 import com.megamaced.crate.data.mapper.MediaItemJsonCodec
@@ -25,11 +26,14 @@ class HomeRepositoryImpl
         override suspend fun fetch(): ApiResult<HomeFeed> {
             val result = apiCall { api.getHome().toDomain() }
             if (result is ApiResult.Success) return result
-            // Fallback to local DB for offline use
-            if (result is ApiResult.NetworkError) {
-                return ApiResult.Success(buildOfflineFeed())
-            }
-            return result
+            // Serve the Room feed whenever the payload never arrived intact:
+            // no connection, or a response the DTO contract couldn't read. A
+            // Home screen built from the cache is far better than a hard error
+            // for either cause, and the cache is what offline use relies on.
+            val serveCache =
+                result is ApiResult.NetworkError ||
+                    (result is ApiResult.HttpError && result.code == PARSE_FAILURE_CODE)
+            return if (serveCache) ApiResult.Success(buildOfflineFeed()) else result
         }
 
         private suspend fun buildOfflineFeed(): HomeFeed {

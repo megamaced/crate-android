@@ -82,7 +82,10 @@ internal object ArtistMemberDtoSerializer : KSerializer<ArtistMemberDto> {
     override fun deserialize(decoder: Decoder): ArtistMemberDto {
         val input = decoder as? JsonDecoder ?: error("ArtistMemberDto only supports JSON")
         return when (val element = input.decodeJsonElement()) {
-            is JsonPrimitive -> ArtistMemberDto(name = element.content)
+            is JsonPrimitive -> {
+                ArtistMemberDto(name = element.content)
+            }
+
             is JsonObject -> {
                 val name = (element["name"] as? JsonPrimitive)?.content
                     ?: error("Artist member object missing 'name'")
@@ -92,7 +95,10 @@ internal object ArtistMemberDtoSerializer : KSerializer<ArtistMemberDto> {
                     ?.toBooleanStrictOrNull()
                 ArtistMemberDto(name = name, active = active)
             }
-            else -> error("Unexpected artist member JSON: $element")
+
+            else -> {
+                error("Unexpected artist member JSON: $element")
+            }
         }
     }
 

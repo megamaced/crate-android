@@ -83,19 +83,26 @@ class ShareSheetViewModel
                         ShareTarget.Category -> shareRepository.listCategoryShares(current.category)
                     }
                 when (result) {
-                    is ApiResult.Success ->
+                    is ApiResult.Success -> {
                         _state.update { it.copy(existingShares = result.value, isLoadingShares = false) }
-                    ApiResult.NetworkError ->
+                    }
+
+                    ApiResult.NetworkError -> {
                         _state.update { it.copy(isLoadingShares = false, errorMessage = "Couldn't reach the server.") }
-                    is ApiResult.HttpError ->
+                    }
+
+                    is ApiResult.HttpError -> {
                         _state.update {
                             it.copy(
                                 isLoadingShares = false,
                                 errorMessage = result.message ?: "Server error (${result.code}).",
                             )
                         }
-                    ApiResult.Unauthorised ->
+                    }
+
+                    ApiResult.Unauthorised -> {
                         _state.update { it.copy(isLoadingShares = false) }
+                    }
                 }
             }
         }
@@ -112,21 +119,28 @@ class ShareSheetViewModel
                     delay(SEARCH_DEBOUNCE_MS)
                     _state.update { it.copy(isSearching = true, errorMessage = null) }
                     when (val result = shareRepository.searchUsers(value.trim())) {
-                        is ApiResult.Success ->
+                        is ApiResult.Success -> {
                             _state.update { it.copy(results = result.value, isSearching = false) }
-                        ApiResult.NetworkError ->
+                        }
+
+                        ApiResult.NetworkError -> {
                             _state.update {
                                 it.copy(isSearching = false, errorMessage = "Couldn't reach the server.")
                             }
-                        is ApiResult.HttpError ->
+                        }
+
+                        is ApiResult.HttpError -> {
                             _state.update {
                                 it.copy(
                                     isSearching = false,
                                     errorMessage = result.message ?: "Server error (${result.code}).",
                                 )
                             }
-                        ApiResult.Unauthorised ->
+                        }
+
+                        ApiResult.Unauthorised -> {
                             _state.update { it.copy(isSearching = false) }
+                        }
                     }
                 }
         }
@@ -137,6 +151,10 @@ class ShareSheetViewModel
 
         fun share(targetUserId: String) {
             val current = _state.value
+            // isWorking is only set inside the coroutine, so it has to be read
+            // here too: a double tap otherwise fires two POSTs and appends the
+            // same person twice.
+            if (current.isWorking) return
             val canWrite = current.grantCanWrite
             viewModelScope.launch {
                 _state.update { it.copy(isWorking = true, errorMessage = null) }
@@ -148,7 +166,7 @@ class ShareSheetViewModel
                         ShareTarget.Category -> shareRepository.shareCategory(current.category, targetUserId, canWrite)
                     }
                 when (result) {
-                    is ApiResult.Success ->
+                    is ApiResult.Success -> {
                         _state.update {
                             it.copy(
                                 isWorking = false,
@@ -157,17 +175,24 @@ class ShareSheetViewModel
                                 existingShares = it.existingShares + result.value,
                             )
                         }
-                    ApiResult.NetworkError ->
+                    }
+
+                    ApiResult.NetworkError -> {
                         _state.update { it.copy(isWorking = false, errorMessage = "Couldn't reach the server.") }
-                    is ApiResult.HttpError ->
+                    }
+
+                    is ApiResult.HttpError -> {
                         _state.update {
                             it.copy(
                                 isWorking = false,
                                 errorMessage = result.message ?: "Server error (${result.code}).",
                             )
                         }
-                    ApiResult.Unauthorised ->
+                    }
+
+                    ApiResult.Unauthorised -> {
                         _state.update { it.copy(isWorking = false) }
+                    }
                 }
             }
         }
@@ -176,24 +201,31 @@ class ShareSheetViewModel
             viewModelScope.launch {
                 _state.update { it.copy(isWorking = true, errorMessage = null) }
                 when (val result = shareRepository.removeShare(shareId)) {
-                    is ApiResult.Success ->
+                    is ApiResult.Success -> {
                         _state.update {
                             it.copy(
                                 isWorking = false,
                                 existingShares = it.existingShares.filterNot { share -> share.id == shareId },
                             )
                         }
-                    ApiResult.NetworkError ->
+                    }
+
+                    ApiResult.NetworkError -> {
                         _state.update { it.copy(isWorking = false, errorMessage = "Couldn't reach the server.") }
-                    is ApiResult.HttpError ->
+                    }
+
+                    is ApiResult.HttpError -> {
                         _state.update {
                             it.copy(
                                 isWorking = false,
                                 errorMessage = result.message ?: "Server error (${result.code}).",
                             )
                         }
-                    ApiResult.Unauthorised ->
+                    }
+
+                    ApiResult.Unauthorised -> {
                         _state.update { it.copy(isWorking = false) }
+                    }
                 }
             }
         }

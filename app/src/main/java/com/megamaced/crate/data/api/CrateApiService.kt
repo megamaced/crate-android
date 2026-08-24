@@ -2,7 +2,6 @@ package com.megamaced.crate.data.api
 
 import com.megamaced.crate.data.api.dto.AddPlaylistItemRequest
 import com.megamaced.crate.data.api.dto.ComicVineSearchResultDto
-import com.megamaced.crate.data.api.dto.ComicVineVolumeDto
 import com.megamaced.crate.data.api.dto.CreateMediaItemRequest
 import com.megamaced.crate.data.api.dto.CreatePlaylistRequest
 import com.megamaced.crate.data.api.dto.CurrencyRequest
@@ -22,14 +21,12 @@ import com.megamaced.crate.data.api.dto.OnlineRecommendationsResponse
 import com.megamaced.crate.data.api.dto.OpenLibraryResultDto
 import com.megamaced.crate.data.api.dto.PaginatedMediaDto
 import com.megamaced.crate.data.api.dto.PlaylistDto
-import com.megamaced.crate.data.api.dto.RawgGameDto
 import com.megamaced.crate.data.api.dto.RawgSearchResultDto
 import com.megamaced.crate.data.api.dto.RecommendationsDto
 import com.megamaced.crate.data.api.dto.RefreshAllDto
 import com.megamaced.crate.data.api.dto.ShareDto
 import com.megamaced.crate.data.api.dto.ShareRequest
 import com.megamaced.crate.data.api.dto.SharedWithMeDto
-import com.megamaced.crate.data.api.dto.TmdbMovieDto
 import com.megamaced.crate.data.api.dto.TmdbSearchResultDto
 import com.megamaced.crate.data.api.dto.TokenRequest
 import com.megamaced.crate.data.api.dto.UserSearchResultDto
@@ -198,6 +195,7 @@ interface CrateApiService {
     @POST(API_BASE + "media/{id}/market-value")
     suspend fun fetchMarketValue(
         @Path("id") id: Long,
+        @Query("currency") currency: String,
     ): MediaItemDto
 
     @OcsResponse
@@ -236,18 +234,6 @@ interface CrateApiService {
         @Path("barcode") barcode: String,
     ): List<DiscogsSearchResultDto>
 
-    @OcsResponse
-    @GET(API_BASE + "discogs/release/{id}")
-    suspend fun discogsRelease(
-        @Path("id") id: String,
-    ): DiscogsSearchResultDto
-
-    @OcsResponse
-    @GET(API_BASE + "discogs/artist/{id}")
-    suspend fun discogsArtist(
-        @Path("id") id: String,
-    ): DiscogsSearchResultDto
-
     // -- TMDB -----------------------------------------------------------------
 
     @OcsResponse
@@ -256,12 +242,6 @@ interface CrateApiService {
         @Query("q") query: String,
     ): List<TmdbSearchResultDto>
 
-    @OcsResponse
-    @GET(API_BASE + "tmdb/movie/{id}")
-    suspend fun tmdbMovie(
-        @Path("id") id: String,
-    ): TmdbMovieDto
-
     // -- Open Library ---------------------------------------------------------
 
     @OcsResponse
@@ -269,12 +249,6 @@ interface CrateApiService {
     suspend fun openLibrarySearch(
         @Query("q") query: String,
     ): List<OpenLibraryResultDto>
-
-    @OcsResponse
-    @GET(API_BASE + "openlibrary/work/{id}")
-    suspend fun openLibraryWork(
-        @Path("id") id: String,
-    ): OpenLibraryResultDto
 
     @OcsResponse
     @GET(API_BASE + "openlibrary/isbn/{isbn}")
@@ -290,12 +264,6 @@ interface CrateApiService {
         @Query("q") query: String,
     ): List<RawgSearchResultDto>
 
-    @OcsResponse
-    @GET(API_BASE + "rawg/game/{id}")
-    suspend fun rawgGame(
-        @Path("id") id: String,
-    ): RawgGameDto
-
     // -- ComicVine ------------------------------------------------------------
 
     @OcsResponse
@@ -303,12 +271,6 @@ interface CrateApiService {
     suspend fun comicVineSearch(
         @Query("q") query: String,
     ): List<ComicVineSearchResultDto>
-
-    @OcsResponse
-    @GET(API_BASE + "comicvine/volume/{id}")
-    suspend fun comicVineVolume(
-        @Path("id") id: String,
-    ): ComicVineVolumeDto
 
     // -- Playlists ------------------------------------------------------------
 

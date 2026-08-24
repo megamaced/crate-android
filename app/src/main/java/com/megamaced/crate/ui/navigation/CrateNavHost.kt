@@ -1,15 +1,13 @@
 package com.megamaced.crate.ui.navigation
 
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.Text
 import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.Lifecycle
 import androidx.navigation.NavHostController
+import androidx.navigation.NavOptionsBuilder
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.megamaced.crate.data.api.dto.SuggestionDto
@@ -61,30 +59,30 @@ fun CrateNavHost(
     ) {
         composable<Destination.Home> {
             HomeScreen(
-                onItemClick = { id -> navController.navigate(Destination.Detail(id)) },
+                onItemClick = { id -> navController.navigateOnce(Destination.Detail(id)) },
             )
         }
         composable<Destination.Collection> {
             CollectionScreen(
-                onItemClick = { id -> navController.navigate(Destination.Detail(id)) },
+                onItemClick = { id -> navController.navigateOnce(Destination.Detail(id)) },
                 onAddItem = { category ->
-                    navController.navigate(Destination.AddEdit(category = category.apiValue))
+                    navController.navigateOnce(Destination.AddEdit(category = category.apiValue))
                 },
                 widthSizeClass = widthSizeClass,
             )
         }
         composable<Destination.Playlists> {
             PlaylistListScreen(
-                onPlaylistClick = { id -> navController.navigate(Destination.PlaylistDetail(id)) },
-                onOpenSharedWithMe = { navController.navigate(Destination.SharedWithMe) },
+                onPlaylistClick = { id -> navController.navigateOnce(Destination.PlaylistDetail(id)) },
+                onOpenSharedWithMe = { navController.navigateOnce(Destination.SharedWithMe) },
             )
         }
         composable<Destination.Search> {
             SearchScreen(
-                onItemClick = { id -> navController.navigate(Destination.Detail(id)) },
+                onItemClick = { id -> navController.navigateOnce(Destination.Detail(id)) },
                 onAddFromExternal = { category, result ->
                     val prefill = Json.encodeToString(ExternalSearchResult.serializer(), result)
-                    navController.navigate(
+                    navController.navigateOnce(
                         Destination.AddEdit(category = category.apiValue, prefillJson = prefill),
                     )
                 },
@@ -92,7 +90,7 @@ fun CrateNavHost(
         }
         composable<Destination.Settings> {
             SettingsScreen(
-                onOpenSharedWithMe = { navController.navigate(Destination.SharedWithMe) },
+                onOpenSharedWithMe = { navController.navigateOnce(Destination.SharedWithMe) },
             )
         }
         composable<Destination.Login> {
@@ -108,7 +106,7 @@ fun CrateNavHost(
             ItemDetailScreen(
                 onBack = { navController.popBackStack() },
                 onEdit = { id, categoryApiValue ->
-                    navController.navigate(Destination.AddEdit(itemId = id, category = categoryApiValue))
+                    navController.navigateOnce(Destination.AddEdit(itemId = id, category = categoryApiValue))
                 },
                 // A genre chip goes back to the list the item lives in — the
                 // shared-category page for a shared item, otherwise the
@@ -118,20 +116,20 @@ fun CrateNavHost(
                 // there is nothing to pop and it simply pushes.
                 onGenreClick = { categoryApiValue, genre, isShared ->
                     if (isShared) {
-                        navController.navigate(
+                        navController.navigateOnce(
                             Destination.SharedCategory(category = categoryApiValue, genre = genre),
                         ) {
                             popUpTo<Destination.SharedCategory> { inclusive = true }
                         }
                     } else {
-                        navController.navigate(
+                        navController.navigateOnce(
                             Destination.Collection(category = categoryApiValue, genre = genre),
                         ) {
                             popUpTo<Destination.Collection> { inclusive = true }
                         }
                     }
                 },
-                onOpenItem = { id -> navController.navigate(Destination.Detail(id)) },
+                onOpenItem = { id -> navController.navigateOnce(Destination.Detail(id)) },
                 // An "If you like this…" suggestion is something the user
                 // doesn't own, so it goes to the add form pre-filled and
                 // defaulted to the wishlist rather than straight into the
@@ -141,7 +139,7 @@ fun CrateNavHost(
                         ExternalSearchResult.serializer(),
                         suggestion.toExternalSearchResult(),
                     )
-                    navController.navigate(
+                    navController.navigateOnce(
                         Destination.AddEdit(
                             category = category.apiValue,
                             prefillJson = prefill,
@@ -158,7 +156,7 @@ fun CrateNavHost(
             AddEditItemScreen(
                 onBack = { navController.popBackStack() },
                 onScan = { categoryApiValue ->
-                    navController.navigate(Destination.Scan(category = categoryApiValue))
+                    navController.navigateOnce(Destination.Scan(category = categoryApiValue))
                 },
                 scanResultJson = scanResultJson,
                 onScanResultConsumed = { backStackEntry.savedStateHandle[SCAN_RESULT_KEY] = null },
@@ -178,22 +176,22 @@ fun CrateNavHost(
         composable<Destination.PlaylistDetail> {
             PlaylistDetailScreen(
                 onBack = { navController.popBackStack() },
-                onItemClick = { id -> navController.navigate(Destination.Detail(id)) },
+                onItemClick = { id -> navController.navigateOnce(Destination.Detail(id)) },
             )
         }
         composable<Destination.SharedWithMe> {
             SharedWithMeScreen(
                 onBack = { navController.popBackStack() },
-                onOpenCategory = { category -> navController.navigate(Destination.SharedCategory(category)) },
-                onPlaylistClick = { id -> navController.navigate(Destination.PlaylistDetail(id)) },
+                onOpenCategory = { category -> navController.navigateOnce(Destination.SharedCategory(category)) },
+                onPlaylistClick = { id -> navController.navigateOnce(Destination.PlaylistDetail(id)) },
             )
         }
         composable<Destination.SharedCategory> {
             SharedCategoryScreen(
                 onBack = { navController.popBackStack() },
-                onItemClick = { id -> navController.navigate(Destination.Detail(id)) },
+                onItemClick = { id -> navController.navigateOnce(Destination.Detail(id)) },
                 onAddItem = { owner, category ->
-                    navController.navigate(
+                    navController.navigateOnce(
                         Destination.AddEdit(category = category, owner = owner),
                     )
                 },
@@ -203,12 +201,19 @@ fun CrateNavHost(
     }
 }
 
-@Composable
-private fun PlaceholderScreen(title: String) {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(title)
-    }
+/**
+ * Push [destination] only while the current entry is RESUMED.
+ *
+ * None of these destinations are launchSingleTop, so a second tap arriving
+ * during the enter transition would stack a duplicate entry — and a duplicate
+ * detail entry means a second ViewModel firing the same refresh, auto-enrich
+ * and market-value writes. Once the first tap starts navigating, the entry it
+ * came from is no longer RESUMED, which is what makes the second tap a no-op.
+ */
+private fun NavHostController.navigateOnce(
+    destination: Destination,
+    builder: NavOptionsBuilder.() -> Unit = {},
+) {
+    if (currentBackStackEntry?.lifecycle?.currentState != Lifecycle.State.RESUMED) return
+    navigate(route = destination, builder = builder)
 }

@@ -168,6 +168,7 @@ fun CollectionScreen(
                         modifier = Modifier.fillMaxSize(),
                         artistFirst = artistFirst,
                     )
+
                     CollectionViewMode.List -> CollectionList(
                         groups = uiState.groups,
                         onItemClick = onItemClick,

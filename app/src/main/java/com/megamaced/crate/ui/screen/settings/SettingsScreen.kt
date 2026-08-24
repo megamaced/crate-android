@@ -55,6 +55,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
@@ -105,11 +106,21 @@ fun SettingsScreen(
             SectionHeader("Categories")
             CategoriesSection(
                 hidden = state.hiddenCategories,
+                writesInFlight = state.categoryWritesInFlight,
                 onSetVisible = viewModel::setCategoryVisible,
             )
 
             SectionHeader("Enrichment")
-            EnrichmentSection(state = state, viewModel = viewModel)
+            EnrichmentSection(
+                discogs = state.discogs,
+                tmdb = state.tmdb,
+                rawg = state.rawg,
+                comicVine = state.comicVine,
+                autoEnrichOnClick = state.market?.autoEnrichOnClick == true,
+                enrichAllProgress = state.enrichAllProgress,
+                onAutoEnrichChange = viewModel::setAutoEnrichOnClick,
+                onEnrichAll = viewModel::enrichAll,
+            )
 
             SectionHeader("Recommendations")
             RecommendationsSection(
@@ -119,7 +130,18 @@ fun SettingsScreen(
             )
 
             SectionHeader("Market")
-            MarketSection(state = state, viewModel = viewModel)
+            MarketSection(
+                isLoading = state.isMarketLoading,
+                discogs = state.discogs,
+                priceCharting = state.priceCharting,
+                currency = state.market?.marketCurrency,
+                currencies = state.currencies,
+                autoFetchMarketRates = state.market?.autoFetchMarketRates == true,
+                refreshAllProgress = state.refreshAllProgress,
+                onCurrencySelected = viewModel::setCurrency,
+                onAutoFetchChange = viewModel::setAutoFetchMarketRates,
+                onRefreshAll = viewModel::refreshAllMarketRates,
+            )
 
             SectionHeader("Tokens")
             TokenEditor(
@@ -162,7 +184,7 @@ fun SettingsScreen(
             }
 
             SectionHeader("Danger zone")
-            DangerZoneSection(viewModel = viewModel)
+            DangerZoneSection(onWipe = viewModel::wipeCollection)
 
             SectionHeader("About")
             AboutSection(
@@ -352,7 +374,6 @@ private fun TokenEditor(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 /**
  * Points at the Tokens section from the sections that depend on it.
  *
@@ -361,6 +382,7 @@ private fun TokenEditor(
  * Rendered only when the relevant token is genuinely absent, and never while
  * the token state is still loading, so it doesn't flash on every open.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun MissingTokenHint(text: String) {
     Text(
@@ -372,25 +394,33 @@ private fun MissingTokenHint(text: String) {
 
 @Composable
 private fun MarketSection(
-    state: SettingsUiState,
-    viewModel: SettingsViewModel,
+    isLoading: Boolean,
+    discogs: TokenState,
+    priceCharting: TokenState,
+    currency: String?,
+    currencies: List<String>,
+    autoFetchMarketRates: Boolean,
+    refreshAllProgress: RefreshAllProgress?,
+    onCurrencySelected: (String) -> Unit,
+    onAutoFetchChange: (Boolean) -> Unit,
+    onRefreshAll: () -> Unit,
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            if (state.isMarketLoading) {
+            if (isLoading) {
                 Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
                 }
                 return@Card
             }
 
-            if (!state.discogs.hasValue &&
-                !state.priceCharting.hasValue &&
-                !state.discogs.isLoading &&
-                !state.priceCharting.isLoading
+            if (!discogs.hasValue &&
+                !priceCharting.hasValue &&
+                !discogs.isLoading &&
+                !priceCharting.isLoading
             ) {
                 MissingTokenHint(
                     "Add a Discogs or PriceCharting token below to enable market values.",
@@ -398,9 +428,9 @@ private fun MarketSection(
             }
 
             CurrencyPicker(
-                selected = state.market?.marketCurrency,
-                currencies = state.currencies,
-                onSelected = viewModel::setCurrency,
+                selected = currency,
+                currencies = currencies,
+                onSelected = onCurrencySelected,
             )
 
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -416,21 +446,21 @@ private fun MarketSection(
                     )
                 }
                 Switch(
-                    checked = state.market?.autoFetchMarketRates == true,
-                    onCheckedChange = viewModel::setAutoFetchMarketRates,
+                    checked = autoFetchMarketRates,
+                    onCheckedChange = onAutoFetchChange,
                 )
             }
 
             HorizontalDivider()
 
-            val refreshing = state.refreshAllProgress != null
+            val refreshing = refreshAllProgress != null
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = "Refresh all market rates",
                         style = MaterialTheme.typography.titleSmall,
                     )
-                    val progress = state.refreshAllProgress
+                    val progress = refreshAllProgress
                     if (progress != null) {
                         Text(
                             text = "Refreshed ${progress.done} of ${progress.total}…",
@@ -448,7 +478,7 @@ private fun MarketSection(
                 if (refreshing) {
                     CircularProgressIndicator(modifier = Modifier.size(24.dp))
                 } else {
-                    IconButton(onClick = viewModel::refreshAllMarketRates) {
+                    IconButton(onClick = onRefreshAll) {
                         Icon(Icons.Filled.Refresh, contentDescription = "Refresh all")
                     }
                 }
@@ -459,15 +489,21 @@ private fun MarketSection(
 
 @Composable
 private fun EnrichmentSection(
-    state: SettingsUiState,
-    viewModel: SettingsViewModel,
+    discogs: TokenState,
+    tmdb: TokenState,
+    rawg: TokenState,
+    comicVine: TokenState,
+    autoEnrichOnClick: Boolean,
+    enrichAllProgress: RefreshAllProgress?,
+    onAutoEnrichChange: (Boolean) -> Unit,
+    onEnrichAll: () -> Unit,
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            val enrichTokens = listOf(state.discogs, state.tmdb, state.rawg, state.comicVine)
+            val enrichTokens = listOf(discogs, tmdb, rawg, comicVine)
             if (enrichTokens.none { it.hasValue } && enrichTokens.none { it.isLoading }) {
                 MissingTokenHint(
                     "Add tokens below to enrich music, films, games and comics. Books use " +
@@ -488,21 +524,21 @@ private fun EnrichmentSection(
                     )
                 }
                 Switch(
-                    checked = state.market?.autoEnrichOnClick == true,
-                    onCheckedChange = viewModel::setAutoEnrichOnClick,
+                    checked = autoEnrichOnClick,
+                    onCheckedChange = onAutoEnrichChange,
                 )
             }
 
             HorizontalDivider()
 
-            val enriching = state.enrichAllProgress != null
+            val enriching = enrichAllProgress != null
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = "Enrich all items",
                         style = MaterialTheme.typography.titleSmall,
                     )
-                    val progress = state.enrichAllProgress
+                    val progress = enrichAllProgress
                     if (progress != null) {
                         Text(
                             text = "Enriched ${progress.done} of ${progress.total}…",
@@ -520,7 +556,7 @@ private fun EnrichmentSection(
                 if (enriching) {
                     CircularProgressIndicator(modifier = Modifier.size(24.dp))
                 } else {
-                    IconButton(onClick = viewModel::enrichAll) {
+                    IconButton(onClick = onEnrichAll) {
                         Icon(Icons.Filled.Refresh, contentDescription = "Enrich all")
                     }
                 }
@@ -595,7 +631,7 @@ private fun ThemeSection(
                         onClick = { onThemeChange(mode) },
                         shape = SegmentedButtonDefaults.itemShape(index = index, count = options.size),
                     ) {
-                        Text(mode.name)
+                        Text(stringResource(mode.labelRes))
                     }
                 }
             }
@@ -662,6 +698,7 @@ private fun RecommendationsSection(
 @Composable
 private fun CategoriesSection(
     hidden: Set<Category>,
+    writesInFlight: Set<Category>,
     onSetVisible: (Category, Boolean) -> Unit,
 ) {
     Card(
@@ -696,9 +733,10 @@ private fun CategoriesSection(
                     )
                     Switch(
                         checked = isVisible,
-                        // Disable only when this is the last visible category —
-                        // you can always un-hide, but you can't hide everything.
-                        enabled = !isVisible || canToggleOff,
+                        // Disabled while this category's own write is in flight,
+                        // and when it is the last visible one — you can always
+                        // un-hide, but you can't hide everything.
+                        enabled = cat !in writesInFlight && (!isVisible || canToggleOff),
                         onCheckedChange = { visible -> onSetVisible(cat, visible) },
                     )
                 }
@@ -708,10 +746,15 @@ private fun CategoriesSection(
 }
 
 @Composable
-private fun DangerZoneSection(viewModel: SettingsViewModel) {
+private fun DangerZoneSection(onWipe: (List<String>) -> Unit) {
     var confirmWipe by remember { mutableStateOf(false) }
-    val scopes = listOf("music", "film", "book", "game", "comic", "playlists")
-    var selected by remember { mutableStateOf(scopes.toSet()) }
+    // Derived from Category so the scopes and their labels can't drift from the
+    // rest of the app — the api values are what the endpoint expects, and the
+    // labels are the app's own plurals ("Films", not "Film").
+    val scopes = remember { Category.entries.map { it.apiValue to it.label } + (PLAYLISTS_SCOPE to "Playlists") }
+    // Nothing pre-selected: this deletes from the server irreversibly, so every
+    // scope is an explicit opt-in and the confirm button starts disabled.
+    var selected by remember { mutableStateOf(emptySet<String>()) }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -746,7 +789,7 @@ private fun DangerZoneSection(viewModel: SettingsViewModel) {
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text("Select categories to permanently delete:")
-                    scopes.forEach { scope ->
+                    scopes.forEach { (scope, label) ->
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             androidx.compose.material3.Checkbox(
                                 checked = scope in selected,
@@ -755,7 +798,7 @@ private fun DangerZoneSection(viewModel: SettingsViewModel) {
                                 },
                             )
                             Text(
-                                text = scope.replaceFirstChar { it.uppercase() },
+                                text = label,
                                 modifier = Modifier.padding(start = 8.dp),
                             )
                         }
@@ -766,7 +809,7 @@ private fun DangerZoneSection(viewModel: SettingsViewModel) {
                 TextButton(
                     onClick = {
                         confirmWipe = false
-                        viewModel.wipeCollection(selected.toList())
+                        onWipe(selected.toList())
                     },
                     enabled = selected.isNotEmpty(),
                 ) { Text("Wipe selected", color = MaterialTheme.colorScheme.error) }
@@ -777,6 +820,9 @@ private fun DangerZoneSection(viewModel: SettingsViewModel) {
         )
     }
 }
+
+/** Scope key the wipe endpoint uses for playlists; the rest are category api values. */
+private const val PLAYLISTS_SCOPE = "playlists"
 
 @Composable
 private fun AboutSection(
@@ -838,36 +884,49 @@ private fun UpdateCheckRow(
         ) {
             Text("Check for updates", style = MaterialTheme.typography.bodyMedium)
             when (state) {
-                UpdateCheckState.Checking ->
+                UpdateCheckState.Checking -> {
                     CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                is UpdateCheckState.Available ->
+                }
+
+                is UpdateCheckState.Available -> {
                     TextButton(onClick = { onOpenRelease(state.htmlUrl) }) {
                         Text("Open ${state.tag}")
                     }
-                else ->
+                }
+
+                else -> {
                     TextButton(onClick = onCheck) { Text("Check") }
+                }
             }
         }
         when (state) {
-            UpdateCheckState.UpToDate ->
+            UpdateCheckState.UpToDate -> {
                 StatusLine(
                     text = "You're on the latest version.",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     onDismiss = onDismiss,
                 )
-            UpdateCheckState.Failed ->
+            }
+
+            UpdateCheckState.Failed -> {
                 StatusLine(
                     text = "Couldn't reach GitHub. Check your connection and try again.",
                     color = MaterialTheme.colorScheme.error,
                     onDismiss = onDismiss,
                 )
-            is UpdateCheckState.Available ->
+            }
+
+            is UpdateCheckState.Available -> {
                 StatusLine(
                     text = "${state.tag} is available on GitHub.",
                     color = MaterialTheme.colorScheme.primary,
                     onDismiss = onDismiss,
                 )
-            UpdateCheckState.Idle, UpdateCheckState.Checking -> Unit
+            }
+
+            UpdateCheckState.Idle, UpdateCheckState.Checking -> {
+                Unit
+            }
         }
     }
 }

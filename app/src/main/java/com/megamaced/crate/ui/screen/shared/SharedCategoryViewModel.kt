@@ -19,10 +19,12 @@ import com.megamaced.crate.ui.screen.collection.formatBuckets
 import com.megamaced.crate.ui.screen.collection.genreBuckets
 import com.megamaced.crate.ui.screen.collection.groupItemsForSort
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -132,7 +134,12 @@ class SharedCategoryViewModel
                     isRefreshing = refreshing,
                     error = storeState.error,
                 )
-            }.stateIn(
+            }.flowOn(
+                // Same filter/sort/group pipeline as the collection view: pure
+                // functions over immutable lists, but far too much work for the
+                // main thread, which is where viewModelScope collects.
+                Dispatchers.Default,
+            ).stateIn(
                 scope = viewModelScope,
                 started = SharingStarted.WhileSubscribed(5_000),
                 initialValue = SharedCategoryUiState(category = category, label = category.label),
@@ -174,6 +181,15 @@ class SharedCategoryViewModel
                 store.refresh()
                 isRefreshing.value = false
             }
+        }
+
+        /**
+         * Clears the error the store latched. Without this the same failure
+         * repeated never changes the value the screen keys its snackbar on, so
+         * a second failed refresh would pass in silence.
+         */
+        fun dismissError() {
+            store.clearError()
         }
     }
 

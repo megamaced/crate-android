@@ -22,7 +22,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
+import okhttp3.MediaType
 import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import timber.log.Timber
@@ -128,8 +130,14 @@ class MediaRepositoryImpl
                 // thread (apiCall's block runs in the caller's context until
                 // the first real suspension).
                 val sanitised = withContext(Dispatchers.Default) { ExifStrip.strip(bytes, mimeType) }
-                val body = sanitised.toRequestBody(mimeType.toMediaType())
-                val part = MultipartBody.Part.createFormData("file", "artwork", body)
+                // Label the part with the type the bytes actually are now —
+                // stripping re-encodes HEIC/WebP to JPEG.
+                val body = sanitised.bytes.toRequestBody(mediaTypeFor(sanitised.mimeType))
+                val part = MultipartBody.Part.createFormData(
+                    "file",
+                    "artwork" + extensionFor(sanitised.mimeType),
+                    body,
+                )
                 binary.uploadArtwork(id, part).close()
                 // Refresh so updatedAt advances and Coil cache key changes.
                 val dto = api.getMediaItem(id)
@@ -155,8 +163,12 @@ class MediaRepositoryImpl
                 // carry GPS, timestamps, camera serials. Decode/re-encode is
                 // CPU-bound; keep it off the main thread.
                 val sanitised = withContext(Dispatchers.Default) { ExifStrip.strip(bytes, mimeType) }
-                val body = sanitised.toRequestBody(mimeType.toMediaType())
-                val part = MultipartBody.Part.createFormData("file", "photo", body)
+                val body = sanitised.bytes.toRequestBody(mediaTypeFor(sanitised.mimeType))
+                val part = MultipartBody.Part.createFormData(
+                    "file",
+                    "photo" + extensionFor(sanitised.mimeType),
+                    body,
+                )
                 binary.uploadPhoto(id, slot, part).close()
                 // Refresh so hasPhoto{slot} flips true and updatedAt advances
                 // (drives Coil cache-key invalidation in the UI).
@@ -275,4 +287,21 @@ class MediaRepositoryImpl
             /** Ids per DELETE, kept well under SQLite's bound-variable ceiling. */
             private const val DELETE_CHUNK = 400
         }
+    }
+
+/**
+ * A wildcard or otherwise unparseable type (ContentResolver.getType can return
+ * null, and the UI falls back to the literal "image/\*") would make
+ * `toMediaType` throw. The server sniffs content rather than trusting the
+ * declared type, so an opaque fallback is safe.
+ */
+private fun mediaTypeFor(mimeType: String): MediaType = mimeType.toMediaTypeOrNull() ?: "application/octet-stream".toMediaType()
+
+private fun extensionFor(mimeType: String): String =
+    when (mimeType) {
+        "image/png" -> ".png"
+        "image/jpeg" -> ".jpg"
+        "image/webp" -> ".webp"
+        "image/gif" -> ".gif"
+        else -> ""
     }

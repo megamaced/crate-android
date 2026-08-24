@@ -10,6 +10,7 @@ import com.megamaced.crate.data.api.dto.RefreshAllDto
 import com.megamaced.crate.data.api.dto.ShareDto
 import com.megamaced.crate.data.api.dto.SharedWithMeDto
 import com.megamaced.crate.data.api.dto.UserSearchResultDto
+import com.megamaced.crate.domain.model.CATEGORY_ORDER
 import com.megamaced.crate.domain.model.Category
 import com.megamaced.crate.domain.model.CategoryFeed
 import com.megamaced.crate.domain.model.CategoryShare
@@ -23,10 +24,13 @@ import com.megamaced.crate.domain.model.UserProfile
 import com.megamaced.crate.domain.model.UserSearchResult
 
 fun HomeFeedDto.toDomain(): HomeFeed {
-    val categoryFeeds = categories.mapNotNull { (key, dto) ->
-        val category = Category.fromApi(key) ?: return@mapNotNull null
-        dto.toDomain(category)
-    }
+    // The server keys this map in created_at DESC order, so section order would
+    // otherwise shift as items are added. Pin it to the app's canonical order.
+    val categoryFeeds = categories
+        .mapNotNull { (key, dto) ->
+            val category = Category.fromApi(key) ?: return@mapNotNull null
+            dto.toDomain(category)
+        }.sortedBy { CATEGORY_ORDER.indexOf(it.category) }
     return HomeFeed(
         categoryFeeds = categoryFeeds,
         recentlyAdded = recentlyAdded.map { it.toDomain() },

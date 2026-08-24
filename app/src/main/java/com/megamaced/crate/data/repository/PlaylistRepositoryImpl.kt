@@ -65,7 +65,12 @@ class PlaylistRepositoryImpl
             name: String,
         ): ApiResult<Playlist> =
             apiCall {
-                val playlist = api.updatePlaylist(id, CreatePlaylistRequest(name))
+                // PlaylistController::update() writes the description
+                // unconditionally and it isn't cached locally, so read the
+                // stored one first and send it back — otherwise renaming from
+                // the phone silently clears a description entered on the web.
+                val description = api.getPlaylist(id).description
+                val playlist = api.updatePlaylist(id, CreatePlaylistRequest(name, description))
                 persistWithItems(playlist)
                 playlist.toDomain()
             }

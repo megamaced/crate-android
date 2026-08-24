@@ -1,5 +1,6 @@
 package com.megamaced.crate.ui.screen.detail
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -16,9 +17,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
@@ -39,6 +40,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -64,16 +66,17 @@ import com.megamaced.crate.R
 import com.megamaced.crate.data.api.dto.SuggestionDto
 import com.megamaced.crate.domain.model.Category
 import com.megamaced.crate.domain.model.MediaItem
+import com.megamaced.crate.domain.model.Track
 import com.megamaced.crate.ui.components.ArtworkImage
 import com.megamaced.crate.ui.components.ArtworkSize
 import com.megamaced.crate.ui.components.LoadingState
 import com.megamaced.crate.ui.components.PhotoImage
 import com.megamaced.crate.ui.components.RecommendationRow
-import com.megamaced.crate.ui.components.SuggestionArt
-import com.megamaced.crate.ui.components.SuggestionEntry
+import com.megamaced.crate.ui.components.SuggestionTarget
 import com.megamaced.crate.ui.screen.collection.genreTokens
 import com.megamaced.crate.ui.screen.share.ShareSheet
 import com.megamaced.crate.ui.screen.share.ShareTarget
+import com.megamaced.crate.ui.theme.crateColors
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -168,7 +171,10 @@ fun ItemDetailScreen(
     ) { innerPadding ->
         val item = uiState.item
         when {
-            uiState.isLoading -> LoadingState(modifier = Modifier.padding(innerPadding))
+            uiState.isLoading -> {
+                LoadingState(modifier = Modifier.padding(innerPadding))
+            }
+
             item == null -> {
                 Box(
                     modifier = Modifier
@@ -179,23 +185,26 @@ fun ItemDetailScreen(
                     Text("Item not found", style = MaterialTheme.typography.bodyLarge)
                 }
             }
-            else -> ItemDetailContent(
-                item = item,
-                activeAction = uiState.activeAction,
-                sharedByUser = uiState.sharedByUser,
-                canWrite = uiState.canWrite,
-                onGenreClick = { genre ->
-                    onGenreClick(item.category.apiValue, genre, uiState.isShared)
-                },
-                recommendations = recommendations,
-                onOpenItem = onOpenItem,
-                onAddSuggestion = { suggestion ->
-                    onAddSuggestion(item.category, suggestion)
-                },
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding),
-            )
+
+            else -> {
+                ItemDetailContent(
+                    item = item,
+                    activeAction = uiState.activeAction,
+                    sharedByUser = uiState.sharedByUser,
+                    canWrite = uiState.canWrite,
+                    onGenreClick = { genre ->
+                        onGenreClick(item.category.apiValue, genre, uiState.isShared)
+                    },
+                    recommendations = recommendations,
+                    onOpenItem = onOpenItem,
+                    onAddSuggestion = { suggestion ->
+                        onAddSuggestion(item.category, suggestion)
+                    },
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding),
+                )
+            }
         }
     }
 
@@ -295,176 +304,186 @@ private fun ItemDetailContent(
     onAddSuggestion: (SuggestionDto) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        modifier = modifier.verticalScroll(rememberScrollState()),
-    ) {
-        Box {
-            ArtworkImage(
-                itemId = item.id,
-                contentDescription = item.title,
-                size = ArtworkSize.Full,
-                updatedAt = item.updatedAt,
-                category = item.category,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(1f),
-            )
-            if (activeAction != null) {
-                Box(
+    // LazyColumn rather than a scrolling Column: a box set's tracklist is
+    // dozens of rows, and a Column composes and measures every one of them
+    // before the first frame can be drawn.
+    LazyColumn(modifier = modifier) {
+        item(key = "hero") {
+            Box {
+                ArtworkImage(
+                    itemId = item.id,
+                    contentDescription = item.title,
+                    size = ArtworkSize.Full,
+                    updatedAt = item.updatedAt,
+                    category = item.category,
                     modifier = Modifier
-                        .fillMaxSize()
-                        .padding(16.dp),
-                    contentAlignment = Alignment.TopEnd,
-                ) {
-                    CircularProgressIndicator(modifier = Modifier.size(28.dp))
+                        .fillMaxWidth()
+                        .aspectRatio(1f),
+                )
+                if (activeAction != null) {
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .padding(16.dp),
+                        contentAlignment = Alignment.TopEnd,
+                    ) {
+                        CircularProgressIndicator(modifier = Modifier.size(28.dp))
+                    }
                 }
             }
         }
 
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            if (sharedByUser != null) {
+        item(key = "metadata") {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                if (sharedByUser != null) {
+                    Text(
+                        text = "Shared by $sharedByUser · ${if (canWrite) "can edit" else "read-only"}",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
                 Text(
-                    text = "Shared by $sharedByUser · ${if (canWrite) "can edit" else "read-only"}",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    text = item.title,
+                    style = MaterialTheme.typography.headlineSmall,
                 )
-            }
-            Text(
-                text = item.title,
-                style = MaterialTheme.typography.headlineSmall,
-            )
-            item.artist?.takeIf { it.isNotBlank() }?.let {
-                Text(
-                    text = it,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+                item.artist?.takeIf { it.isNotBlank() }?.let {
+                    Text(
+                        text = it,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
 
-            ChipRow(item)
+                ChipRow(item)
 
-            GenreChips(item = item, onGenreClick = onGenreClick)
+                GenreChips(item = item, onGenreClick = onGenreClick)
 
-            CategorySpecificFacts(item)
+                CategorySpecificFacts(item)
 
-            if (item.marketValue.isPresent) {
-                MarketValueCard(item)
-            }
+                if (item.marketValue.isPresent) {
+                    MarketValueCard(item)
+                }
 
-            if (item.purchasePrice.isPresent) {
-                PurchasePriceRow(item)
-            }
+                if (item.purchasePrice.isPresent) {
+                    PurchasePriceRow(item)
+                }
 
-            if (item.hasPhoto1 || item.hasPhoto2) {
-                PhotoGallery(item)
-            }
-
-            if (item.tracklist.isNotEmpty()) {
-                SectionHeader("Tracklist")
-                item.tracklist.forEach { track ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        track.position?.let {
-                            Text(
-                                text = it,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        Text(
-                            text = track.title.orEmpty(),
-                            style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.weight(1f),
-                        )
-                        track.duration?.let {
-                            Text(
-                                text = it,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                if (item.hasPhoto1 || item.hasPhoto2) {
+                    PhotoGallery(item)
                 }
             }
+        }
 
-            item.artistBio?.takeIf { it.isNotBlank() }?.let { bio ->
+        if (item.tracklist.isNotEmpty()) {
+            item(key = "tracklist-header") {
                 SectionHeader(
-                    when (item.category) {
-                        Category.Films -> "About the director"
-                        Category.Books -> "About the author"
-                        Category.Games -> "About the developer"
-                        Category.Comics -> "About the publisher"
-                        Category.Music -> "About the artist"
-                    },
+                    text = "Tracklist",
+                    modifier = Modifier.padding(horizontal = 16.dp),
                 )
-                Text(text = bio, style = MaterialTheme.typography.bodyMedium)
             }
-
-            item.notes?.takeIf { it.isNotBlank() }?.let { notes ->
-                SectionHeader("Notes")
-                Text(text = notes, style = MaterialTheme.typography.bodyMedium)
+            // Positional keys: the tracklist is a fixed, replaced-wholesale list
+            // and its own fields aren't unique (two untitled tracks, repeated
+            // positions across discs).
+            itemsIndexed(
+                items = item.tracklist,
+                key = { index, _ -> "track-$index" },
+            ) { _, track ->
+                TrackRow(track = track, modifier = Modifier.padding(horizontal = 16.dp))
             }
+        }
 
-            Spacer(Modifier.height(24.dp))
+        item(key = "prose") {
+            Column(
+                modifier = Modifier.padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                item.artistBio?.takeIf { it.isNotBlank() }?.let { bio ->
+                    SectionHeader(
+                        when (item.category) {
+                            Category.Films -> "About the director"
+                            Category.Books -> "About the author"
+                            Category.Games -> "About the developer"
+                            Category.Comics -> "About the publisher"
+                            Category.Music -> "About the artist"
+                        },
+                    )
+                    Text(text = bio, style = MaterialTheme.typography.bodyMedium)
+                }
+
+                item.notes?.takeIf { it.isNotBlank() }?.let { notes ->
+                    SectionHeader("Notes")
+                    Text(text = notes, style = MaterialTheme.typography.bodyMedium)
+                }
+
+                Spacer(Modifier.height(24.dp))
+            }
         }
 
         // Outside the padded column: RecommendationRow manages its own
         // horizontal padding so its LazyRow can scroll edge to edge.
-        RecommendationRow(
-            title = "More from your crate",
-            entries = recommendations.local.map { suggestion ->
-                SuggestionEntry(
-                    key = "local-${suggestion.id}",
-                    title = suggestion.title,
-                    subtitle = listOfNotNull(suggestion.artist, suggestion.year?.toString())
-                        .joinToString(" · ")
-                        .ifBlank { null },
-                    art = SuggestionArt.Owned(
-                        itemId = suggestion.id,
-                        updatedAt = suggestion.updatedAt,
-                        category = suggestion.category,
-                    ),
-                )
-            },
-            onClick = { entry ->
-                entry.key
-                    .removePrefix("local-")
-                    .toLongOrNull()
-                    ?.let(onOpenItem)
-            },
-        )
+        item(key = "local-suggestions") {
+            RecommendationRow(
+                title = "More from your crate",
+                entries = recommendations.local,
+                onClick = { entry ->
+                    (entry.target as? SuggestionTarget.Owned)?.let { onOpenItem(it.itemId) }
+                },
+            )
+        }
 
-        RecommendationRow(
-            title = "If you like this…",
-            source = recommendations.onlineSource,
-            entries = recommendations.online.mapIndexed { index, suggestion ->
-                SuggestionEntry(
-                    key = "online-$index",
-                    title = suggestion.title,
-                    subtitle = listOfNotNull(suggestion.artist, suggestion.year?.toString())
-                        .joinToString(" · ")
-                        .ifBlank { null },
-                    art = SuggestionArt.Remote(suggestion.thumb ?: suggestion.artworkUrl),
-                )
-            },
-            onClick = { entry ->
-                entry.key
-                    .removePrefix("online-")
-                    .toIntOrNull()
-                    ?.let { recommendations.online.getOrNull(it) }
-                    ?.let(onAddSuggestion)
-            },
-        )
+        item(key = "online-suggestions") {
+            RecommendationRow(
+                title = "If you like this…",
+                source = recommendations.onlineSource,
+                entries = recommendations.online,
+                onClick = { entry ->
+                    (entry.target as? SuggestionTarget.Provider)?.let { onAddSuggestion(it.suggestion) }
+                },
+            )
+        }
 
-        Spacer(Modifier.height(24.dp))
+        item(key = "bottom-spacer") {
+            Spacer(Modifier.height(24.dp))
+        }
+    }
+}
+
+@Composable
+private fun TrackRow(
+    track: Track,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            track.position?.let {
+                Text(
+                    text = it,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Text(
+                text = track.title.orEmpty(),
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.weight(1f),
+            )
+            track.duration?.let {
+                Text(
+                    text = it,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
     }
 }
 
@@ -484,17 +503,22 @@ private fun ChipRow(item: MediaItem) {
         modifier = Modifier.fillMaxWidth(),
     ) {
         chips.forEach { value ->
-            AssistChip(
-                onClick = {},
-                label = {
-                    Text(
-                        text = value,
-                        maxLines = 1,
-                        softWrap = false,
-                    )
-                },
+            // Deliberately not an AssistChip: these carry no action, and a chip
+            // with an empty onClick is announced as a button and takes keyboard
+            // focus, indistinguishable from the genre chips that do navigate.
+            Surface(
                 shape = AssistChipDefaults.shape,
-            )
+                color = MaterialTheme.colorScheme.surface,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+            ) {
+                Text(
+                    text = value,
+                    style = MaterialTheme.typography.labelLarge,
+                    maxLines = 1,
+                    softWrap = false,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                )
+            }
         }
     }
 }
@@ -615,14 +639,16 @@ private fun MarketValueCard(item: MediaItem) {
 }
 
 @Composable
-private fun SectionHeader(text: String) {
+private fun SectionHeader(
+    text: String,
+    modifier: Modifier = Modifier,
+) {
     Text(
         text = text,
         style = MaterialTheme.typography.titleMedium,
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
-            .padding(top = 8.dp)
-            .clip(RoundedCornerShape(0.dp)),
+            .padding(top = 8.dp),
     )
 }
 
@@ -684,7 +710,7 @@ private fun PurchasePriceRow(item: MediaItem) {
                         null
                     }
                 val direction = if (diff >= 0) "+" else "−"
-                val tint = if (diff >= 0) GainGreen else MaterialTheme.colorScheme.error
+                val tint = if (diff >= 0) crateColors.gain else MaterialTheme.colorScheme.error
                 Text(
                     text = "$direction${formatMoney(kotlin.math.abs(diff), priceCurrency)}" +
                         (percent?.let { " ($direction$it%)" } ?: ""),
@@ -692,6 +718,7 @@ private fun PurchasePriceRow(item: MediaItem) {
                     color = tint,
                 )
             }
+
             market != null -> {
                 Text(
                     text = "currencies differ",
@@ -702,8 +729,6 @@ private fun PurchasePriceRow(item: MediaItem) {
         }
     }
 }
-
-private val GainGreen = Color(0xFF4ADE80)
 
 /**
  * Two-up photo strip below the metadata. Tapping a thumbnail opens a

@@ -65,7 +65,15 @@ class AuthInterceptor
 
             val response = chain.proceed(request)
 
-            if (isUserHost && response.code == 401) {
+            // Only a 401 from the Crate API itself proves the app password is
+            // gone. Coil fetches artwork and photos through this same client,
+            // and a reverse proxy, WAF or SSO layer in front of Nextcloud can
+            // answer 401 on unrelated paths — treating those as terminal would
+            // sign the user out and wipe the offline cache spuriously.
+            if (isUserHost &&
+                response.code == 401 &&
+                original.url.encodedPath.contains(CrateApiService.API_BASE)
+            ) {
                 sessionManager.onUnauthorised()
             }
 

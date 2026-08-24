@@ -35,9 +35,12 @@ class EnrichmentRepositoryImpl
                 dto.toDomain()
             }
 
-        override suspend fun fetchMarketValue(itemId: Long): ApiResult<MediaItem> =
+        override suspend fun fetchMarketValue(
+            itemId: Long,
+            currency: String,
+        ): ApiResult<MediaItem> =
             apiCall {
-                val dto = api.fetchMarketValue(itemId)
+                val dto = api.fetchMarketValue(itemId, currency)
                 dao.upsert(dto.toEntity(codec))
                 dto.toDomain()
             }

@@ -35,11 +35,17 @@ class HostInterceptor
             val credentials = tokenStore.getCredentials() ?: return chain.proceed(original)
             val target = credentials.host.toHttpUrlOrNull() ?: return chain.proceed(original)
 
+            // Carry the stored host's base path across too. Nextcloud can be
+            // served from a subdirectory (https://example.com/nextcloud), which
+            // the login flow returns verbatim in `server`; dropping it here
+            // would send every API call to the domain root instead.
+            val basePath = target.encodedPath.trimEnd('/')
             val rewritten = original.url
                 .newBuilder()
                 .scheme(target.scheme)
                 .host(target.host)
                 .port(target.port)
+                .encodedPath(basePath + original.url.encodedPath)
                 .build()
 
             return chain.proceed(

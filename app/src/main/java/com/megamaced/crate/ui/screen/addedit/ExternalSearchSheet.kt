@@ -8,7 +8,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -101,25 +101,35 @@ fun ExternalSearchSheet(
                 contentAlignment = Alignment.Center,
             ) {
                 when {
-                    state.isLoading -> CircularProgressIndicator()
-                    state.errorMessage != null ->
+                    state.isLoading -> {
+                        CircularProgressIndicator()
+                    }
+
+                    state.errorMessage != null -> {
                         Text(
                             text = state.errorMessage!!,
                             color = MaterialTheme.colorScheme.error,
                             style = MaterialTheme.typography.bodyMedium,
                         )
-                    state.results.isEmpty() && state.hasSearched ->
+                    }
+
+                    state.results.isEmpty() && state.hasSearched -> {
                         Text(
                             text = "No results.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
-                    state.results.isNotEmpty() ->
+                    }
+
+                    state.results.isNotEmpty() -> {
                         LazyColumn(
                             modifier = Modifier.fillMaxWidth(),
                             contentPadding = PaddingValues(vertical = 4.dp),
                         ) {
-                            items(state.results, key = { it.identityKey() }) { result ->
+                            itemsIndexed(
+                                state.results,
+                                key = { index, result -> result.listKey(index) },
+                            ) { _, result ->
                                 ExternalResultRow(
                                     result = result,
                                     onClick = {
@@ -130,23 +140,17 @@ fun ExternalSearchSheet(
                                 HorizontalDivider()
                             }
                         }
-                    else ->
+                    }
+
+                    else -> {
                         Text(
                             text = "Type a query and tap search.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                    }
                 }
             }
         }
     }
 }
-
-private fun providerName(category: Category): String =
-    when (category) {
-        Category.Music -> "Discogs"
-        Category.Films -> "TMDB"
-        Category.Books -> "Open Library"
-        Category.Games -> "RAWG"
-        Category.Comics -> "ComicVine"
-    }

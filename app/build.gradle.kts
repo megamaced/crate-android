@@ -31,8 +31,8 @@ android {
         applicationId = "com.megamaced.crate"
         minSdk = 29
         targetSdk = 36
-        versionCode = 24
-        versionName = "1.13.0"
+        versionCode = 25
+        versionName = "1.14.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
@@ -151,6 +151,7 @@ dependencies {
 
     // Secure storage (Tink-backed)
     implementation(libs.androidx.security.crypto)
+    implementation(libs.tink.android)
 
     // EXIF (read orientation before stripping metadata via re-encode)
     implementation(libs.androidx.exifinterface)
@@ -172,6 +173,7 @@ dependencies {
 
     // Barcode scanning (F-Droid friendly)
     implementation(libs.zxing.android.embedded)
+    implementation(libs.zxing.core)
 
     // Logging
     implementation(libs.timber)
@@ -191,7 +193,7 @@ dependencies {
 }
 
 ktlint {
-    version.set("1.5.0")
+    version.set("1.8.0")
     android.set(true)
     ignoreFailures.set(false)
     filter {

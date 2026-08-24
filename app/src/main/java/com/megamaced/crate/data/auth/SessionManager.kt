@@ -4,6 +4,7 @@ import android.content.Context
 import coil3.SingletonImageLoader
 import com.megamaced.crate.data.db.CrateDatabase
 import com.megamaced.crate.data.prefs.UserPreferences
+import com.megamaced.crate.sync.SyncScheduler
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -12,6 +13,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -31,6 +33,7 @@ class SessionManager
         private val tokenStore: TokenStore,
         private val userPreferences: UserPreferences,
         private val database: CrateDatabase,
+        private val syncScheduler: SyncScheduler,
     ) {
         private val _authState = MutableStateFlow<AuthState>(AuthState.Unknown)
         val authState: StateFlow<AuthState> = _authState.asStateFlow()
@@ -55,6 +58,10 @@ class SessionManager
         fun logout() {
             tokenStore.clear()
             _authState.value = AuthState.Unauthenticated
+            // Stop the background sync too. Without this the periodic and
+            // foreground workers keep firing against an unresolvable
+            // placeholder host and burn exponential-backoff retries forever.
+            syncScheduler.cancelSync()
             // Clear per-user sync state so logging in as a different
             // Nextcloud account doesn't reuse the previous user's delta
             // cursor (flagged by the Phase 16 audit). Theme + collection
@@ -76,13 +83,30 @@ class SessionManager
             }
         }
 
+        /**
+         * Persists the credentials the login flow returned. Returns false —
+         * leaving the session unauthenticated — when [host] is not a usable
+         * absolute URL, rather than storing a host every later request would
+         * silently fail to reach.
+         */
         fun onLoginSuccess(
             host: String,
             loginName: String,
             appPassword: String,
-        ) {
-            tokenStore.saveCredentials(host, loginName, appPassword)
+        ): Boolean {
+            val parsed = host.toHttpUrlOrNull() ?: return false
+            if (loginName.isBlank() || appPassword.isBlank()) return false
+            // Keep any base path (subdirectory installs) but drop the trailing
+            // slash HttpUrl always renders, so HostInterceptor can concatenate.
+            tokenStore.saveCredentials(
+                parsed.toString().trimEnd('/'),
+                loginName,
+                appPassword,
+            )
             _authState.value = AuthState.Authenticated
+            syncScheduler.ensurePeriodicSync()
+            syncScheduler.syncNow()
+            return true
         }
 
         fun onUnauthorised() {

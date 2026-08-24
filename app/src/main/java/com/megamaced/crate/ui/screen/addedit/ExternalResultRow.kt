@@ -21,6 +21,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.SubcomposeAsyncImage
+import com.megamaced.crate.domain.model.Category
 
 /**
  * One provider result — cover thumbnail, title, and a metadata subtitle.
@@ -83,10 +84,36 @@ internal fun ExternalResultRow(
     }
 }
 
+/**
+ * Stable-enough identity for logging/diffing. NOT unique: only the Discogs
+ * mapper sets [ExternalSearchResult.discogsId], and providers routinely return
+ * several rows sharing a title, author and year (Open Library editions of one
+ * work, same-year TMDB remakes) — or, from a barcode lookup, the same barcode.
+ * Use [listKey] for anything that needs a unique lazy-list key.
+ */
 internal fun ExternalSearchResult.identityKey(): String =
     discogsId
         ?: barcode
         ?: "$title|${artist.orEmpty()}|${year ?: 0}"
+
+/**
+ * Unique key for one row of a provider result list.
+ *
+ * Provider results are replaced wholesale and never reordered, so position is
+ * the only reliable discriminator — [identityKey] alone collides and takes the
+ * lazy list down with `IllegalArgumentException: Key … was already used`.
+ */
+internal fun ExternalSearchResult.listKey(index: Int): String = "$index-${identityKey()}"
+
+/** Display name of the provider backing [category]'s external search. */
+internal fun providerName(category: Category): String =
+    when (category) {
+        Category.Music -> "Discogs"
+        Category.Films -> "TMDB"
+        Category.Books -> "Open Library"
+        Category.Games -> "RAWG"
+        Category.Comics -> "ComicVine"
+    }
 
 private fun buildSubtitle(result: ExternalSearchResult): String? =
     listOfNotNull(

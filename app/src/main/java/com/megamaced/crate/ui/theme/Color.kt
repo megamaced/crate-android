@@ -25,6 +25,12 @@ private val MossOnTertiary = Color(0xFFFFFFFF)
 private val MossTertiaryContainer = Color(0xFFDDEAC3)
 private val MossOnTertiaryContainer = Color(0xFF181E09)
 
+// Material's schemes carry no "success" role, but a market-value gain needs a
+// counterpart to colorScheme.error with the same contrast discipline: a fixed
+// mint green reads at ~1.7:1 on the light surface, nowhere near WCAG's 4.5:1.
+internal val GainLight = Color(0xFF186B3A)
+internal val GainDark = Color(0xFF7BDBA0)
+
 private val ErrorLight = Color(0xFFBA1A1A)
 private val OnErrorLight = Color(0xFFFFFFFF)
 private val ErrorContainerLight = Color(0xFFFFDAD6)

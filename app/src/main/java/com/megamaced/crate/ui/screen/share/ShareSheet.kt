@@ -127,7 +127,11 @@ fun ShareSheet(
                         .heightIn(max = 240.dp),
                 ) {
                     items(state.results, key = { it.userId }) { user ->
-                        UserRow(user = user, onClick = { viewModel.share(user.userId) })
+                        UserRow(
+                            user = user,
+                            enabled = !state.isWorking,
+                            onClick = { viewModel.share(user.userId) },
+                        )
                         HorizontalDivider()
                     }
                 }
@@ -145,14 +149,19 @@ fun ShareSheet(
                 contentAlignment = Alignment.Center,
             ) {
                 when {
-                    state.isLoadingShares -> CircularProgressIndicator()
-                    state.existingShares.isEmpty() ->
+                    state.isLoadingShares -> {
+                        CircularProgressIndicator()
+                    }
+
+                    state.existingShares.isEmpty() -> {
                         Text(
                             text = "No one yet.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
-                    else ->
+                    }
+
+                    else -> {
                         LazyColumn(modifier = Modifier.fillMaxWidth()) {
                             items(state.existingShares, key = { it.id }) { share ->
                                 ExistingShareRow(
@@ -163,6 +172,7 @@ fun ShareSheet(
                                 HorizontalDivider()
                             }
                         }
+                    }
                 }
             }
         }
@@ -172,12 +182,13 @@ fun ShareSheet(
 @Composable
 private fun UserRow(
     user: UserSearchResult,
+    enabled: Boolean,
     onClick: () -> Unit,
 ) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .clickable(enabled = enabled, onClick = onClick)
             .padding(vertical = 12.dp, horizontal = 4.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {

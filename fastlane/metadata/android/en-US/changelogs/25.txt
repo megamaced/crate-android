@@ -1,0 +1,10 @@
+Security and reliability release.
+
+- Login only accepts credentials scoped to the server you typed.
+- Signing out now stops background sync instead of retrying forever.
+- A 401 from a proxy no longer signs you out and clears the cache.
+- Your collection is excluded from cloud backup.
+- Fixes a crash in external search results.
+- Market values use your chosen currency, not always GBP.
+- Subdirectory Nextcloud installs now work.
+- Faster collection, detail and settings screens.

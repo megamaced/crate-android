@@ -1,6 +1,7 @@
 package com.megamaced.crate.data.prefs
 
 import android.content.Context
+import androidx.annotation.StringRes
 import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
@@ -10,6 +11,7 @@ import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.megamaced.crate.R
 import com.megamaced.crate.domain.model.Category
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
@@ -20,10 +22,16 @@ import javax.inject.Singleton
 
 private val Context.dataStore by preferencesDataStore(name = "crate_prefs")
 
-enum class ThemeMode {
-    System,
-    Light,
-    Dark,
+/**
+ * Theme override. [labelRes] exists because the enum name is not display text —
+ * rendering it directly leaves the picker untranslatable.
+ */
+enum class ThemeMode(
+    @param:StringRes val labelRes: Int,
+) {
+    System(R.string.theme_mode_system),
+    Light(R.string.theme_mode_light),
+    Dark(R.string.theme_mode_dark),
 }
 
 enum class CollectionViewMode {

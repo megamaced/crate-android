@@ -74,7 +74,7 @@ class ExternalSearchViewModel
                         }
                     }
                 when (result) {
-                    is ApiResult.Success ->
+                    is ApiResult.Success -> {
                         _state.update {
                             it.copy(
                                 results = result.value,
@@ -83,10 +83,14 @@ class ExternalSearchViewModel
                                 errorMessage = null,
                             )
                         }
-                    ApiResult.NetworkError ->
+                    }
+
+                    ApiResult.NetworkError -> {
                         _state.update {
                             it.copy(isLoading = false, hasSearched = true, errorMessage = "Couldn't reach the server.")
                         }
+                    }
+
                     is ApiResult.HttpError -> {
                         val msg =
                             when (result.code) {
@@ -95,8 +99,10 @@ class ExternalSearchViewModel
                             }
                         _state.update { it.copy(isLoading = false, hasSearched = true, errorMessage = msg) }
                     }
-                    ApiResult.Unauthorised ->
+
+                    ApiResult.Unauthorised -> {
                         _state.update { it.copy(isLoading = false) }
+                    }
                 }
             }
         }

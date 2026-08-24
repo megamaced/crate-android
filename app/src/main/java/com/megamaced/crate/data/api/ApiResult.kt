@@ -2,9 +2,22 @@ package com.megamaced.crate.data.api
 
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.SerializationException
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonObject
 import retrofit2.HttpException
 import timber.log.Timber
 import java.io.IOException
+
+/**
+ * [ApiResult.HttpError.code] used when the failure never reached the HTTP
+ * layer — a response that didn't match the DTO contract, or an unexpected
+ * exception. Callers that can degrade gracefully (serving a cached copy)
+ * treat it like [ApiResult.NetworkError].
+ */
+const val PARSE_FAILURE_CODE = -1
 
 sealed interface ApiResult<out T> {
     data class Success<T>(
@@ -21,13 +34,43 @@ sealed interface ApiResult<out T> {
     data object Unauthorised : ApiResult<Nothing>
 }
 
+/**
+ * The best server-supplied explanation for a failed request.
+ *
+ * Crate's controllers answer a validation failure with an OCS envelope
+ * carrying the reason in `ocs.data.error` (and sometimes `ocs.meta.message`).
+ * The HTTP reason phrase that [HttpException.message] exposes is an empty
+ * string over HTTP/2 — the normal case for Nextcloud behind TLS — so it is
+ * only a last resort, and blank is reported as no message at all so callers
+ * fall back to their own wording.
+ */
+fun ocsErrorMessage(e: HttpException): String? {
+    val body = runCatching { e.response()?.errorBody()?.string() }.getOrNull()
+    return body?.let(::parseOcsError) ?: e.message().orEmpty().ifBlank { null }
+}
+
+private val errorBodyJson = Json { ignoreUnknownKeys = true }
+
+private fun parseOcsError(body: String): String? =
+    runCatching {
+        val ocs = errorBodyJson.parseToJsonElement(body).jsonObject["ocs"]?.jsonObject
+        val fromData = (ocs?.get("data") as? JsonObject)?.stringOrNull("error")
+        val fromMeta = (ocs?.get("meta") as? JsonObject)?.stringOrNull("message")
+        fromData ?: fromMeta
+    }.getOrNull()
+
+private fun JsonObject.stringOrNull(key: String): String? =
+    (this[key] as? JsonPrimitive)
+        ?.contentOrNull
+        ?.takeIf { it.isNotBlank() }
+
 suspend inline fun <T> apiCall(crossinline block: suspend () -> T): ApiResult<T> =
     try {
         ApiResult.Success(block())
     } catch (e: HttpException) {
         when (e.code()) {
             401 -> ApiResult.Unauthorised
-            else -> ApiResult.HttpError(e.code(), e.message())
+            else -> ApiResult.HttpError(e.code(), ocsErrorMessage(e))
         }
     } catch (e: OcsException) {
         // OCS 997 == "not authenticated"; treat it like an HTTP 401.
@@ -48,8 +91,8 @@ suspend inline fun <T> apiCall(crossinline block: suspend () -> T): ApiResult<T>
         // mismatch, backend drift). Distinguish it from a generic failure so
         // the user sees an intelligible message instead of "Server error (-1)".
         Timber.e(e, "Failed to parse server response")
-        ApiResult.HttpError(-1, "Unexpected response from server.")
+        ApiResult.HttpError(PARSE_FAILURE_CODE, "Unexpected response from server.")
     } catch (e: Exception) {
         Timber.e(e, "Unexpected API error")
-        ApiResult.HttpError(-1, e.message)
+        ApiResult.HttpError(PARSE_FAILURE_CODE, e.message)
     }

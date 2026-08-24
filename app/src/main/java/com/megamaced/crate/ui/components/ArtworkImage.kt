@@ -12,11 +12,13 @@ import androidx.compose.material.icons.outlined.AutoStories
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import coil3.compose.AsyncImage
 import coil3.compose.SubcomposeAsyncImage
 import coil3.request.ImageRequest
 import com.megamaced.crate.data.api.PlaceholderHost
@@ -48,24 +50,44 @@ fun ArtworkImage(
     category: Category? = null,
 ) {
     val context = LocalContext.current
-    val url = PlaceholderHost.urlPath("apps/crate/artwork/$itemId?size=${size.apiValue}")
-    val cacheKey = "artwork-$itemId-${size.apiValue}-${updatedAt.orEmpty()}"
+    // This is the hottest composable in the app — every grid cell, list row and
+    // suggestion tile. Without remember, each frame rebuilt the request and its
+    // three strings for every visible cell.
+    val request = remember(context, itemId, size, updatedAt) {
+        val cacheKey = "artwork-$itemId-${size.apiValue}-${updatedAt.orEmpty()}"
+        ImageRequest
+            .Builder(context)
+            .data(PlaceholderHost.urlPath("apps/crate/artwork/$itemId?size=${size.apiValue}"))
+            .memoryCacheKey(cacheKey)
+            .diskCacheKey(cacheKey)
+            .build()
+    }
 
-    val request = ImageRequest
-        .Builder(context)
-        .data(url)
-        .memoryCacheKey(cacheKey)
-        .diskCacheKey(cacheKey)
-        .build()
+    if (size == ArtworkSize.Full) {
+        // One instance on screen at a time (the detail hero), so a subcomposed
+        // placeholder is affordable here and nowhere else.
+        SubcomposeAsyncImage(
+            model = request,
+            contentDescription = contentDescription,
+            contentScale = contentScale,
+            modifier = modifier,
+            loading = { ArtworkPlaceholder(category = category, modifier = Modifier.fillMaxSize()) },
+            error = { ArtworkPlaceholder(category = category, modifier = Modifier.fillMaxSize()) },
+        )
+        return
+    }
 
-    SubcomposeAsyncImage(
-        model = request,
-        contentDescription = contentDescription,
-        contentScale = contentScale,
-        modifier = modifier,
-        loading = { ArtworkPlaceholder(category = category, modifier = Modifier.fillMaxSize()) },
-        error = { ArtworkPlaceholder(category = category, modifier = Modifier.fillMaxSize()) },
-    )
+    // AsyncImage over a drawn placeholder: no per-cell subcomposition, and the
+    // placeholder simply stays visible while loading and after a failure.
+    Box(modifier = modifier) {
+        ArtworkPlaceholder(category = category, modifier = Modifier.matchParentSize())
+        AsyncImage(
+            model = request,
+            contentDescription = contentDescription,
+            contentScale = contentScale,
+            modifier = Modifier.matchParentSize(),
+        )
+    }
 }
 
 @Composable

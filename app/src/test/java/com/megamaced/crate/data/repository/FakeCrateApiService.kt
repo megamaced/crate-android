@@ -3,7 +3,6 @@ package com.megamaced.crate.data.repository
 import com.megamaced.crate.data.api.CrateApiService
 import com.megamaced.crate.data.api.dto.AddPlaylistItemRequest
 import com.megamaced.crate.data.api.dto.ComicVineSearchResultDto
-import com.megamaced.crate.data.api.dto.ComicVineVolumeDto
 import com.megamaced.crate.data.api.dto.CreateMediaItemRequest
 import com.megamaced.crate.data.api.dto.CreatePlaylistRequest
 import com.megamaced.crate.data.api.dto.CurrencyRequest
@@ -23,14 +22,12 @@ import com.megamaced.crate.data.api.dto.OnlineRecommendationsResponse
 import com.megamaced.crate.data.api.dto.OpenLibraryResultDto
 import com.megamaced.crate.data.api.dto.PaginatedMediaDto
 import com.megamaced.crate.data.api.dto.PlaylistDto
-import com.megamaced.crate.data.api.dto.RawgGameDto
 import com.megamaced.crate.data.api.dto.RawgSearchResultDto
 import com.megamaced.crate.data.api.dto.RecommendationsDto
 import com.megamaced.crate.data.api.dto.RefreshAllDto
 import com.megamaced.crate.data.api.dto.ShareDto
 import com.megamaced.crate.data.api.dto.ShareRequest
 import com.megamaced.crate.data.api.dto.SharedWithMeDto
-import com.megamaced.crate.data.api.dto.TmdbMovieDto
 import com.megamaced.crate.data.api.dto.TmdbSearchResultDto
 import com.megamaced.crate.data.api.dto.TokenRequest
 import com.megamaced.crate.data.api.dto.UserSearchResultDto
@@ -130,7 +127,10 @@ class FakeCrateApiService : CrateApiService {
 
     override suspend fun stripEnrichment(id: Long): MediaItemDto = unsupported()
 
-    override suspend fun fetchMarketValue(id: Long): MediaItemDto = unsupported()
+    override suspend fun fetchMarketValue(
+        id: Long,
+        currency: String,
+    ): MediaItemDto = unsupported()
 
     override suspend fun listRefreshableMarketValues(): RefreshAllDto = unsupported()
 
@@ -140,27 +140,15 @@ class FakeCrateApiService : CrateApiService {
 
     override suspend fun discogsBarcode(barcode: String): List<DiscogsSearchResultDto> = unsupported()
 
-    override suspend fun discogsRelease(id: String): DiscogsSearchResultDto = unsupported()
-
-    override suspend fun discogsArtist(id: String): DiscogsSearchResultDto = unsupported()
-
     override suspend fun tmdbSearch(query: String): List<TmdbSearchResultDto> = unsupported()
 
-    override suspend fun tmdbMovie(id: String): TmdbMovieDto = unsupported()
-
     override suspend fun openLibrarySearch(query: String): List<OpenLibraryResultDto> = unsupported()
-
-    override suspend fun openLibraryWork(id: String): OpenLibraryResultDto = unsupported()
 
     override suspend fun openLibraryIsbn(isbn: String): OpenLibraryResultDto = unsupported()
 
     override suspend fun rawgSearch(query: String): List<RawgSearchResultDto> = unsupported()
 
-    override suspend fun rawgGame(id: String): RawgGameDto = unsupported()
-
     override suspend fun comicVineSearch(query: String): List<ComicVineSearchResultDto> = unsupported()
-
-    override suspend fun comicVineVolume(id: String): ComicVineVolumeDto = unsupported()
 
     override suspend fun listPlaylists(): List<PlaylistDto> = unsupported()
 

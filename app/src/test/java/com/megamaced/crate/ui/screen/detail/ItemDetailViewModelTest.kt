@@ -173,7 +173,7 @@ private class FakeMediaRepository : MediaRepository {
 private class FakeEnrichmentRepository : EnrichmentRepository {
     val enrichCalls = mutableListOf<Long>()
     val stripCalls = mutableListOf<Long>()
-    val marketValueCalls = mutableListOf<Long>()
+    val marketValueCalls = mutableListOf<Pair<Long, String>>()
 
     override suspend fun enrich(itemId: Long): ApiResult<MediaItem> {
         enrichCalls += itemId
@@ -185,8 +185,11 @@ private class FakeEnrichmentRepository : EnrichmentRepository {
         return ApiResult.Success(item(itemId))
     }
 
-    override suspend fun fetchMarketValue(itemId: Long): ApiResult<MediaItem> {
-        marketValueCalls += itemId
+    override suspend fun fetchMarketValue(
+        itemId: Long,
+        currency: String,
+    ): ApiResult<MediaItem> {
+        marketValueCalls += itemId to currency
         return ApiResult.Success(item(itemId))
     }
 

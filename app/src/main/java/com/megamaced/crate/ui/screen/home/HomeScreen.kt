@@ -79,13 +79,20 @@ fun HomeScreen(
                 .padding(innerPadding),
         ) {
             when {
-                uiState.isLoading -> LoadingState()
-                uiState.feed == null ->
+                uiState.isLoading -> {
+                    LoadingState()
+                }
+
+                uiState.feed == null -> {
                     EmptyState(
                         title = "Nothing to show",
                         subtitle = "Pull to refresh once your collection has items.",
                     )
-                else -> HomeContent(feed = uiState.feed!!, onItemClick = onItemClick)
+                }
+
+                else -> {
+                    HomeContent(feed = uiState.feed!!, onItemClick = onItemClick)
+                }
             }
         }
     }

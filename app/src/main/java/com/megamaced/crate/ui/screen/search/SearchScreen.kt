@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -48,7 +49,10 @@ import com.megamaced.crate.domain.model.Category
 import com.megamaced.crate.domain.model.MediaItem
 import com.megamaced.crate.ui.components.ArtworkImage
 import com.megamaced.crate.ui.components.CategoryBadge
+import com.megamaced.crate.ui.screen.addedit.ExternalResultRow
 import com.megamaced.crate.ui.screen.addedit.ExternalSearchResult
+import com.megamaced.crate.ui.screen.addedit.listKey
+import com.megamaced.crate.ui.screen.addedit.providerName
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -87,19 +91,22 @@ fun SearchScreen(
             )
             TabRow(selected = state.tab, onSelect = viewModel::selectTab)
             when (state.tab) {
-                SearchTab.Collection ->
+                SearchTab.Collection -> {
                     CollectionResults(
                         query = state.query,
                         results = state.collectionResults,
                         onItemClick = onItemClick,
                     )
-                SearchTab.External ->
+                }
+
+                SearchTab.External -> {
                     ExternalResults(
                         state = state,
                         onCategorySelected = viewModel::selectCategory,
                         onSearch = viewModel::runExternalSearch,
                         onPick = { result -> onAddFromExternal(state.externalCategory, result) },
                     )
+                }
             }
         }
     }
@@ -161,11 +168,15 @@ private fun CollectionResults(
     onItemClick: (Long) -> Unit,
 ) {
     when {
-        query.isBlank() ->
+        query.isBlank() -> {
             Hint("Type to filter your local collection.")
-        results.isEmpty() ->
+        }
+
+        results.isEmpty() -> {
             Hint("No matches in your collection.")
-        else ->
+        }
+
+        else -> {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(vertical = 8.dp),
@@ -175,6 +186,7 @@ private fun CollectionResults(
                     HorizontalDivider()
                 }
             }
+        }
     }
 }
 
@@ -194,26 +206,42 @@ private fun ExternalResults(
         )
         Box(modifier = Modifier.fillMaxSize()) {
             when {
-                state.isExternalLoading ->
+                state.isExternalLoading -> {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator()
                     }
-                state.query.isBlank() ->
+                }
+
+                state.query.isBlank() -> {
                     Hint("Type a query then tap search to look up ${providerName(state.externalCategory)}.")
-                state.externalResults.isEmpty() && state.externalHasSearched ->
+                }
+
+                state.externalResults.isEmpty() && state.externalHasSearched -> {
                     Hint("No results from ${providerName(state.externalCategory)}.")
-                state.externalResults.isEmpty() ->
+                }
+
+                state.externalResults.isEmpty() -> {
                     Hint("Tap search to look up ${providerName(state.externalCategory)}.", showSearch = true, onSearch = onSearch)
-                else ->
+                }
+
+                else -> {
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(vertical = 8.dp),
                     ) {
-                        items(state.externalResults, key = { it.identityKey() }) { result ->
-                            ExternalRow(result = result, onClick = { onPick(result) })
+                        itemsIndexed(
+                            state.externalResults,
+                            key = { index, result -> result.listKey(index) },
+                        ) { _, result ->
+                            ExternalResultRow(
+                                result = result,
+                                onClick = { onPick(result) },
+                                modifier = Modifier.padding(horizontal = 16.dp),
+                            )
                             HorizontalDivider()
                         }
                     }
+                }
             }
         }
     }
@@ -298,43 +326,6 @@ private fun CollectionRow(
 }
 
 @Composable
-private fun ExternalRow(
-    result: ExternalSearchResult,
-    onClick: () -> Unit,
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(2.dp),
-    ) {
-        Text(
-            text = result.title.ifBlank { "(untitled)" },
-            style = MaterialTheme.typography.titleSmall,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-        )
-        val sub =
-            result.subtitle ?: listOfNotNull(
-                result.artist?.takeIf { it.isNotBlank() },
-                result.year?.toString(),
-                result.format?.takeIf { it.isNotBlank() },
-                result.label?.takeIf { it.isNotBlank() },
-            ).joinToString(" · ").ifBlank { null }
-        if (!sub.isNullOrBlank()) {
-            Text(
-                text = sub,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-    }
-}
-
-@Composable
 private fun Hint(
     text: String,
     showSearch: Boolean = false,
@@ -368,17 +359,3 @@ private fun Hint(
         }
     }
 }
-
-private fun ExternalSearchResult.identityKey(): String =
-    discogsId
-        ?: barcode
-        ?: "$title|${artist.orEmpty()}|${year ?: 0}"
-
-private fun providerName(category: Category): String =
-    when (category) {
-        Category.Music -> "Discogs"
-        Category.Films -> "TMDB"
-        Category.Books -> "Open Library"
-        Category.Games -> "RAWG"
-        Category.Comics -> "ComicVine"
-    }

@@ -10,7 +10,9 @@ package com.megamaced.crate.domain.model
 // item is shared more than one way.
 
 // Standard category order used across the app (mirrors HomeView display order).
-private val CATEGORY_ORDER =
+// The server returns per-category maps in insertion order (created_at DESC), so
+// anything rendering category sections has to impose this order itself.
+internal val CATEGORY_ORDER =
     listOf(Category.Music, Category.Films, Category.Books, Category.Games, Category.Comics)
 
 data class SharedCategorySummary(

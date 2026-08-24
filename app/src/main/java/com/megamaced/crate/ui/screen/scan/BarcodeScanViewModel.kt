@@ -88,14 +88,18 @@ class BarcodeScanViewModel
                     }
                 }
             when (result) {
-                is ApiResult.Success ->
+                is ApiResult.Success -> {
                     _uiState.update {
                         it.copy(isLooking = false, candidates = result.value, errorMessage = null)
                     }
-                ApiResult.NetworkError ->
+                }
+
+                ApiResult.NetworkError -> {
                     _uiState.update {
                         it.copy(isLooking = false, errorMessage = "Couldn't reach the server.")
                     }
+                }
+
                 is ApiResult.HttpError -> {
                     val msg =
                         when (result.code) {
@@ -105,8 +109,10 @@ class BarcodeScanViewModel
                         }
                     _uiState.update { it.copy(isLooking = false, errorMessage = msg) }
                 }
-                ApiResult.Unauthorised ->
+
+                ApiResult.Unauthorised -> {
                     _uiState.update { it.copy(isLooking = false) }
+                }
             }
         }
     }

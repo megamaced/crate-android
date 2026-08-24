@@ -8,6 +8,7 @@ import com.megamaced.crate.data.auth.NextcloudLoginFlow
 import com.megamaced.crate.data.auth.SessionManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -35,11 +36,21 @@ class LoginViewModel
         private val _uiState = MutableStateFlow(LoginUiState())
         val uiState: StateFlow<LoginUiState> = _uiState.asStateFlow()
 
+        /**
+         * The in-flight login attempt. Tracked so a fresh attempt cancels the
+         * previous long-poll instead of leaving it running — two concurrent
+         * flows would each be able to mint an app password.
+         */
+        private var flowJob: Job? = null
+
         fun onHostChanged(host: String) {
             _uiState.update { it.copy(hostInput = host, error = null) }
         }
 
         fun startLogin() {
+            // The Go key on the keyboard is not gated on isLoading/isPolling
+            // the way the button is, so guard the entry point itself.
+            if (_uiState.value.isLoading || _uiState.value.isPolling) return
             val host = _uiState.value.hostInput.trim()
             if (host.isBlank()) {
                 _uiState.update { it.copy(error = "Enter your Nextcloud server URL") }
@@ -57,12 +68,13 @@ class LoginViewModel
 
             _uiState.update { it.copy(isLoading = true, error = null) }
 
-            viewModelScope.launch {
+            flowJob?.cancel()
+            flowJob = viewModelScope.launch {
                 val result = withContext(Dispatchers.IO) {
                     loginFlow.initiate(normalisedHost)
                 }
                 result.fold(
-                    onSuccess = { initResponse -> onFlowInitiated(initResponse) },
+                    onSuccess = { initResponse -> onFlowInitiated(initResponse, normalisedHost) },
                     onFailure = { e ->
                         _uiState.update {
                             it.copy(isLoading = false, error = e.message ?: "Connection failed")
@@ -72,7 +84,10 @@ class LoginViewModel
             }
         }
 
-        private fun onFlowInitiated(initResponse: LoginFlowInitResponse) {
+        private fun onFlowInitiated(
+            initResponse: LoginFlowInitResponse,
+            normalisedHost: String,
+        ) {
             _uiState.update {
                 it.copy(
                     isLoading = false,
@@ -81,24 +96,39 @@ class LoginViewModel
                 )
             }
 
-            viewModelScope.launch {
+            flowJob = viewModelScope.launch {
                 val status = withContext(Dispatchers.IO) {
-                    loginFlow.poll(initResponse.poll.endpoint, initResponse.poll.token)
+                    loginFlow.poll(
+                        endpoint = initResponse.poll.endpoint,
+                        token = initResponse.poll.token,
+                        expectedOrigin = normalisedHost,
+                    )
                 }
                 when (status) {
                     is LoginFlowStatus.Success -> {
-                        sessionManager.onLoginSuccess(
+                        val stored = sessionManager.onLoginSuccess(
                             host = status.result.server,
                             loginName = status.result.loginName,
                             appPassword = status.result.appPassword,
                         )
-                        _uiState.update { it.copy(isPolling = false, loginSuccess = true) }
+                        if (stored) {
+                            _uiState.update { it.copy(isPolling = false, loginSuccess = true) }
+                        } else {
+                            _uiState.update {
+                                it.copy(
+                                    isPolling = false,
+                                    error = "The server returned an address Crate can't use.",
+                                )
+                            }
+                        }
                     }
+
                     is LoginFlowStatus.Error -> {
                         _uiState.update {
                             it.copy(isPolling = false, error = status.message)
                         }
                     }
+
                     LoginFlowStatus.Polling -> { /* unreachable from poll() return */ }
                 }
             }

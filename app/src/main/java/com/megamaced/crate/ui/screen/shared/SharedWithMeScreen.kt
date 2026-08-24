@@ -89,13 +89,18 @@ fun SharedWithMeScreen(
                 .padding(innerPadding),
         ) {
             when {
-                state.isLoading -> LoadingState()
-                state.isEmpty ->
+                state.isLoading -> {
+                    LoadingState()
+                }
+
+                state.isEmpty -> {
                     EmptyState(
                         title = "Nothing shared with you",
                         subtitle = "Ask a Nextcloud user to share something from their collection.",
                     )
-                else ->
+                }
+
+                else -> {
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(vertical = 8.dp),
@@ -121,6 +126,7 @@ fun SharedWithMeScreen(
                             }
                         }
                     }
+                }
             }
         }
     }

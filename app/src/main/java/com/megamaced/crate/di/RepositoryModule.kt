@@ -15,6 +15,8 @@ import com.megamaced.crate.domain.repository.MediaRepository
 import com.megamaced.crate.domain.repository.PlaylistRepository
 import com.megamaced.crate.domain.repository.SettingsRepository
 import com.megamaced.crate.domain.repository.ShareRepository
+import com.megamaced.crate.util.ContentResolverImageReader
+import com.megamaced.crate.util.PickedImageReader
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
@@ -53,6 +55,10 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindCurrentSession(impl: TokenStoreCurrentSession): CurrentSession
+
+    @Binds
+    @Singleton
+    abstract fun bindPickedImageReader(impl: ContentResolverImageReader): PickedImageReader
 
     companion object {
         @Provides

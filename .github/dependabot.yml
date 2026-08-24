@@ -1,0 +1,16 @@
+version: 2
+updates:
+  - package-ecosystem: gradle
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      androidx:
+        patterns: ['androidx.*']
+
+  # Also keeps the commit-SHA pins in .github/workflows up to date, which is
+  # what makes pinning to a SHA maintainable rather than a one-off.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

@@ -22,6 +22,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import com.megamaced.crate.data.api.dto.SuggestionDto
 import com.megamaced.crate.domain.model.Category
 
 /**
@@ -43,11 +44,30 @@ sealed interface SuggestionArt {
     ) : SuggestionArt
 }
 
+/**
+ * What tapping a suggestion should do. Typed, so the row's click handler works
+ * off the payload rather than parsing an id back out of [SuggestionEntry.key] —
+ * a key-format change would break navigation with nothing to catch it.
+ */
+sealed interface SuggestionTarget {
+    /** Something already in the collection: open its detail screen. */
+    data class Owned(
+        val itemId: Long,
+    ) : SuggestionTarget
+
+    /** A provider row the user doesn't own: open the add form pre-filled. */
+    data class Provider(
+        val suggestion: SuggestionDto,
+    ) : SuggestionTarget
+}
+
 data class SuggestionEntry(
+    /** List identity only — never a carrier for the payload. */
     val key: String,
     val title: String,
     val subtitle: String?,
     val art: SuggestionArt,
+    val target: SuggestionTarget,
 )
 
 /**
@@ -99,7 +119,7 @@ fun RecommendationRow(
                         .clip(RoundedCornerShape(8.dp))
 
                     when (val art = entry.art) {
-                        is SuggestionArt.Owned ->
+                        is SuggestionArt.Owned -> {
                             ArtworkImage(
                                 itemId = art.itemId,
                                 contentDescription = entry.title,
@@ -107,14 +127,16 @@ fun RecommendationRow(
                                 category = art.category,
                                 modifier = artModifier,
                             )
+                        }
 
-                        is SuggestionArt.Remote ->
+                        is SuggestionArt.Remote -> {
                             AsyncImage(
                                 model = art.url,
                                 contentDescription = entry.title,
                                 contentScale = ContentScale.Crop,
                                 modifier = artModifier,
                             )
+                        }
                     }
 
                     Text(

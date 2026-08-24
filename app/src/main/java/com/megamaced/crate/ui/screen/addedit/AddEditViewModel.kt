@@ -14,12 +14,15 @@ import com.megamaced.crate.domain.model.UserProfile
 import com.megamaced.crate.domain.repository.EnrichmentRepository
 import com.megamaced.crate.domain.repository.MediaRepository
 import com.megamaced.crate.domain.repository.SettingsRepository
+import com.megamaced.crate.util.MAX_PICKED_IMAGE_BYTES
+import com.megamaced.crate.util.PickedImageReader
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.util.Calendar
 import javax.inject.Inject
@@ -50,6 +53,7 @@ val DEFAULT_CURRENCIES = listOf(
     "ZAR",
 )
 
+@Serializable
 data class AddEditUiState(
     val isEditing: Boolean = false,
     val editingItemId: Long? = null,
@@ -75,7 +79,7 @@ data class AddEditUiState(
     val status: Status = Status.Owned,
     val category: Category = Category.Music,
     val autoEnrich: Boolean = false,
-    val pendingArtwork: PendingArtwork? = null,
+    val pendingArtwork: PendingImage? = null,
     /**
      * Cover URL supplied by an enrichment source (Discogs/TMDB/etc.). Shown
      * in the artwork preview before save; on save the backend caches the
@@ -90,8 +94,8 @@ data class AddEditUiState(
      * and a Remove flag that flips when the user clears an existing photo.
      * The presence flags come from the loaded item.
      */
-    val pendingPhoto1: PendingArtwork? = null,
-    val pendingPhoto2: PendingArtwork? = null,
+    val pendingPhoto1: PendingImage? = null,
+    val pendingPhoto2: PendingImage? = null,
     val removePhoto1: Boolean = false,
     val removePhoto2: Boolean = false,
     val hasPhoto1: Boolean = false,
@@ -104,9 +108,24 @@ data class AddEditUiState(
     val availableCurrencies: List<String> = DEFAULT_CURRENCIES,
     val errorMessage: String? = null,
     val savedItemId: Long? = null,
+    /**
+     * True when the item saved but at least one photo slot didn't. Reported
+     * before the screen pops, so the user isn't left believing a photo
+     * uploaded when it didn't.
+     */
+    val photoUploadFailed: Boolean = false,
 ) {
     val yearError: Boolean
         get() = year.isNotBlank() && (year.toIntOrNull()?.let { it !in MIN_YEAR..CURRENT_YEAR } ?: true)
+
+    /**
+     * True when a format is set that isn't one of the category's known values —
+     * a provider can hand back a platform or format string Crate doesn't file
+     * under. Advisory only: the server accepts free text, so this warns rather
+     * than blocking the save.
+     */
+    val formatUnrecognised: Boolean
+        get() = format.isNotBlank() && !CategoryFormats.isValid(category, format)
 
     val canSave: Boolean
         get() = title.isNotBlank() &&
@@ -121,12 +140,24 @@ data class AddEditUiState(
             (isEditing && !removeArtwork && editingItemId != null)
 }
 
-data class PendingArtwork(
-    val bytes: ByteArray,
+/**
+ * An image the user picked but hasn't uploaded yet, held as the content Uri
+ * rather than its bytes: reading eagerly would block the main thread on a
+ * cloud-only photo, three decoded images risk an OOM, and the bytes could
+ * never survive [SavedStateHandle]'s 1 MB transaction limit.
+ */
+@Serializable
+data class PendingImage(
+    val uri: String,
     val mimeType: String,
 )
 
 const val SCAN_RESULT_KEY = "scan_result"
+
+/** Key the in-progress form is parked under across process death. */
+private const val FORM_STATE_KEY = "add_edit_form"
+
+private val formJson = Json { ignoreUnknownKeys = true }
 
 @HiltViewModel
 class AddEditViewModel
@@ -136,6 +167,7 @@ class AddEditViewModel
         private val mediaRepository: MediaRepository,
         private val settingsRepository: SettingsRepository,
         private val enrichmentRepository: EnrichmentRepository,
+        private val imageReader: PickedImageReader,
         private val api: CrateApiService,
     ) : ViewModel() {
         private val itemId: Long? = savedStateHandle.get<Long>("itemId")?.takeIf { it > 0L }
@@ -152,31 +184,63 @@ class AddEditViewModel
         private val categoryLocked: Boolean =
             owner != null && !savedStateHandle.get<String>("category").isNullOrBlank()
 
+        // A form recovered from process death already holds everything the nav
+        // args and the item fetch would supply, so those one-off initialisers
+        // must not run again and overwrite what the user typed.
+        private val restored: AddEditUiState? = readSavedForm()
+
         private val _uiState =
             MutableStateFlow(
-                AddEditUiState(
-                    isEditing = itemId != null,
-                    editingItemId = itemId,
-                    owner = owner,
-                    categoryLocked = categoryLocked,
-                    category = initialCategory,
-                    initialLoading = itemId != null,
-                ),
+                restored
+                    ?: AddEditUiState(
+                        isEditing = itemId != null,
+                        editingItemId = itemId,
+                        owner = owner,
+                        categoryLocked = categoryLocked,
+                        category = initialCategory,
+                        initialLoading = itemId != null,
+                    ),
             )
         val uiState: StateFlow<AddEditUiState> = _uiState.asStateFlow()
 
         init {
-            loadProfileDefaults()
+            // The currency allowlist is server state, not user input, so it is
+            // always re-fetched.
             loadCurrencyOptions()
-            if (itemId != null) loadExisting(itemId)
-            // Before the prefill, so an existing item's own status still wins.
-            if (itemId == null && savedStateHandle.get<Boolean>("defaultWanted") == true) {
-                _uiState.update { it.copy(status = Status.Wanted) }
+            if (restored == null) {
+                loadProfileDefaults()
+                if (itemId != null) loadExisting(itemId)
+                // Before the prefill, so an existing item's own status still wins.
+                if (itemId == null && savedStateHandle.get<Boolean>("defaultWanted") == true) {
+                    update { copy(status = Status.Wanted) }
+                }
+                applyInitialPrefill(savedStateHandle.get<String>("prefillJson"))
             }
-            applyInitialPrefill(savedStateHandle.get<String>("prefillJson"))
             // NB: barcode-scan results (SCAN_RESULT_KEY) are consumed solely by
             // AddEditItemScreen's LaunchedEffect + onScanResultConsumed. Do not
             // also observe them here — two owners resetting the same key races.
+        }
+
+        /**
+         * The parked form, or null when there is nothing usable to restore.
+         *
+         * A snapshot taken while the item fetch was still in flight is
+         * discarded: it holds no user input yet, and keeping it would skip the
+         * fetch and leave an edit form blank.
+         */
+        private fun readSavedForm(): AddEditUiState? {
+            val json = savedStateHandle.get<String>(FORM_STATE_KEY) ?: return null
+            val saved = runCatching { formJson.decodeFromString<AddEditUiState>(json) }.getOrNull()
+            if (saved == null || saved.initialLoading) return null
+            // Drop the in-flight/one-shot flags: the coroutines that owned them
+            // died with the process.
+            return saved.copy(
+                isSaving = false,
+                isLookingUpIsbn = false,
+                errorMessage = null,
+                savedItemId = null,
+                photoUploadFailed = false,
+            )
         }
 
         /**
@@ -189,7 +253,7 @@ class AddEditViewModel
             viewModelScope.launch {
                 val result = apiCall { api.getCurrencies() }
                 if (result is ApiResult.Success && result.value.isNotEmpty()) {
-                    _uiState.update { it.copy(availableCurrencies = result.value) }
+                    update { copy(availableCurrencies = result.value) }
                 }
             }
         }
@@ -204,7 +268,10 @@ class AddEditViewModel
         private fun loadProfileDefaults() {
             viewModelScope.launch {
                 when (val result = settingsRepository.getMe()) {
-                    is ApiResult.Success -> applyProfile(result.value)
+                    is ApiResult.Success -> {
+                        applyProfile(result.value)
+                    }
+
                     else -> { /* Ignore — toggle simply stays off. */ }
                 }
             }
@@ -212,15 +279,15 @@ class AddEditViewModel
 
         private fun applyProfile(profile: UserProfile) {
             val currency = profile.marketCurrency?.takeIf { it.isNotBlank() } ?: DEFAULT_CURRENCY
-            _uiState.update {
-                if (it.isEditing) {
-                    it
+            update {
+                if (isEditing) {
+                    this
                 } else {
-                    it.copy(
+                    copy(
                         autoEnrich = profile.autoEnrichOnClick,
                         // Pre-fill the currency on new items, but only if the
                         // user hasn't already typed one.
-                        purchasePriceCurrency = if (it.purchasePriceCurrency == DEFAULT_CURRENCY) currency else it.purchasePriceCurrency,
+                        purchasePriceCurrency = if (purchasePriceCurrency == DEFAULT_CURRENCY) currency else purchasePriceCurrency,
                     )
                 }
             }
@@ -229,27 +296,33 @@ class AddEditViewModel
         private fun loadExisting(id: Long) {
             viewModelScope.launch {
                 when (val result = mediaRepository.refreshSingle(id)) {
-                    is ApiResult.Success -> populate(result.value)
-                    ApiResult.NetworkError ->
-                        _uiState.update {
-                            it.copy(initialLoading = false, errorMessage = "Couldn't reach the server.")
-                        }
-                    is ApiResult.HttpError ->
-                        _uiState.update {
-                            it.copy(
+                    is ApiResult.Success -> {
+                        populate(result.value)
+                    }
+
+                    ApiResult.NetworkError -> {
+                        update { copy(initialLoading = false, errorMessage = "Couldn't reach the server.") }
+                    }
+
+                    is ApiResult.HttpError -> {
+                        update {
+                            copy(
                                 initialLoading = false,
                                 errorMessage = result.message ?: "Server error (${result.code}).",
                             )
                         }
-                    ApiResult.Unauthorised ->
-                        _uiState.update { it.copy(initialLoading = false) }
+                    }
+
+                    ApiResult.Unauthorised -> {
+                        update { copy(initialLoading = false) }
+                    }
                 }
             }
         }
 
         private fun populate(item: MediaItem) {
-            _uiState.update {
-                it.copy(
+            update {
+                copy(
                     initialLoading = false,
                     title = item.title,
                     artist = item.artist.orEmpty(),
@@ -271,7 +344,7 @@ class AddEditViewModel
                     purchasePriceCurrency =
                         item.purchasePrice.currency
                             ?.takeIf { c -> c.isNotBlank() }
-                            ?: it.purchasePriceCurrency,
+                            ?: purchasePriceCurrency,
                     hasPhoto1 = item.hasPhoto1,
                     hasPhoto2 = item.hasPhoto2,
                 )
@@ -319,7 +392,10 @@ class AddEditViewModel
                         var dotSeen = false
                         for (ch in value.replace(',', '.')) {
                             when {
-                                ch.isDigit() -> append(ch)
+                                ch.isDigit() -> {
+                                    append(ch)
+                                }
+
                                 ch == '.' && !dotSeen -> {
                                     append(ch)
                                     dotSeen = true
@@ -332,15 +408,16 @@ class AddEditViewModel
 
         fun onPurchasePriceCurrencyChange(value: String) = update { copy(purchasePriceCurrency = value) }
 
-        fun onArtworkPicked(
-            bytes: ByteArray,
-            mimeType: String,
-        ) = update {
-            copy(
-                pendingArtwork = PendingArtwork(bytes, mimeType),
-                pendingArtworkUrl = null,
-                removeArtwork = false,
-            )
+        fun onArtworkPicked(uri: String) {
+            acceptPicked(uri) { pending ->
+                update {
+                    copy(
+                        pendingArtwork = pending,
+                        pendingArtworkUrl = null,
+                        removeArtwork = false,
+                    )
+                }
+            }
         }
 
         fun onRemoveArtwork() =
@@ -355,14 +432,38 @@ class AddEditViewModel
 
         fun onPhotoPicked(
             slot: Int,
-            bytes: ByteArray,
-            mimeType: String,
-        ) = update {
-            val pending = PendingArtwork(bytes, mimeType)
-            when (slot) {
-                1 -> copy(pendingPhoto1 = pending, removePhoto1 = false)
-                2 -> copy(pendingPhoto2 = pending, removePhoto2 = false)
-                else -> this
+            uri: String,
+        ) {
+            acceptPicked(uri) { pending ->
+                update {
+                    when (slot) {
+                        1 -> copy(pendingPhoto1 = pending, removePhoto1 = false)
+                        2 -> copy(pendingPhoto2 = pending, removePhoto2 = false)
+                        else -> this
+                    }
+                }
+            }
+        }
+
+        /**
+         * Vets a picked image off the main thread before it enters the form.
+         *
+         * The size check is up front rather than at upload time so an
+         * oversized pick is refused while the user is still looking at the
+         * picker's outcome, not after they press Save.
+         */
+        private fun acceptPicked(
+            uri: String,
+            onAccepted: (PendingImage) -> Unit,
+        ) {
+            viewModelScope.launch {
+                val length = imageReader.length(uri)
+                if (length != null && length > MAX_PICKED_IMAGE_BYTES) {
+                    update { copy(errorMessage = "That image is too large — pick one under 25 MB.") }
+                    return@launch
+                }
+                val mime = imageReader.mimeType(uri) ?: "image/*"
+                onAccepted(PendingImage(uri = uri, mimeType = mime))
             }
         }
 
@@ -376,20 +477,20 @@ class AddEditViewModel
             }
 
         fun applyExternalResult(result: ExternalSearchResult) {
-            _uiState.update { current ->
+            update {
                 val cover = result.coverUrl?.takeIf { it.isNotBlank() }
-                current.copy(
-                    title = result.title.ifBlank { current.title },
-                    artist = result.artist?.takeIf { it.isNotBlank() } ?: current.artist,
-                    format = result.format?.takeIf { it.isNotBlank() } ?: current.format,
-                    year = result.year?.toString() ?: current.year,
-                    barcode = result.barcode?.takeIf { it.isNotBlank() } ?: current.barcode,
-                    label = result.label?.takeIf { it.isNotBlank() } ?: current.label,
-                    country = result.country?.takeIf { it.isNotBlank() } ?: current.country,
-                    discogsId = result.discogsId ?: current.discogsId,
-                    pendingArtworkUrl = cover ?: current.pendingArtworkUrl,
-                    artworkPath = cover ?: current.artworkPath,
-                    removeArtwork = if (cover != null) false else current.removeArtwork,
+                copy(
+                    title = result.title.ifBlank { title },
+                    artist = result.artist?.takeIf { it.isNotBlank() } ?: artist,
+                    format = result.format?.takeIf { it.isNotBlank() } ?: format,
+                    year = result.year?.toString() ?: year,
+                    barcode = result.barcode?.takeIf { it.isNotBlank() } ?: barcode,
+                    label = result.label?.takeIf { it.isNotBlank() } ?: label,
+                    country = result.country?.takeIf { it.isNotBlank() } ?: country,
+                    discogsId = result.discogsId ?: discogsId,
+                    pendingArtworkUrl = cover ?: pendingArtworkUrl,
+                    artworkPath = cover ?: artworkPath,
+                    removeArtwork = if (cover != null) false else removeArtwork,
                 )
             }
         }
@@ -398,7 +499,7 @@ class AddEditViewModel
             val isbn = _uiState.value.barcode.trim()
             if (isbn.isBlank() || _uiState.value.isLookingUpIsbn) return
             viewModelScope.launch {
-                _uiState.update { it.copy(isLookingUpIsbn = true, errorMessage = null) }
+                update { copy(isLookingUpIsbn = true, errorMessage = null) }
                 val result = apiCall { api.openLibraryIsbn(isbn) }
                 when (result) {
                     is ApiResult.Success -> {
@@ -413,21 +514,25 @@ class AddEditViewModel
                                 coverUrl = dto.artworkUrl ?: dto.thumb,
                             ),
                         )
-                        _uiState.update { it.copy(isLookingUpIsbn = false) }
+                        update { copy(isLookingUpIsbn = false) }
                     }
-                    ApiResult.NetworkError ->
-                        _uiState.update {
-                            it.copy(isLookingUpIsbn = false, errorMessage = "Couldn't reach the server.")
-                        }
-                    is ApiResult.HttpError ->
-                        _uiState.update {
-                            it.copy(
+
+                    ApiResult.NetworkError -> {
+                        update { copy(isLookingUpIsbn = false, errorMessage = "Couldn't reach the server.") }
+                    }
+
+                    is ApiResult.HttpError -> {
+                        update {
+                            copy(
                                 isLookingUpIsbn = false,
                                 errorMessage = "ISBN not found in Open Library",
                             )
                         }
-                    ApiResult.Unauthorised ->
-                        _uiState.update { it.copy(isLookingUpIsbn = false) }
+                    }
+
+                    ApiResult.Unauthorised -> {
+                        update { copy(isLookingUpIsbn = false) }
+                    }
                 }
             }
         }
@@ -438,7 +543,7 @@ class AddEditViewModel
             val state = _uiState.value
             if (!state.canSave) return
             viewModelScope.launch {
-                _uiState.update { it.copy(isSaving = true, errorMessage = null) }
+                update { copy(isSaving = true, errorMessage = null, photoUploadFailed = false) }
                 val draft = state.toDraft()
                 val saveResult =
                     if (state.isEditing) {
@@ -450,7 +555,7 @@ class AddEditViewModel
                     is ApiResult.Success -> handleSaved(saveResult.value, state)
                     ApiResult.NetworkError -> setError("Couldn't reach the server.")
                     is ApiResult.HttpError -> setError(saveResult.message ?: "Server error (${saveResult.code}).")
-                    ApiResult.Unauthorised -> _uiState.update { it.copy(isSaving = false) }
+                    ApiResult.Unauthorised -> update { copy(isSaving = false) }
                 }
             }
         }
@@ -465,56 +570,71 @@ class AddEditViewModel
             // so the backend caches them server-side — no client upload needed.
             when {
                 beforeState.pendingArtwork != null -> {
-                    val art = beforeState.pendingArtwork
-                    mediaRepository.uploadArtwork(saved.id, art.bytes, art.mimeType)
+                    val bytes = imageReader.read(beforeState.pendingArtwork.uri)
+                    if (bytes != null) {
+                        mediaRepository.uploadArtwork(saved.id, bytes, beforeState.pendingArtwork.mimeType)
+                    }
                 }
+
                 beforeState.removeArtwork && beforeState.isEditing -> {
                     mediaRepository.deleteArtwork(saved.id)
                 }
             }
             // Same logic applied to each photo slot. Independent of artwork
             // (different endpoint, different appdata folder server-side).
-            applyPhotoSlot(saved.id, slot = 1, beforeState.pendingPhoto1, beforeState.removePhoto1, beforeState.isEditing)
-            applyPhotoSlot(saved.id, slot = 2, beforeState.pendingPhoto2, beforeState.removePhoto2, beforeState.isEditing)
+            val photo1Ok = applyPhotoSlot(saved.id, slot = 1, beforeState.pendingPhoto1, beforeState.removePhoto1, beforeState.isEditing)
+            val photo2Ok = applyPhotoSlot(saved.id, slot = 2, beforeState.pendingPhoto2, beforeState.removePhoto2, beforeState.isEditing)
             if (beforeState.autoEnrich) {
                 enrichmentRepository.enrich(saved.id)
             }
-            _uiState.update { it.copy(isSaving = false, savedItemId = saved.id) }
+            // savedItemId is what pops the screen, so it is set last and in the
+            // same emission as the photo outcome — the screen can then report a
+            // failure before it navigates away.
+            update {
+                copy(
+                    isSaving = false,
+                    photoUploadFailed = !photo1Ok || !photo2Ok,
+                    savedItemId = saved.id,
+                )
+            }
         }
 
+        /** False when the slot had work to do and it failed. */
         private suspend fun applyPhotoSlot(
             itemId: Long,
             slot: Int,
-            pending: PendingArtwork?,
+            pending: PendingImage?,
             remove: Boolean,
             isEditing: Boolean,
-        ) {
+        ): Boolean {
             val result = when {
-                pending != null -> mediaRepository.uploadPhoto(itemId, slot, pending.bytes, pending.mimeType)
-                remove && isEditing -> mediaRepository.deletePhoto(itemId, slot)
-                else -> return
+                pending != null -> {
+                    val bytes = imageReader.read(pending.uri) ?: return false
+                    mediaRepository.uploadPhoto(itemId, slot, bytes, pending.mimeType)
+                }
+
+                remove && isEditing -> {
+                    mediaRepository.deletePhoto(itemId, slot)
+                }
+
+                else -> {
+                    return true
+                }
             }
-            // Surface upload/delete failure to the user — the item save has
-            // already succeeded by this point, so the snackbar tells them
-            // *what* failed without unwinding the save itself.
-            when (result) {
-                is ApiResult.Success -> Unit
-                ApiResult.NetworkError ->
-                    _uiState.update { it.copy(errorMessage = "Photo $slot didn't upload — offline.") }
-                is ApiResult.HttpError ->
-                    _uiState.update {
-                        it.copy(errorMessage = "Photo $slot didn't upload (${result.code}).")
-                    }
-                ApiResult.Unauthorised -> Unit
-            }
+            return result is ApiResult.Success
         }
 
         private fun setError(message: String) {
-            _uiState.update { it.copy(isSaving = false, errorMessage = message) }
+            update { copy(isSaving = false, errorMessage = message) }
         }
 
-        private inline fun update(crossinline block: AddEditUiState.() -> AddEditUiState) {
+        /**
+         * Single funnel for every state write, so the parked copy in
+         * [SavedStateHandle] can never drift from what the form is showing.
+         */
+        private fun update(block: AddEditUiState.() -> AddEditUiState) {
             _uiState.update(block)
+            savedStateHandle[FORM_STATE_KEY] = formJson.encodeToString(_uiState.value)
         }
     }
 
@@ -530,9 +650,12 @@ private fun AddEditUiState.toDraft(): MediaItemDraft {
         status = status,
         category = category,
         discogsId = discogsId,
-        artworkPath = artworkPath,
-        label = label.trim().takeIf { it.isNotBlank() },
-        country = country.trim().takeIf { it.isNotBlank() },
+        // The server reads null as "leave unchanged" and "" as "clear", and the
+        // Json config omits null keys entirely — so an emptied field has to go
+        // out as "" or the old value survives the next fetch.
+        artworkPath = artworkPath.orEmpty(),
+        label = label.trim(),
+        country = country.trim(),
         purchasePrice = price,
         purchasePriceCurrency = if (price != null) purchasePriceCurrency else null,
         // Non-null only for a shared-collection add — routes the create to the

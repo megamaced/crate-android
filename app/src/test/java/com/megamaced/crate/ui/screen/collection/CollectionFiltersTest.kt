@@ -20,6 +20,25 @@ class CollectionFiltersTest {
     }
 
     @Test
+    fun `a JSON array of genres tokenises instead of splitting as text`() {
+        // Older enriched rows can carry the provider's array verbatim; split on
+        // commas it renders chips like `["Rock` that never match a filter.
+        val item = item(1, genres = """["Rock", "Art Rock"]""")
+        assertEquals(listOf("Rock", "Art Rock"), genreTokens(item))
+        assertTrue(hasGenre(item, "art rock"))
+    }
+
+    @Test
+    fun `an empty JSON array yields no genres`() {
+        assertEquals(emptyList<String>(), genreTokens(item(1, genres = "[]")))
+    }
+
+    @Test
+    fun `a bracketed string that isn't valid JSON falls back to comma splitting`() {
+        assertEquals(listOf("[Rock", "Art Rock"), genreTokens(item(1, genres = "[Rock, Art Rock")))
+    }
+
+    @Test
     fun `genre matching is case-insensitive and exact per token`() {
         val item = item(1, genres = "Alternative Rock, Art Rock")
         assertTrue(hasGenre(item, "alternative rock"))

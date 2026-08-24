@@ -1,6 +1,9 @@
 package com.megamaced.crate.ui.screen.collection
 
 import com.megamaced.crate.domain.model.MediaItem
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonPrimitive
 
 // Genre / decade filtering for the collection views, mirroring
 // crate/src/utils/genres.js so web and mobile bucket identically.
@@ -15,13 +18,34 @@ data class FilterBucket(
     val count: Int,
 )
 
-/** An item's genres, split and trimmed. Empty when it has none. */
-internal fun genreTokens(item: MediaItem): List<String> =
-    item.genres
-        .orEmpty()
+private val genreJson = Json { ignoreUnknownKeys = true }
+
+/**
+ * An item's genres, split and trimmed. Empty when it has none.
+ *
+ * Also tolerates a JSON array, which older enriched rows can carry — without
+ * that branch such a row renders chips like `["Rock` and never matches a
+ * filter. Mirrors the same tolerance in crate/src/utils/genres.js.
+ */
+internal fun genreTokens(item: MediaItem): List<String> {
+    val raw = item.genres.orEmpty().trim()
+    if (raw.isEmpty()) return emptyList()
+    if (raw.startsWith("[")) {
+        parseJsonArrayGenres(raw)?.let { return it }
+    }
+    return raw
         .split(',')
         .map { it.trim() }
         .filter { it.isNotEmpty() }
+}
+
+/** Null when [raw] isn't a JSON array, so the caller falls back to splitting. */
+private fun parseJsonArrayGenres(raw: String): List<String>? =
+    runCatching {
+        (genreJson.parseToJsonElement(raw) as? JsonArray)
+            ?.map { (it as? JsonPrimitive)?.content.orEmpty().trim() }
+            ?.filter { it.isNotEmpty() }
+    }.getOrNull()
 
 /** True when [item] carries [genre] (case-insensitive). */
 internal fun hasGenre(

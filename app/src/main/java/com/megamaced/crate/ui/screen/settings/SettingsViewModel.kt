@@ -51,6 +51,8 @@ data class SettingsUiState(
     val enrichAllProgress: RefreshAllProgress? = null,
     val themeMode: ThemeMode = ThemeMode.System,
     val hiddenCategories: Set<Category> = emptySet(),
+    /** Categories with a visibility write outstanding; their switches are disabled. */
+    val categoryWritesInFlight: Set<Category> = emptySet(),
     val onlineRecommendations: Boolean = false,
     val updateCheck: UpdateCheckState = UpdateCheckState.Idle,
     val errorMessage: String? = null,
@@ -95,6 +97,7 @@ class SettingsViewModel
         private val enrichProgress = MutableStateFlow<RefreshAllProgress?>(null)
         private val updateCheck = MutableStateFlow<UpdateCheckState>(UpdateCheckState.Idle)
         private val errorMessage = MutableStateFlow<String?>(null)
+        private val hiddenCategoryEditor = HiddenCategoryEditor(settingsRepository::setHiddenCategories)
 
         val uiState: StateFlow<SettingsUiState> =
             combine(
@@ -104,11 +107,18 @@ class SettingsViewModel
                 combine(refreshProgress, enrichProgress, errorMessage) { r, e, err -> Triple(r, e, err) },
                 combine(
                     updateCheck,
-                    userPreferences.hiddenCategoriesFlow,
+                    // The pending edit wins while a write is in flight: the
+                    // cached flow lags a round trip behind the user's taps.
+                    combine(
+                        userPreferences.hiddenCategoriesFlow,
+                        hiddenCategoryEditor.pending,
+                        hiddenCategoryEditor.busy,
+                    ) { cached, pending, busy -> (pending ?: cached) to busy },
                     userPreferences.onlineRecommendationsFlow,
                 ) { u, h, r -> Triple(u, h, r) },
             ) { (p, m), t, theme, (progress, enrichProg, err), updateHiddenRecs ->
-                val (update, hidden, onlineRecs) = updateHiddenRecs
+                val (update, hiddenState, onlineRecs) = updateHiddenRecs
+                val (hidden, categoryBusy) = hiddenState
                 SettingsUiState(
                     profile = p.profile,
                     isProfileLoading = p.isLoading,
@@ -124,6 +134,7 @@ class SettingsViewModel
                     enrichAllProgress = enrichProg,
                     themeMode = theme,
                     hiddenCategories = hidden,
+                    categoryWritesInFlight = categoryBusy,
                     onlineRecommendations = onlineRecs,
                     updateCheck = update,
                     errorMessage = err,
@@ -143,16 +154,25 @@ class SettingsViewModel
         private fun loadProfile() {
             viewModelScope.launch {
                 when (val result = settingsRepository.getMe()) {
-                    is ApiResult.Success ->
+                    is ApiResult.Success -> {
                         profile.value = ProfileState(profile = result.value, isLoading = false)
-                    ApiResult.NetworkError -> reportError("Couldn't reach the server.").also {
+                    }
+
+                    ApiResult.NetworkError -> {
+                        reportError("Couldn't reach the server.").also {
+                            profile.update { it.copy(isLoading = false) }
+                        }
+                    }
+
+                    is ApiResult.HttpError -> {
+                        reportError(result.message ?: "Server error (${result.code}).").also {
+                            profile.update { it.copy(isLoading = false) }
+                        }
+                    }
+
+                    ApiResult.Unauthorised -> {
                         profile.update { it.copy(isLoading = false) }
                     }
-                    is ApiResult.HttpError -> reportError(result.message ?: "Server error (${result.code}).").also {
-                        profile.update { it.copy(isLoading = false) }
-                    }
-                    ApiResult.Unauthorised ->
-                        profile.update { it.copy(isLoading = false) }
                 }
             }
         }
@@ -232,8 +252,15 @@ class SettingsViewModel
                 market.update { it.copy(settings = settings) }
                 when (val result = settingsRepository.setMarketSettings(settings)) {
                     is ApiResult.Success -> { /* persisted */ }
-                    ApiResult.NetworkError -> reportError("Couldn't reach the server.")
-                    is ApiResult.HttpError -> reportError(result.message ?: "Server error (${result.code}).")
+
+                    ApiResult.NetworkError -> {
+                        reportError("Couldn't reach the server.")
+                    }
+
+                    is ApiResult.HttpError -> {
+                        reportError(result.message ?: "Server error (${result.code}).")
+                    }
+
                     ApiResult.Unauthorised -> { /* SessionManager handles */ }
                 }
             }
@@ -245,17 +272,22 @@ class SettingsViewModel
                 val refreshResult = enrichmentRepository.listRefreshableMarketValues()
                 val refreshable =
                     when (refreshResult) {
-                        is ApiResult.Success -> refreshResult.value
+                        is ApiResult.Success -> {
+                            refreshResult.value
+                        }
+
                         ApiResult.NetworkError -> {
                             reportError("Couldn't reach the server.")
                             refreshProgress.value = null
                             return@launch
                         }
+
                         is ApiResult.HttpError -> {
                             reportError(refreshResult.message ?: "Server error (${refreshResult.code}).")
                             refreshProgress.value = null
                             return@launch
                         }
+
                         ApiResult.Unauthorised -> {
                             refreshProgress.value = null
                             return@launch
@@ -265,7 +297,9 @@ class SettingsViewModel
                 refreshProgress.value = RefreshAllProgress(total = ids.size, done = 0)
                 ids.forEachIndexed { index, id ->
                     ensureActive()
-                    enrichmentRepository.fetchMarketValue(id)
+                    // refresh-all reports the user's own currency; without it
+                    // every item in the sweep would be repriced in GBP.
+                    enrichmentRepository.fetchMarketValue(id, refreshable.currency)
                     refreshProgress.value = RefreshAllProgress(total = ids.size, done = index + 1)
                 }
                 refreshProgress.value = null
@@ -295,17 +329,22 @@ class SettingsViewModel
                 enrichProgress.value = RefreshAllProgress(total = 0, done = 0)
                 val mediaResult = enrichmentRepository.listUnenrichedItems()
                 val ids = when (mediaResult) {
-                    is ApiResult.Success -> mediaResult.value
+                    is ApiResult.Success -> {
+                        mediaResult.value
+                    }
+
                     ApiResult.NetworkError -> {
                         reportError("Couldn't reach the server.")
                         enrichProgress.value = null
                         return@launch
                     }
+
                     is ApiResult.HttpError -> {
                         reportError(mediaResult.message ?: "Server error (${mediaResult.code}).")
                         enrichProgress.value = null
                         return@launch
                     }
+
                     ApiResult.Unauthorised -> {
                         enrichProgress.value = null
                         return@launch
@@ -329,23 +368,27 @@ class SettingsViewModel
          * Toggle visibility of a single category. Always keeps at least one
          * category visible — the server enforces this too, so an attempt that
          * would empty the set is short-circuited client-side.
+         *
+         * [HiddenCategoryEditor] owns the merge and serialises the writes, so
+         * two quick toggles accumulate instead of the second undoing the first.
          */
         fun setCategoryVisible(
             category: Category,
             visible: Boolean,
         ) {
-            val current = uiState.value.hiddenCategories.toMutableSet()
-            if (visible) {
-                current.remove(category)
-            } else {
-                if (current.size >= Category.entries.size - 1) return
-                current.add(category)
-            }
+            val target = hiddenCategoryEditor.stage(uiState.value.hiddenCategories, category, visible) ?: return
             viewModelScope.launch {
-                when (val result = settingsRepository.setHiddenCategories(current)) {
+                when (val result = hiddenCategoryEditor.commit(target, category)) {
                     is ApiResult.Success -> { /* userPreferences cache updated inside repo */ }
-                    ApiResult.NetworkError -> reportError("Couldn't reach the server.")
-                    is ApiResult.HttpError -> reportError(result.message ?: "Server error (${result.code}).")
+
+                    ApiResult.NetworkError -> {
+                        reportError("Couldn't reach the server.")
+                    }
+
+                    is ApiResult.HttpError -> {
+                        reportError(result.message ?: "Server error (${result.code}).")
+                    }
+
                     ApiResult.Unauthorised -> { /* SessionManager already handled */ }
                 }
             }
@@ -361,10 +404,17 @@ class SettingsViewModel
                 updateCheck.value = UpdateCheckState.Checking
                 updateCheck.value =
                     when (val result = updateChecker.checkNow()) {
-                        UpdateChecker.Result.UpToDate -> UpdateCheckState.UpToDate
-                        UpdateChecker.Result.Failed -> UpdateCheckState.Failed
-                        is UpdateChecker.Result.UpdateAvailable ->
+                        UpdateChecker.Result.UpToDate -> {
+                            UpdateCheckState.UpToDate
+                        }
+
+                        UpdateChecker.Result.Failed -> {
+                            UpdateCheckState.Failed
+                        }
+
+                        is UpdateChecker.Result.UpdateAvailable -> {
                             UpdateCheckState.Available(result.tag, result.htmlUrl)
+                        }
                     }
             }
         }
@@ -377,8 +427,15 @@ class SettingsViewModel
             viewModelScope.launch {
                 when (val result = mediaRepository.wipeCollection(scopes)) {
                     is ApiResult.Success -> { /* local DB also cleared by repo */ }
-                    ApiResult.NetworkError -> reportError("Couldn't reach the server.")
-                    is ApiResult.HttpError -> reportError(result.message ?: "Server error (${result.code}).")
+
+                    ApiResult.NetworkError -> {
+                        reportError("Couldn't reach the server.")
+                    }
+
+                    is ApiResult.HttpError -> {
+                        reportError(result.message ?: "Server error (${result.code}).")
+                    }
+
                     ApiResult.Unauthorised -> { /* SessionManager handles */ }
                 }
             }
@@ -394,9 +451,18 @@ class SettingsViewModel
         ) {
             viewModelScope.launch {
                 when (val result = call()) {
-                    is ApiResult.Success -> onSuccess()
-                    ApiResult.NetworkError -> reportError("Couldn't reach the server.")
-                    is ApiResult.HttpError -> reportError(result.message ?: "Server error (${result.code}).")
+                    is ApiResult.Success -> {
+                        onSuccess()
+                    }
+
+                    ApiResult.NetworkError -> {
+                        reportError("Couldn't reach the server.")
+                    }
+
+                    is ApiResult.HttpError -> {
+                        reportError(result.message ?: "Server error (${result.code}).")
+                    }
+
                     ApiResult.Unauthorised -> { /* SessionManager handles */ }
                 }
             }

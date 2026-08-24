@@ -18,6 +18,16 @@
     <string name="photo_slot_label">Slot %1$d</string>
     <string name="photo_upload_failed">Couldn’t upload photo</string>
 
+    <!-- Add / edit form -->
+    <string name="add_edit_title_add">Add %1$s</string>
+    <string name="add_edit_title_edit">Edit %1$s</string>
+    <string name="format_unrecognised">Not a standard %1$s — pick one from the list.</string>
+
+    <!-- Theme picker -->
+    <string name="theme_mode_system">System</string>
+    <string name="theme_mode_light">Light</string>
+    <string name="theme_mode_dark">Dark</string>
+
     <!-- Phase A22.5 — collection view parity -->
     <string name="collection_view_switch_to_list">Switch to list view</string>
     <string name="collection_view_switch_to_card">Switch to card view</string>

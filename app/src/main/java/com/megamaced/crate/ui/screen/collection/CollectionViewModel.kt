@@ -13,6 +13,7 @@ import com.megamaced.crate.domain.model.MediaItem
 import com.megamaced.crate.domain.repository.MediaRepository
 import com.megamaced.crate.domain.repository.SettingsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -20,6 +21,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -155,7 +157,12 @@ class CollectionViewModel
                     isRefreshing = refreshing,
                     errorMessage = err,
                 )
-            }.stateIn(
+            }.flowOn(
+                // Bucketing, filtering, sorting and grouping the whole category
+                // runs on every emission — including each isRefreshing flip.
+                // viewModelScope is Main.immediate, so it must be moved off it.
+                Dispatchers.Default,
+            ).stateIn(
                 scope = viewModelScope,
                 started = SharingStarted.WhileSubscribed(5_000),
                 initialValue = CollectionUiState(),
@@ -258,8 +265,15 @@ class CollectionViewModel
                 errorMessage.value = null
                 when (val result = mediaRepository.refresh(category = category.value, limit = 200)) {
                     is ApiResult.Success -> { /* DAO updates flow downstream */ }
-                    ApiResult.NetworkError -> errorMessage.value = "Couldn't reach the server."
-                    is ApiResult.HttpError -> errorMessage.value = result.message ?: "Server error (${result.code})."
+
+                    ApiResult.NetworkError -> {
+                        errorMessage.value = "Couldn't reach the server."
+                    }
+
+                    is ApiResult.HttpError -> {
+                        errorMessage.value = result.message ?: "Server error (${result.code})."
+                    }
+
                     ApiResult.Unauthorised -> { /* SessionManager already triggered logout */ }
                 }
                 isRefreshing.value = false

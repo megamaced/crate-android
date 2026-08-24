@@ -71,14 +71,20 @@ class SharedContentStore
                     _state.update { it.copy(data = result.value, isLoading = false, error = null) }
                     lastLoadedAtMs = System.currentTimeMillis()
                 }
-                ApiResult.NetworkError ->
+
+                ApiResult.NetworkError -> {
                     _state.update { it.copy(isLoading = false, error = "Couldn't reach the server.") }
-                is ApiResult.HttpError ->
+                }
+
+                is ApiResult.HttpError -> {
                     _state.update {
                         it.copy(isLoading = false, error = result.message ?: "Server error (${result.code}).")
                     }
-                ApiResult.Unauthorised ->
+                }
+
+                ApiResult.Unauthorised -> {
                     _state.update { it.copy(isLoading = false) }
+                }
             }
         }
 

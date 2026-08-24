@@ -10,12 +10,16 @@ import com.megamaced.crate.domain.model.Playlist
 import com.megamaced.crate.domain.repository.MediaRepository
 import com.megamaced.crate.domain.repository.PlaylistRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
 
 data class PlaylistDetailUiState(
@@ -55,10 +59,14 @@ class PlaylistDetailViewModel
         // refresh (not persisted through Room). Own playlists don't rely on it.
         private val sharedCanWrite = MutableStateFlow(false)
 
-        // Guards against double-submit from rapid taps. Mutations are launched
-        // on the main dispatcher, so a plain flag flipped before the coroutine
-        // launches is a sufficient (single-threaded) gate.
-        private var isMutating = false
+        // Mutations are queued rather than dropped: the add-item sheet stays
+        // open so the user can add several items in a row, and dropping the
+        // taps that land while a request is in flight loses them silently.
+        private val mutationMutex = Mutex()
+
+        // Delete is the exception — it is a one-shot that closes the screen, so
+        // repeat taps are dropped instead of queued.
+        private var isDeleting = false
 
         val uiState: StateFlow<PlaylistDetailUiState> =
             combine(
@@ -94,7 +102,12 @@ class PlaylistDetailViewModel
                     isOwner = owner,
                     canWrite = owner || canWriteShare,
                 )
-            }.stateIn(
+            }.flowOn(
+                // The candidate list is the whole collection minus this
+                // playlist's items, recomputed on every emission — off the main
+                // thread, which is where viewModelScope would otherwise run it.
+                Dispatchers.Default,
+            ).stateIn(
                 scope = viewModelScope,
                 started = SharingStarted.WhileSubscribed(5_000),
                 initialValue = PlaylistDetailUiState(playlistId = playlistId),
@@ -117,12 +130,27 @@ class PlaylistDetailViewModel
         }
 
         fun delete() {
+            if (isDeleting) return
+            isDeleting = true
             launchMutation {
-                when (val result = playlistRepository.delete(playlistId)) {
-                    is ApiResult.Success -> deleted.value = true
-                    ApiResult.NetworkError -> errorMessage.value = "Couldn't reach the server."
-                    is ApiResult.HttpError -> errorMessage.value = result.message ?: "Server error (${result.code})."
-                    ApiResult.Unauthorised -> { /* SessionManager handles */ }
+                try {
+                    when (val result = playlistRepository.delete(playlistId)) {
+                        is ApiResult.Success -> {
+                            deleted.value = true
+                        }
+
+                        ApiResult.NetworkError -> {
+                            errorMessage.value = "Couldn't reach the server."
+                        }
+
+                        is ApiResult.HttpError -> {
+                            errorMessage.value = result.message ?: "Server error (${result.code})."
+                        }
+
+                        ApiResult.Unauthorised -> { /* SessionManager handles */ }
+                    }
+                } finally {
+                    isDeleting = false
                 }
             }
         }
@@ -135,15 +163,10 @@ class PlaylistDetailViewModel
             launchMutation { handle(playlistRepository.removeItem(playlistId, mediaItemId)) }
         }
 
+        /** Runs [block] after any earlier mutation has finished, never dropping it. */
         private fun launchMutation(block: suspend () -> Unit) {
-            if (isMutating) return
-            isMutating = true
             viewModelScope.launch {
-                try {
-                    block()
-                } finally {
-                    isMutating = false
-                }
+                mutationMutex.withLock { block() }
             }
         }
 
@@ -154,8 +177,15 @@ class PlaylistDetailViewModel
         private fun <T> handle(result: ApiResult<T>) {
             when (result) {
                 is ApiResult.Success -> { /* Repository writes through to Room */ }
-                ApiResult.NetworkError -> errorMessage.value = "Couldn't reach the server."
-                is ApiResult.HttpError -> errorMessage.value = result.message ?: "Server error (${result.code})."
+
+                ApiResult.NetworkError -> {
+                    errorMessage.value = "Couldn't reach the server."
+                }
+
+                is ApiResult.HttpError -> {
+                    errorMessage.value = result.message ?: "Server error (${result.code})."
+                }
+
                 ApiResult.Unauthorised -> { /* SessionManager handles */ }
             }
         }

@@ -68,13 +68,14 @@ The certificate fingerprint reported here is what Android's PackageManager uses 
 ## Cutting a tagged release
 
 1. Bump `versionCode` and `versionName` in `app/build.gradle.kts`.
-2. Commit, push `main`.
-3. Tag: `git tag vX.Y.Z && git push origin vX.Y.Z`.
-4. CI builds, signs with the secrets, and attaches `app-release.apk` to the GitHub release that the workflow auto-creates from the tag.
+2. Add the changelog entry: `fastlane/metadata/android/en-US/changelogs/<versionCode>.txt`.
+3. Commit, push `main`.
+4. Tag: `git tag vX.Y.Z && git push origin vX.Y.Z`.
+5. CI builds, signs with the secrets, and attaches `app-release.apk` to the GitHub release that the workflow auto-creates from the tag. The release job fails if the signing secrets are missing, so an unsigned APK can never be published.
 
 ## In-app update check
 
-The app checks the GitHub Releases API at startup (rate-limited to once per 24h via DataStore) and posts a system notification when `tag_name` is newer than the installed `versionName`. Tapping the notification opens the release's `html_url` in the browser, where the user can download the attached signed APK manually.
+The check is manual only: Settings → About → "Check for updates" queries the GitHub Releases API and posts a system notification when `tag_name` is newer than the installed `versionName`. Tapping the notification opens the release's `html_url` in the browser, where the user can download the attached signed APK manually. Nothing contacts GitHub unless the user asks — F-Droid policy forbids unsolicited third-party network calls at startup.
 
 This relies on:
 
@@ -82,4 +83,4 @@ This relies on:
 - The release being published (not draft / pre-release).
 - At least one APK asset attached to the release.
 
-The CI workflow's `softprops/action-gh-release@v2` step satisfies all three when a `v*` tag is pushed with the keystore secrets set.
+The CI workflow's release job satisfies all three when a `v*` tag is pushed; it fails rather than publishing if the keystore secrets are absent.

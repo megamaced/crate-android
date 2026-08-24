@@ -29,6 +29,8 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.movableContentOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.navigation.NavDestination.Companion.hasRoute
@@ -77,6 +79,7 @@ fun CrateScaffold(
                     popUpTo(0) { inclusive = true }
                 }
             }
+
             AuthState.Authenticated, AuthState.Unknown -> { /* no-op */ }
         }
     }
@@ -84,51 +87,38 @@ fun CrateScaffold(
     val isOnLogin = currentDestination?.hasRoute(Destination.Login::class) == true
     val useNavRail = widthSizeClass != WindowWidthSizeClass.Compact
 
-    CompositionLocalProvider(LocalIsOnline provides isOnline) {
-        if (isOnLogin) {
+    // The nav host is declared once, as movable content, and only the chrome
+    // around it varies. Compose identity is otherwise positional, so three
+    // separate CrateNavHost calls would give the host three different slots:
+    // crossing the width-class boundary on a tablet rotation, or the login →
+    // authenticated transition, would dispose the entire nav graph and rebuild
+    // it, losing every list scroll position, sheet and non-saveable remember.
+    // The size class is a parameter rather than a capture so the moved content
+    // still sees the current value.
+    val host = remember(navController) {
+        movableContentOf<Modifier, WindowWidthSizeClass> { hostModifier, sizeClass ->
             CrateNavHost(
                 navController = navController,
-                widthSizeClass = widthSizeClass,
+                widthSizeClass = sizeClass,
+                modifier = hostModifier,
             )
-        } else if (useNavRail) {
-            Row(modifier = Modifier.fillMaxSize()) {
-                NavigationRail {
-                    topLevelRoutes.forEach { route ->
-                        val selected = currentDestination?.hierarchy?.any {
-                            it.hasRoute(route.destination::class)
-                        } == true
-                        NavigationRailItem(
-                            selected = selected,
-                            onClick = { navController.navigateTopLevel(route.destination) },
-                            icon = {
-                                Icon(
-                                    imageVector = if (selected) route.selectedIcon else route.unselectedIcon,
-                                    contentDescription = route.label,
-                                )
-                            },
-                            label = { Text(route.label) },
-                        )
-                    }
-                }
-                Column(modifier = Modifier.weight(1f)) {
-                    OfflineBanner(isOnline = isOnline)
-                    CrateNavHost(
-                        navController = navController,
-                        widthSizeClass = widthSizeClass,
-                        modifier = Modifier.weight(1f),
-                    )
-                }
+        }
+    }
+
+    CompositionLocalProvider(LocalIsOnline provides isOnline) {
+        when {
+            isOnLogin -> {
+                host(Modifier, widthSizeClass)
             }
-        } else {
-            Scaffold(
-                contentWindowInsets = WindowInsets(0, 0, 0, 0),
-                bottomBar = {
-                    NavigationBar {
+
+            useNavRail -> {
+                Row(modifier = Modifier.fillMaxSize()) {
+                    NavigationRail {
                         topLevelRoutes.forEach { route ->
                             val selected = currentDestination?.hierarchy?.any {
                                 it.hasRoute(route.destination::class)
                             } == true
-                            NavigationBarItem(
+                            NavigationRailItem(
                                 selected = selected,
                                 onClick = { navController.navigateTopLevel(route.destination) },
                                 icon = {
@@ -141,15 +131,41 @@ fun CrateScaffold(
                             )
                         }
                     }
-                },
-            ) { innerPadding ->
-                Column(modifier = Modifier.padding(innerPadding)) {
-                    OfflineBanner(isOnline = isOnline)
-                    CrateNavHost(
-                        navController = navController,
-                        widthSizeClass = widthSizeClass,
-                        modifier = Modifier.weight(1f),
-                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        OfflineBanner(isOnline = isOnline)
+                        host(Modifier.weight(1f), widthSizeClass)
+                    }
+                }
+            }
+
+            else -> {
+                Scaffold(
+                    contentWindowInsets = WindowInsets(0, 0, 0, 0),
+                    bottomBar = {
+                        NavigationBar {
+                            topLevelRoutes.forEach { route ->
+                                val selected = currentDestination?.hierarchy?.any {
+                                    it.hasRoute(route.destination::class)
+                                } == true
+                                NavigationBarItem(
+                                    selected = selected,
+                                    onClick = { navController.navigateTopLevel(route.destination) },
+                                    icon = {
+                                        Icon(
+                                            imageVector = if (selected) route.selectedIcon else route.unselectedIcon,
+                                            contentDescription = route.label,
+                                        )
+                                    },
+                                    label = { Text(route.label) },
+                                )
+                            }
+                        }
+                    },
+                ) { innerPadding ->
+                    Column(modifier = Modifier.padding(innerPadding)) {
+                        OfflineBanner(isOnline = isOnline)
+                        host(Modifier.weight(1f), widthSizeClass)
+                    }
                 }
             }
         }

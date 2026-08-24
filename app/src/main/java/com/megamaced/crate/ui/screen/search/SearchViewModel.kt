@@ -170,8 +170,14 @@ class SearchViewModel
                         }
                     }
                 when (result) {
-                    is ApiResult.Success -> externalResults.value = result.value
-                    ApiResult.NetworkError -> externalError.value = "Couldn't reach the server."
+                    is ApiResult.Success -> {
+                        externalResults.value = result.value
+                    }
+
+                    ApiResult.NetworkError -> {
+                        externalError.value = "Couldn't reach the server."
+                    }
+
                     is ApiResult.HttpError -> {
                         externalError.value =
                             when (result.code) {
@@ -179,6 +185,7 @@ class SearchViewModel
                                 else -> result.message ?: "Server error (${result.code})."
                             }
                     }
+
                     ApiResult.Unauthorised -> { /* SessionManager handles */ }
                 }
                 isExternalLoading.value = false

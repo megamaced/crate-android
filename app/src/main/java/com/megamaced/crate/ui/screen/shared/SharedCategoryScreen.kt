@@ -58,7 +58,10 @@ fun SharedCategoryScreen(
     val isOnline = LocalIsOnline.current
 
     LaunchedEffect(uiState.error) {
-        uiState.error?.let { snackbarHostState.showSnackbar(it) }
+        uiState.error?.let { msg ->
+            snackbarHostState.showSnackbar(msg)
+            viewModel.dismissError()
+        }
     }
 
     Scaffold(
@@ -135,6 +138,7 @@ fun SharedCategoryScreen(
                         modifier = Modifier.fillMaxSize(),
                         artistFirst = artistFirst,
                     )
+
                     CollectionViewMode.List -> CollectionList(
                         groups = uiState.groups,
                         onItemClick = onItemClick,

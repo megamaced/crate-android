@@ -7,11 +7,32 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
+
+/**
+ * Colour roles Material's scheme doesn't define. Kept theme-aware rather than
+ * hardcoded at the call site so both light and dark stay legible.
+ */
+@Immutable
+data class CrateExtendedColors(
+    /** A gain against the recorded purchase price; the loss side uses `error`. */
+    val gain: Color,
+)
+
+private val LocalCrateExtendedColors =
+    staticCompositionLocalOf { CrateExtendedColors(gain = GainLight) }
+
+/** The extended roles for the current theme. Provided by [CrateTheme]. */
+val crateColors: CrateExtendedColors
+    @Composable get() = LocalCrateExtendedColors.current
 
 @Composable
 fun CrateTheme(
@@ -26,8 +47,14 @@ fun CrateTheme(
             val context = LocalContext.current
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
-        darkTheme -> CrateDarkColorScheme
-        else -> CrateLightColorScheme
+
+        darkTheme -> {
+            CrateDarkColorScheme
+        }
+
+        else -> {
+            CrateLightColorScheme
+        }
     }
 
     val view = LocalView.current
@@ -46,10 +73,14 @@ fun CrateTheme(
         }
     }
 
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = CrateTypography,
-        shapes = CrateShapes,
-        content = content,
-    )
+    val extended = CrateExtendedColors(gain = if (darkTheme) GainDark else GainLight)
+
+    CompositionLocalProvider(LocalCrateExtendedColors provides extended) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography = CrateTypography,
+            shapes = CrateShapes,
+            content = content,
+        )
+    }
 }

@@ -12,9 +12,3 @@ data class CategoryFeed(
     val itemOfDay: MediaItem?,
     val recentItems: List<MediaItem>,
 )
-
-data class FormatRow(
-    val format: String,
-    val label: String,
-    val items: List<MediaItem>,
-)

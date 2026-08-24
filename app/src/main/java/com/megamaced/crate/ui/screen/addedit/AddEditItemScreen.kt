@@ -1,8 +1,7 @@
 package com.megamaced.crate.ui.screen.addedit
 
-import android.content.Context
-import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -52,7 +51,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -81,7 +79,6 @@ fun AddEditItemScreen(
     val state by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     var searchSheetOpen by remember { mutableStateOf(false) }
-    val context = LocalContext.current
 
     LaunchedEffect(scanResultJson) {
         scanResultJson?.let { json ->
@@ -100,25 +97,36 @@ fun AddEditItemScreen(
         }
     }
 
+    // The save outcome and the photo outcome arrive in one emission, so the
+    // warning can be shown to completion before the screen pops — two separate
+    // effects would race and navigation would win, hiding the warning.
+    val photoFailedMessage = stringResource(R.string.photo_upload_failed)
     LaunchedEffect(state.savedItemId) {
-        if (state.savedItemId != null) onBack()
+        if (state.savedItemId != null) {
+            if (state.photoUploadFailed) snackbarHostState.showSnackbar(photoFailedMessage)
+            onBack()
+        }
     }
 
+    // PickVisualMedia rather than GetContent: it can only return images, and it
+    // hands back a Uri the ViewModel reads off the main thread at upload time —
+    // reading here would block the UI on a cloud-only photo's download.
+    val imageRequest = remember { PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly) }
     val artworkPicker =
-        rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-            uri?.let { handlePickedUri(context, it, viewModel) }
+        rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+            uri?.let { viewModel.onArtworkPicked(it.toString()) }
         }
 
-    // Photo pickers — one per slot so the launcher knows which slot to set
-    // the bytes on. Registering two launchers is cheaper than juggling a
+    // Photo pickers — one per slot so the launcher knows which slot the pick
+    // belongs to. Registering two launchers is cheaper than juggling a
     // "pendingSlot" state variable across recomposition.
     val photo1Picker =
-        rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-            uri?.let { handlePickedPhoto(context, it, slot = 1, viewModel) }
+        rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+            uri?.let { viewModel.onPhotoPicked(slot = 1, uri = it.toString()) }
         }
     val photo2Picker =
-        rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-            uri?.let { handlePickedPhoto(context, it, slot = 2, viewModel) }
+        rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+            uri?.let { viewModel.onPhotoPicked(slot = 2, uri = it.toString()) }
         }
 
     val titleLabels = remember(state.category) { CategoryLabels.forCategory(state.category) }
@@ -128,7 +136,10 @@ fun AddEditItemScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = (if (state.isEditing) "Edit " else "Add ") + titleLabels.singularNoun,
+                        text = stringResource(
+                            if (state.isEditing) R.string.add_edit_title_edit else R.string.add_edit_title_add,
+                            titleLabels.singularNoun,
+                        ),
                     )
                 },
                 navigationIcon = {
@@ -155,11 +166,11 @@ fun AddEditItemScreen(
             FormContent(
                 state = state,
                 viewModel = viewModel,
-                onPickArtwork = { artworkPicker.launch("image/*") },
+                onPickArtwork = { artworkPicker.launch(imageRequest) },
                 onPickPhoto = { slot ->
                     when (slot) {
-                        1 -> photo1Picker.launch("image/*")
-                        2 -> photo2Picker.launch("image/*")
+                        1 -> photo1Picker.launch(imageRequest)
+                        2 -> photo2Picker.launch(imageRequest)
                     }
                 },
                 onOpenSearch = { searchSheetOpen = true },
@@ -280,6 +291,7 @@ private fun FormContent(
             label = labels.format,
             category = state.category,
             value = state.format,
+            unrecognised = state.formatUnrecognised,
             onValueChange = viewModel::onFormatChange,
         )
 
@@ -482,6 +494,9 @@ private fun FormatField(
     label: String,
     category: Category,
     value: String,
+    // A provider can hand back a format Crate doesn't file under; flag it
+    // rather than block the save, since the server accepts free text.
+    unrecognised: Boolean,
     onValueChange: (String) -> Unit,
 ) {
     var sheetOpen by remember { mutableStateOf(false) }
@@ -497,6 +512,11 @@ private fun FormatField(
             placeholder = { Text("Select…") },
             singleLine = true,
             isError = value.isBlank(),
+            supportingText = if (unrecognised) {
+                { Text(stringResource(R.string.format_unrecognised, label)) }
+            } else {
+                null
+            },
             colors = OutlinedTextFieldDefaults.colors(
                 disabledTextColor = MaterialTheme.colorScheme.onSurface,
                 disabledBorderColor = if (value.isBlank()) {
@@ -587,21 +607,25 @@ private fun ArtworkPreview(
         contentAlignment = Alignment.Center,
     ) {
         when {
-            state.pendingArtwork != null ->
+            state.pendingArtwork != null -> {
                 coil3.compose.AsyncImage(
-                    model = state.pendingArtwork.bytes,
+                    model = state.pendingArtwork.uri,
                     contentDescription = "Selected artwork",
                     contentScale = androidx.compose.ui.layout.ContentScale.Crop,
                     modifier = Modifier.fillMaxSize(),
                 )
-            !state.pendingArtworkUrl.isNullOrBlank() ->
+            }
+
+            !state.pendingArtworkUrl.isNullOrBlank() -> {
                 coil3.compose.AsyncImage(
                     model = state.pendingArtworkUrl,
                     contentDescription = "Selected artwork",
                     contentScale = androidx.compose.ui.layout.ContentScale.Crop,
                     modifier = Modifier.fillMaxSize(),
                 )
-            state.isEditing && !state.removeArtwork && state.editingItemId != null ->
+            }
+
+            state.isEditing && !state.removeArtwork && state.editingItemId != null -> {
                 ArtworkImage(
                     itemId = state.editingItemId,
                     contentDescription = state.title,
@@ -610,43 +634,15 @@ private fun ArtworkPreview(
                     category = state.category,
                     modifier = Modifier.fillMaxSize(),
                 )
-            else ->
+            }
+
+            else -> {
                 Text(
                     text = "Tap to pick artwork",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-        }
-    }
-}
-
-private fun handlePickedUri(
-    context: Context,
-    uri: Uri,
-    viewModel: AddEditViewModel,
-) {
-    val contentResolver = context.contentResolver
-    val mime = contentResolver.getType(uri) ?: "image/*"
-    contentResolver.openInputStream(uri)?.use { stream ->
-        val bytes = stream.readBytes()
-        if (bytes.isNotEmpty()) {
-            viewModel.onArtworkPicked(bytes, mime)
-        }
-    }
-}
-
-private fun handlePickedPhoto(
-    context: Context,
-    uri: Uri,
-    slot: Int,
-    viewModel: AddEditViewModel,
-) {
-    val contentResolver = context.contentResolver
-    val mime = contentResolver.getType(uri) ?: "image/*"
-    contentResolver.openInputStream(uri)?.use { stream ->
-        val bytes = stream.readBytes()
-        if (bytes.isNotEmpty()) {
-            viewModel.onPhotoPicked(slot, bytes, mime)
+            }
         }
     }
 }
@@ -669,7 +665,7 @@ private fun PhotoSlotsRow(
         ) {
             PhotoSlotPreview(
                 slot = 1,
-                pendingBytes = state.pendingPhoto1?.bytes,
+                pendingUri = state.pendingPhoto1?.uri,
                 hasExisting = state.hasPhoto1 && !state.removePhoto1,
                 isEditing = state.isEditing,
                 editingItemId = state.editingItemId,
@@ -680,7 +676,7 @@ private fun PhotoSlotsRow(
             )
             PhotoSlotPreview(
                 slot = 2,
-                pendingBytes = state.pendingPhoto2?.bytes,
+                pendingUri = state.pendingPhoto2?.uri,
                 hasExisting = state.hasPhoto2 && !state.removePhoto2,
                 isEditing = state.isEditing,
                 editingItemId = state.editingItemId,
@@ -696,7 +692,7 @@ private fun PhotoSlotsRow(
 @Composable
 private fun PhotoSlotPreview(
     slot: Int,
-    pendingBytes: ByteArray?,
+    pendingUri: String?,
     hasExisting: Boolean,
     isEditing: Boolean,
     editingItemId: Long?,
@@ -706,7 +702,7 @@ private fun PhotoSlotPreview(
     modifier: Modifier = Modifier,
 ) {
     val shape = RoundedCornerShape(12.dp)
-    val hasPhoto = pendingBytes != null || hasExisting
+    val hasPhoto = pendingUri != null || hasExisting
     Column(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -721,14 +717,16 @@ private fun PhotoSlotPreview(
             contentAlignment = Alignment.Center,
         ) {
             when {
-                pendingBytes != null ->
+                pendingUri != null -> {
                     coil3.compose.AsyncImage(
-                        model = pendingBytes,
+                        model = pendingUri,
                         contentDescription = "Photo $slot",
                         contentScale = androidx.compose.ui.layout.ContentScale.Crop,
                         modifier = Modifier.fillMaxSize(),
                     )
-                hasExisting && isEditing && editingItemId != null ->
+                }
+
+                hasExisting && isEditing && editingItemId != null -> {
                     PhotoImage(
                         itemId = editingItemId,
                         slot = slot,
@@ -736,12 +734,15 @@ private fun PhotoSlotPreview(
                         updatedAt = updatedAt,
                         modifier = Modifier.fillMaxSize(),
                     )
-                else ->
+                }
+
+                else -> {
                     Text(
                         text = stringResource(R.string.photo_slot_label, slot),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                }
             }
         }
         OutlinedButton(onClick = onPick, modifier = Modifier.fillMaxWidth()) {
@@ -786,6 +787,7 @@ private data class CategoryLabels(
                     labelPlaceholder = "e.g. EMI",
                     barcodePlaceholder = "e.g. 5099902987521",
                 )
+
                 Category.Films -> CategoryLabels(
                     artist = "Director",
                     title = "Film Title",
@@ -799,6 +801,7 @@ private data class CategoryLabels(
                     labelPlaceholder = "e.g. Warner Bros.",
                     barcodePlaceholder = "",
                 )
+
                 Category.Books -> CategoryLabels(
                     artist = "Author",
                     title = "Title",
@@ -812,6 +815,7 @@ private data class CategoryLabels(
                     labelPlaceholder = "e.g. Penguin",
                     barcodePlaceholder = "e.g. 978-0451524935",
                 )
+
                 Category.Games -> CategoryLabels(
                     artist = "Developer",
                     title = "Game Title",
@@ -825,6 +829,7 @@ private data class CategoryLabels(
                     labelPlaceholder = "e.g. Nintendo",
                     barcodePlaceholder = "",
                 )
+
                 Category.Comics -> CategoryLabels(
                     artist = "Writer",
                     title = "Series / Volume Title",

@@ -3,8 +3,18 @@
     <!-- Path must match TokenStore.PREFS_FILE ("crate_auth") + ".xml". -->
     <cloud-backup>
         <exclude domain="sharedpref" path="crate_auth.xml" />
+        <!-- See backup_rules.xml: the collection cache is personal data and
+             is re-fetched from the server, so keep it off cloud backup. -->
+        <exclude domain="database" path="crate.db" />
+        <exclude domain="database" path="crate.db-wal" />
+        <exclude domain="database" path="crate.db-shm" />
+        <exclude domain="file" path="datastore/" />
     </cloud-backup>
     <device-transfer>
         <exclude domain="sharedpref" path="crate_auth.xml" />
+        <!-- Device-to-device transfer stays local, so the collection cache is
+             allowed through; only the sync cursor is excluded, so the new
+             device does a full sweep rather than trusting a copied cursor. -->
+        <exclude domain="file" path="datastore/" />
     </device-transfer>
 </data-extraction-rules>

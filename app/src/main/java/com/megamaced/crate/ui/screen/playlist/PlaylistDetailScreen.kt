@@ -127,19 +127,26 @@ fun PlaylistDetailScreen(
         },
     ) { innerPadding ->
         when {
-            state.isLoading -> LoadingState(modifier = Modifier.padding(innerPadding))
-            state.playlist == null ->
+            state.isLoading -> {
+                LoadingState(modifier = Modifier.padding(innerPadding))
+            }
+
+            state.playlist == null -> {
                 EmptyState(
                     title = "Playlist not found",
                     modifier = Modifier.padding(innerPadding),
                 )
-            state.playlist!!.items.isEmpty() ->
+            }
+
+            state.playlist!!.items.isEmpty() -> {
                 EmptyState(
                     title = "No items yet",
                     subtitle = "Tap + to add tracks, films, books, games, or comics from your collection.",
                     modifier = Modifier.padding(innerPadding),
                 )
-            else ->
+            }
+
+            else -> {
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxSize()
@@ -156,6 +163,7 @@ fun PlaylistDetailScreen(
                         HorizontalDivider()
                     }
                 }
+            }
         }
     }
 

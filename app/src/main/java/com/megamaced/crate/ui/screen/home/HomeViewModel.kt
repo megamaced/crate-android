@@ -49,7 +49,7 @@ class HomeViewModel
                     )
                 }
                 when (val result = homeRepository.fetch()) {
-                    is ApiResult.Success ->
+                    is ApiResult.Success -> {
                         _uiState.update {
                             it.copy(
                                 feed = result.value,
@@ -57,7 +57,9 @@ class HomeViewModel
                                 isRefreshing = false,
                             )
                         }
-                    ApiResult.NetworkError ->
+                    }
+
+                    ApiResult.NetworkError -> {
                         _uiState.update {
                             it.copy(
                                 isLoading = false,
@@ -65,7 +67,9 @@ class HomeViewModel
                                 errorMessage = "Couldn't reach the server.",
                             )
                         }
-                    is ApiResult.HttpError ->
+                    }
+
+                    is ApiResult.HttpError -> {
                         _uiState.update {
                             it.copy(
                                 isLoading = false,
@@ -73,10 +77,13 @@ class HomeViewModel
                                 errorMessage = result.message ?: "Server error (${result.code}).",
                             )
                         }
-                    ApiResult.Unauthorised ->
+                    }
+
+                    ApiResult.Unauthorised -> {
                         _uiState.update {
                             it.copy(isLoading = false, isRefreshing = false)
                         }
+                    }
                 }
             }
         }
