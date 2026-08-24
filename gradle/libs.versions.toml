@@ -23,7 +23,7 @@ exifInterface = "1.4.1"
 
 # DI
 # Pinned below 2.59 — Hilt 2.59 requires AGP 9. Bump together with AGP 9.
-hilt = "2.58"
+hilt = "2.60.1"
 
 # Networking
 retrofit = "3.0.0"
