@@ -41,6 +41,15 @@ updates:
         versions: ['>=2.4.0']
       - dependency-name: 'com.google.dagger:*'
         versions: ['>=2.59']
+      # AGP 9 and Gradle 9 are the migration itself, not blocked by it — but
+      # neither lands on its own, so a PR for either can only ever be red.
+      # The migration is planned as one change-set; see CRATE-AUDIT-RESUME.md.
+      - dependency-name: 'com.android.application'
+        versions: ['>=9.0.0']
+      - dependency-name: 'com.android.library'
+        versions: ['>=9.0.0']
+      - dependency-name: 'gradle'
+        versions: ['>=9.0.0']
 
   # Also keeps the commit-SHA pins in .github/workflows up to date, which is
   # what makes pinning to a SHA maintainable rather than a one-off.
