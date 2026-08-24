@@ -57,7 +57,7 @@ class CollectionViewModelTest {
                     ),
                 )
             }
-            val vm = CollectionViewModel(SavedStateHandle(), repo, FakeCollectionPrefs(), StubSettingsRepository())
+            val vm = CollectionViewModel(SavedStateHandle(), repo, FakeCollectionPrefs(), StubSettingsRepository(), dispatcher)
 
             vm.uiState.test {
                 // Skip the initial empty emission until items arrive.
@@ -85,7 +85,7 @@ class CollectionViewModelTest {
                     ),
                 )
             }
-            val vm = CollectionViewModel(SavedStateHandle(), repo, FakeCollectionPrefs(), StubSettingsRepository())
+            val vm = CollectionViewModel(SavedStateHandle(), repo, FakeCollectionPrefs(), StubSettingsRepository(), dispatcher)
 
             vm.toggleFormat("LP")
 
@@ -112,7 +112,7 @@ class CollectionViewModelTest {
                     ),
                 )
             }
-            val vm = CollectionViewModel(SavedStateHandle(), repo, FakeCollectionPrefs(), StubSettingsRepository())
+            val vm = CollectionViewModel(SavedStateHandle(), repo, FakeCollectionPrefs(), StubSettingsRepository(), dispatcher)
             vm.selectSort(CollectionSort(SortField.Title, SortDirection.Asc))
 
             vm.uiState.test {
@@ -138,7 +138,7 @@ class CollectionViewModelTest {
                 )
             }
             val args = SavedStateHandle(mapOf("category" to "music", "genre" to "Art Rock"))
-            val vm = CollectionViewModel(args, repo, FakeCollectionPrefs(), StubSettingsRepository())
+            val vm = CollectionViewModel(args, repo, FakeCollectionPrefs(), StubSettingsRepository(), dispatcher)
 
             vm.uiState.test {
                 var current = awaitItem()
@@ -157,7 +157,7 @@ class CollectionViewModelTest {
                 seed(listOf(item(1, "OK Computer", genres = "Alternative Rock")))
             }
             val args = SavedStateHandle(mapOf("genre" to "Vaporwave"))
-            val vm = CollectionViewModel(args, repo, FakeCollectionPrefs(), StubSettingsRepository())
+            val vm = CollectionViewModel(args, repo, FakeCollectionPrefs(), StubSettingsRepository(), dispatcher)
 
             vm.uiState.test {
                 var current = awaitItem()
@@ -174,7 +174,7 @@ class CollectionViewModelTest {
             val repo = FakeMediaRepository().apply {
                 seed(listOf(item(1, "OK Computer", format = "LP", category = Category.Music)))
             }
-            val vm = CollectionViewModel(SavedStateHandle(), repo, FakeCollectionPrefs(), StubSettingsRepository())
+            val vm = CollectionViewModel(SavedStateHandle(), repo, FakeCollectionPrefs(), StubSettingsRepository(), dispatcher)
             vm.toggleFormat("LP")
 
             repo.seed(

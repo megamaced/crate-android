@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.megamaced.crate.data.prefs.CollectionPrefs
 import com.megamaced.crate.data.prefs.CollectionViewMode
 import com.megamaced.crate.data.repository.SharedContentStore
+import com.megamaced.crate.di.DefaultDispatcher
 import com.megamaced.crate.domain.model.Category
 import com.megamaced.crate.domain.model.CollectionSort
 import com.megamaced.crate.domain.model.SharedCategorySummary
@@ -19,6 +20,7 @@ import com.megamaced.crate.ui.screen.collection.formatBuckets
 import com.megamaced.crate.ui.screen.collection.genreBuckets
 import com.megamaced.crate.ui.screen.collection.groupItemsForSort
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -68,6 +70,7 @@ class SharedCategoryViewModel
         savedStateHandle: SavedStateHandle,
         private val store: SharedContentStore,
         private val collectionPrefs: CollectionPrefs,
+        @DefaultDispatcher private val computeDispatcher: CoroutineDispatcher,
     ) : ViewModel() {
         private val category: Category =
             Category.fromApi(savedStateHandle.get<String>("category")) ?: Category.Music
@@ -138,7 +141,7 @@ class SharedCategoryViewModel
                 // Same filter/sort/group pipeline as the collection view: pure
                 // functions over immutable lists, but far too much work for the
                 // main thread, which is where viewModelScope collects.
-                Dispatchers.Default,
+                computeDispatcher,
             ).stateIn(
                 scope = viewModelScope,
                 started = SharingStarted.WhileSubscribed(5_000),

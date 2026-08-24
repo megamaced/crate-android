@@ -5,11 +5,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.megamaced.crate.data.api.ApiResult
 import com.megamaced.crate.data.auth.CurrentSession
+import com.megamaced.crate.di.DefaultDispatcher
 import com.megamaced.crate.domain.model.MediaItem
 import com.megamaced.crate.domain.model.Playlist
 import com.megamaced.crate.domain.repository.MediaRepository
 import com.megamaced.crate.domain.repository.PlaylistRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -44,6 +46,7 @@ class PlaylistDetailViewModel
         private val playlistRepository: PlaylistRepository,
         mediaRepository: MediaRepository,
         currentSession: CurrentSession,
+        @DefaultDispatcher private val computeDispatcher: CoroutineDispatcher,
     ) : ViewModel() {
         private val playlistId: Long =
             checkNotNull(savedStateHandle["playlistId"]) {
@@ -106,7 +109,7 @@ class PlaylistDetailViewModel
                 // The candidate list is the whole collection minus this
                 // playlist's items, recomputed on every emission — off the main
                 // thread, which is where viewModelScope would otherwise run it.
-                Dispatchers.Default,
+                computeDispatcher,
             ).stateIn(
                 scope = viewModelScope,
                 started = SharingStarted.WhileSubscribed(5_000),

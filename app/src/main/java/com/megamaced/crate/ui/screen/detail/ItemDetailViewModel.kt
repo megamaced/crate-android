@@ -8,6 +8,7 @@ import com.megamaced.crate.data.api.CrateApiService
 import com.megamaced.crate.data.api.apiCall
 import com.megamaced.crate.data.api.dto.SuggestionDto
 import com.megamaced.crate.data.auth.CurrentSession
+import com.megamaced.crate.di.DefaultDispatcher
 import com.megamaced.crate.domain.LocalSimilarity
 import com.megamaced.crate.domain.model.Category
 import com.megamaced.crate.domain.model.MediaItem
@@ -18,6 +19,7 @@ import com.megamaced.crate.ui.components.SuggestionArt
 import com.megamaced.crate.ui.components.SuggestionEntry
 import com.megamaced.crate.ui.components.SuggestionTarget
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -85,6 +87,7 @@ class ItemDetailViewModel
         private val settingsRepository: SettingsRepository,
         private val api: CrateApiService,
         currentSession: CurrentSession,
+        @DefaultDispatcher private val computeDispatcher: CoroutineDispatcher,
     ) : ViewModel() {
         private val itemId: Long = checkNotNull(savedStateHandle["itemId"]) {
             "Detail route requires an itemId argument"
@@ -174,7 +177,7 @@ class ItemDetailViewModel
             }.flowOn(
                 // Ranking tokenises and sorts the whole collection; viewModelScope
                 // is Main.immediate, so without this it all runs on the UI thread.
-                Dispatchers.Default,
+                computeDispatcher,
             ).stateIn(
                 scope = viewModelScope,
                 started = SharingStarted.WhileSubscribed(5_000),

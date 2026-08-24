@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.megamaced.crate.data.api.ApiResult
 import com.megamaced.crate.data.prefs.CollectionPrefs
 import com.megamaced.crate.data.prefs.CollectionViewMode
+import com.megamaced.crate.di.DefaultDispatcher
 import com.megamaced.crate.domain.model.Category
 import com.megamaced.crate.domain.model.CategorySortConfig
 import com.megamaced.crate.domain.model.CollectionSort
@@ -13,6 +14,7 @@ import com.megamaced.crate.domain.model.MediaItem
 import com.megamaced.crate.domain.repository.MediaRepository
 import com.megamaced.crate.domain.repository.SettingsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -74,6 +76,7 @@ class CollectionViewModel
         private val mediaRepository: MediaRepository,
         private val collectionPrefs: CollectionPrefs,
         private val settingsRepository: SettingsRepository,
+        @DefaultDispatcher private val computeDispatcher: CoroutineDispatcher,
     ) : ViewModel() {
         // Nav args, set when arriving from a genre chip in the item detail view:
         // the item's category plus the genre to narrow to. Absent for the
@@ -161,7 +164,7 @@ class CollectionViewModel
                 // Bucketing, filtering, sorting and grouping the whole category
                 // runs on every emission — including each isRefreshing flip.
                 // viewModelScope is Main.immediate, so it must be moved off it.
-                Dispatchers.Default,
+                computeDispatcher,
             ).stateIn(
                 scope = viewModelScope,
                 started = SharingStarted.WhileSubscribed(5_000),

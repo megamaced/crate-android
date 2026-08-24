@@ -90,6 +90,7 @@ class ItemDetailViewModelTest {
             FakeSettingsRepository(),
             FakeCrateApiService(),
             FakeCurrentSession(),
+            dispatcher,
         )
 }
 
