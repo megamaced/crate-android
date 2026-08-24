@@ -7,6 +7,40 @@ updates:
     groups:
       androidx:
         patterns: ['androidx.*']
+    # Everything below is blocked by the AGP 8.13 -> 9 migration, verified by
+    # building each one rather than from release notes. Two distinct causes:
+    #
+    #   compileSdk 37 (needs AGP 9.1+, 8.13 caps at 36):
+    #     androidx.hilt 1.4.0, compose-bom 2026.08.00, core-ktx 1.19.0,
+    #     lifecycle 2.11.0, exifinterface 1.4.2, okhttp 5.5.0
+    #
+    #   Kotlin metadata 2.4.0, which Hilt 2.58's kotlin-metadata-jvm cannot
+    #   read — and Hilt 2.59+ itself requires AGP 9:
+    #     coil 3.5.0, Kotlin 2.4.x, Hilt 2.60.x
+    #
+    # Floors are set so patches below the gate still come through. Lift these
+    # together with the AGP 9 migration, not one at a time.
+    ignore:
+      - dependency-name: 'androidx.hilt:*'
+        versions: ['>=1.4.0']
+      - dependency-name: 'androidx.compose:compose-bom'
+        versions: ['>=2026.08.00']
+      - dependency-name: 'androidx.core:core-ktx'
+        versions: ['>=1.19.0']
+      - dependency-name: 'androidx.lifecycle:*'
+        versions: ['>=2.11.0']
+      - dependency-name: 'androidx.exifinterface:exifinterface'
+        versions: ['>=1.4.2']
+      - dependency-name: 'com.squareup.okhttp3:*'
+        versions: ['>=5.5.0']
+      - dependency-name: 'io.coil-kt.coil3:*'
+        versions: ['>=3.5.0']
+      - dependency-name: 'org.jetbrains.kotlin:*'
+        versions: ['>=2.4.0']
+      - dependency-name: 'org.jetbrains.kotlin.*'
+        versions: ['>=2.4.0']
+      - dependency-name: 'com.google.dagger:*'
+        versions: ['>=2.59']
 
   # Also keeps the commit-SHA pins in .github/workflows up to date, which is
   # what makes pinning to a SHA maintainable rather than a one-off.
