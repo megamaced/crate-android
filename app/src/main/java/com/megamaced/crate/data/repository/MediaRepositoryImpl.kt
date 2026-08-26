@@ -130,6 +130,11 @@ class MediaRepositoryImpl
                 // thread (apiCall's block runs in the caller's context until
                 // the first real suspension).
                 val sanitised = withContext(Dispatchers.Default) { ExifStrip.strip(bytes, mimeType) }
+                // ExifStrip logs why a strip fell back; this names the upload
+                // it happened on, which is what makes the warning actionable.
+                if (!sanitised.stripped) {
+                    Timber.w("Artwork for item %d is uploading with its original metadata", id)
+                }
                 // Label the part with the type the bytes actually are now —
                 // stripping re-encodes HEIC/WebP to JPEG.
                 val body = sanitised.bytes.toRequestBody(mediaTypeFor(sanitised.mimeType))
@@ -163,6 +168,9 @@ class MediaRepositoryImpl
                 // carry GPS, timestamps, camera serials. Decode/re-encode is
                 // CPU-bound; keep it off the main thread.
                 val sanitised = withContext(Dispatchers.Default) { ExifStrip.strip(bytes, mimeType) }
+                if (!sanitised.stripped) {
+                    Timber.w("Photo %d for item %d is uploading with its original metadata", slot, id)
+                }
                 val body = sanitised.bytes.toRequestBody(mediaTypeFor(sanitised.mimeType))
                 val part = MultipartBody.Part.createFormData(
                     "file",

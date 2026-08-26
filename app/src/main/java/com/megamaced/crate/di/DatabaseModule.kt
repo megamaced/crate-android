@@ -18,6 +18,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import timber.log.Timber
 import javax.inject.Singleton
 
 @Module
@@ -42,6 +43,18 @@ object DatabaseModule {
             .addCallback(
                 object : RoomDatabase.Callback() {
                     override fun onDestructiveMigration(db: SupportSQLiteDatabase) {
+                        // Room found no migration path to the current schema
+                        // version and dropped every table, so this device just
+                        // lost its whole local collection. Nothing here can get
+                        // it back — the only defence is a missing migration
+                        // being impossible to overlook in a log or bug report.
+                        // CrateDatabaseMigrationTest is what stops it reaching
+                        // a device in the first place.
+                        Timber.e(
+                            "DESTRUCTIVE MIGRATION of %s at v%d: every local row dropped, a migration is missing",
+                            CrateDatabase.NAME,
+                            db.version,
+                        )
                         // The DB was just recreated empty, but the delta-sync
                         // cursor in DataStore still points at the pre-wipe
                         // state. Left alone, the next sync would only fetch

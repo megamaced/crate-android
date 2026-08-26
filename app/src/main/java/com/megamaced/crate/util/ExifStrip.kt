@@ -31,7 +31,10 @@ import java.io.ByteArrayOutputStream
  * camera image (12MP+ → ~48 MB as ARGB_8888) can't OOM the process.
  *
  * On any failure the original bytes are returned: we'd rather upload an intact
- * image with metadata than fail the upload outright.
+ * image with metadata than fail the upload outright. That trade-off is
+ * reported rather than silent — the fallback is logged, and [Stripped.stripped]
+ * is false so a caller can tell an upload that still carries GPS from one that
+ * doesn't.
  */
 object ExifStrip {
     /**
@@ -43,16 +46,29 @@ object ExifStrip {
     data class Stripped(
         val bytes: ByteArray,
         val mimeType: String,
+        /**
+         * True when [bytes] are a fresh re-encode and therefore carry no
+         * EXIF/IPTC/XMP. False when the platform couldn't decode the image and
+         * these are the untouched original bytes — whatever GPS, timestamps and
+         * camera serials the source held are still in them.
+         */
+        val stripped: Boolean = true,
     ) {
         // ByteArray uses identity equals/hashCode, so the generated data-class
         // implementations would be misleading. Compare contents instead.
         override fun equals(other: Any?): Boolean {
             if (this === other) return true
             if (other !is Stripped) return false
-            return mimeType == other.mimeType && bytes.contentEquals(other.bytes)
+            return mimeType == other.mimeType &&
+                stripped == other.stripped &&
+                bytes.contentEquals(other.bytes)
         }
 
-        override fun hashCode(): Int = 31 * bytes.contentHashCode() + mimeType.hashCode()
+        override fun hashCode(): Int {
+            var result = bytes.contentHashCode()
+            result = 31 * result + mimeType.hashCode()
+            return 31 * result + stripped.hashCode()
+        }
     }
 
     /**
@@ -71,9 +87,6 @@ object ExifStrip {
         val outFormat =
             if (isPng) Bitmap.CompressFormat.PNG else Bitmap.CompressFormat.JPEG
         val outMime = if (isPng) "image/png" else "image/jpeg"
-        // The un-re-encoded fallbacks below keep the source type, since the
-        // bytes are returned exactly as they arrived.
-        val unchanged = Stripped(bytes, mimeType)
         return try {
             // 1. Bounds-only pass to size the downsample factor without
             //    allocating the full bitmap.
@@ -82,7 +95,7 @@ object ExifStrip {
             if (boundsOpts.outWidth <= 0 || boundsOpts.outHeight <= 0) {
                 // Not a decodable raster (or an unsupported codec). Fall back
                 // to the original bytes rather than fail the upload.
-                return unchanged
+                return unstripped(bytes, mimeType, "no decodable image bounds")
             }
 
             val decodeOpts =
@@ -90,7 +103,7 @@ object ExifStrip {
                     inSampleSize = sampleSize(boundsOpts.outWidth, boundsOpts.outHeight, MAX_DIMENSION)
                 }
             val decoded = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, decodeOpts)
-                ?: return unchanged
+                ?: return unstripped(bytes, mimeType, "the platform decoder returned no bitmap")
 
             // 2. Bake in the source orientation (the tag is lost on re-encode).
             val oriented = applyOrientation(decoded, readOrientation(bytes))
@@ -100,11 +113,36 @@ object ExifStrip {
             val ok = oriented.compress(outFormat, quality, out)
             if (oriented !== decoded) decoded.recycle()
             oriented.recycle()
-            if (ok) Stripped(out.toByteArray(), outMime) else unchanged
+            if (ok) {
+                Stripped(out.toByteArray(), outMime)
+            } else {
+                unstripped(bytes, mimeType, "re-encoding to $outMime failed")
+            }
         } catch (t: Throwable) {
-            Timber.w(t, "EXIF strip failed; uploading original bytes")
-            unchanged
+            unstripped(bytes, mimeType, "the strip threw", t)
         }
+    }
+
+    /**
+     * The original bytes, returned as they arrived and still carrying their
+     * metadata. Logged at warn because the user is told uploads are stripped:
+     * a silent fallback leaves them believing their location was removed when
+     * it wasn't.
+     */
+    private fun unstripped(
+        bytes: ByteArray,
+        mimeType: String,
+        reason: String,
+        cause: Throwable? = null,
+    ): Stripped {
+        Timber.w(
+            cause,
+            "EXIF NOT stripped from %s (%s) — uploading the original %d bytes, GPS and timestamps intact",
+            mimeType,
+            reason,
+            bytes.size,
+        )
+        return Stripped(bytes, mimeType, stripped = false)
     }
 
     /** Power-of-two subsample so the longest edge lands at or below [maxDim]. */
