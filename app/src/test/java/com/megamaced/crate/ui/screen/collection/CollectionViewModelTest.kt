@@ -218,7 +218,7 @@ class CollectionViewModelTest {
         }
 
     @Test
-    fun `the owned tab is the default and wanted items stay out of it`() =
+    fun `owned is the default status and wanted items stay out of it`() =
         runTest {
             val repo = FakeMediaRepository().apply {
                 seed(
@@ -237,7 +237,7 @@ class CollectionViewModelTest {
                 assertEquals(Status.Owned, current.status)
                 assertEquals(listOf(1L, 2L), current.items.map { it.id }.sorted())
                 assertEquals(2, current.totalCount)
-                // The chips describe the tab on screen, not the whole category:
+                // The chips describe the list on screen, not the whole category:
                 // Cassette is only on the wanted list, so offering it here would
                 // be a filter that matches nothing.
                 assertEquals(listOf("CD", "LP"), current.availableFormats.map { it.value })
@@ -246,7 +246,7 @@ class CollectionViewModelTest {
         }
 
     @Test
-    fun `switching tab swaps the list and drops the value filters`() =
+    fun `switching status swaps the list and drops the value filters`() =
         runTest {
             val repo = FakeMediaRepository().apply {
                 seed(
@@ -270,9 +270,10 @@ class CollectionViewModelTest {
 
                 vm.selectStatus(Status.Wanted)
                 while (current.status != Status.Wanted) current = awaitItem()
-                // The tab switch and the cleared filters can arrive as separate
-                // emissions; settle on the one carrying both. LP exists on both
-                // tabs, so a filter that survived would show item 3 alone.
+                // The status switch and the cleared filters can arrive as
+                // separate emissions; settle on the one carrying both. LP
+                // exists on both lists, so a filter that survived would show
+                // item 3 alone.
                 while (current.selectedFormats.isNotEmpty()) current = awaitItem()
                 assertEquals(listOf(3L, 4L), current.items.map { it.id }.sorted())
                 cancelAndIgnoreRemainingEvents()
@@ -280,7 +281,7 @@ class CollectionViewModelTest {
         }
 
     @Test
-    fun `a wanted status nav arg opens the list on the wanted tab`() =
+    fun `a wanted status nav arg opens the list on the wanted items`() =
         runTest {
             val repo = FakeMediaRepository().apply {
                 seed(
@@ -297,7 +298,7 @@ class CollectionViewModelTest {
                 var current = awaitItem()
                 while (current.items.isEmpty()) current = awaitItem()
                 assertEquals(Status.Wanted, current.status)
-                // The tapped item's own tab, not the owned copy of that genre.
+                // The tapped item's own list, not the owned copy of that genre.
                 assertEquals(listOf(2L), current.items.map { it.id })
                 cancelAndIgnoreRemainingEvents()
             }

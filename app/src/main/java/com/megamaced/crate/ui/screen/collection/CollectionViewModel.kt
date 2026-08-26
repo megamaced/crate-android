@@ -36,8 +36,8 @@ import javax.inject.Inject
 
 data class CollectionUiState(
     val category: Category = Category.Music,
-    // The tab on screen. Owned and wanted are separate lists, not a filter over
-    // one list, mirroring CollectionView.vue.
+    // Which of the two lists is on screen. Owned and wanted are separate
+    // lists, not a filter over one list, mirroring CollectionView.vue.
     val status: Status = Status.Owned,
     val sort: CollectionSort = CollectionSort.Default,
     val selectedFormats: Set<String> = emptySet(),
@@ -93,8 +93,8 @@ class CollectionViewModel
         private val argCategory = savedStateHandle.get<String>("category")?.let { Category.fromApi(it) }
 
         // The tapped item's own status, sent along with the filter arg so the
-        // list lands on the tab that actually contains that item rather than
-        // filtering the owned tab down to nothing.
+        // list lands on the one that actually contains that item rather than
+        // filtering the owned list down to nothing.
         private val argStatus = savedStateHandle.get<String>("status")?.let { Status.fromApi(it) }
 
         // category is initialised optimistically to Music — the init block
@@ -164,23 +164,23 @@ class CollectionViewModel
                 val hidden = args[5] as Set<Category>
                 // Status narrows the list before anything else, as it does in
                 // CollectionView.vue: every option list below is built from the
-                // active tab alone, so no tab offers a format, genre or decade
-                // that matches nothing in it.
-                val inTab = filterByStatus(items, f.status)
-                val buckets = formatBuckets(inTab)
+                // selected status alone, so neither list offers a format, genre
+                // or decade that matches nothing in it.
+                val inStatus = filterByStatus(items, f.status)
+                val buckets = formatBuckets(inStatus)
                 val availableSet = buckets.map { it.value }.toSet()
                 val activeFormats = f.selectedFormats.intersect(availableSet)
-                // Option lists are built from the tab's unfiltered items so
-                // picking a genre doesn't reshuffle every other option's count.
-                // A selection that no longer exists (item deleted, category or
-                // tab switched) drops back to "any" rather than hiding
-                // everything.
-                val genres = genreBuckets(inTab)
-                val decades = decadeBuckets(inTab)
+                // Option lists are built from that status's unfiltered items
+                // so picking a genre doesn't reshuffle every other option's
+                // count. A selection that no longer exists (item deleted,
+                // category or status switched) drops back to "any" rather than
+                // hiding everything.
+                val genres = genreBuckets(inStatus)
+                val decades = decadeBuckets(inStatus)
                 val activeGenre = f.genre?.takeIf { g -> genres.any { it.value.equals(g, ignoreCase = true) } }
                 val activeDecade = f.decade?.takeIf { d -> decades.any { it.value == d } }
                 val byFormat =
-                    if (activeFormats.isEmpty()) inTab else inTab.filter { it.format in activeFormats }
+                    if (activeFormats.isEmpty()) inStatus else inStatus.filter { it.format in activeFormats }
                 val filtered = applyValueFilters(byFormat, activeGenre, activeDecade)
                 val sorted = filtered.sortedWith(comparatorForSort(f.sort))
                 val groups = groupItemsForSort(sorted, f.sort.axis)
@@ -197,7 +197,7 @@ class CollectionViewModel
                     availableFormats = buckets,
                     availableGenres = genres,
                     availableDecades = decades,
-                    totalCount = inTab.size,
+                    totalCount = inStatus.size,
                     viewMode = mode,
                     visibleCategories = Category.entries.filter { it !in hidden },
                     isRefreshing = refreshing,
@@ -276,9 +276,10 @@ class CollectionViewModel
         }
 
         /**
-         * Switches tab. Drops the value filters with it, as clicking a status
-         * tab does in the web app: they were chosen against the other tab's
-         * options and would usually narrow this one to nothing.
+         * Switches between the owned and wanted lists. Drops the value filters
+         * with it, as clicking a status tab does in the web app: they were
+         * chosen against the other list's options and would usually narrow this
+         * one to nothing.
          */
         fun selectStatus(value: Status) {
             if (value == status.value) return
@@ -286,7 +287,7 @@ class CollectionViewModel
             clearValueFilters()
         }
 
-        /** Drops the format / genre / decade selections, keeping the tab. */
+        /** Drops the format / genre / decade selections, keeping the status. */
         fun clearValueFilters() {
             selectedFormats.value = emptySet()
             selectedGenre.value = null

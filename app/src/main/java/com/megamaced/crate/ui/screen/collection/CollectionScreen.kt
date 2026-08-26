@@ -21,6 +21,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ViewList
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.outlined.BookmarkBorder
+import androidx.compose.material.icons.outlined.Category
 import androidx.compose.material.icons.outlined.GridView
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.DropdownMenu
@@ -30,11 +33,9 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -73,7 +74,6 @@ import com.megamaced.crate.ui.components.CollectionFilterBar
 import com.megamaced.crate.ui.components.EmptyState
 import com.megamaced.crate.ui.components.MediaCard
 import com.megamaced.crate.ui.components.SortMenuButton
-import com.megamaced.crate.ui.navigation.CategorySegmentedRow
 import com.megamaced.crate.ui.network.LocalIsOnline
 import com.megamaced.crate.ui.screen.share.ShareSheet
 import com.megamaced.crate.ui.screen.share.ShareTarget
@@ -111,6 +111,15 @@ fun CollectionScreen(
             TopAppBar(
                 title = { Text(stringResource(uiState.category.labelRes)) },
                 actions = {
+                    CategoryMenu(
+                        selected = uiState.category,
+                        visible = uiState.visibleCategories,
+                        onCategorySelected = viewModel::selectCategory,
+                    )
+                    StatusMenu(
+                        selected = uiState.status,
+                        onStatusSelected = viewModel::selectStatus,
+                    )
                     ViewModeToggle(
                         current = uiState.viewMode,
                         onSelected = viewModel::setViewMode,
@@ -149,15 +158,6 @@ fun CollectionScreen(
                 .padding(innerPadding),
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
-                CategorySegmentedRow(
-                    selected = uiState.category,
-                    onCategorySelected = viewModel::selectCategory,
-                    visible = uiState.visibleCategories,
-                )
-                StatusSegmentedRow(
-                    selected = uiState.status,
-                    onStatusSelected = viewModel::selectStatus,
-                )
                 CollectionFilterBar(
                     formats = uiState.availableFormats,
                     totalCount = uiState.totalCount,
@@ -173,7 +173,7 @@ fun CollectionScreen(
                 )
                 val artistFirst = uiState.sort.axis == SortField.Artist
                 // The empty case is decided here rather than inside the grid and
-                // the list: what to say depends on the tab and on whether a
+                // the list: what to say depends on the status and on whether a
                 // filter emptied it, and neither of those reaches them.
                 if (uiState.groups.all { it.items.isEmpty() }) {
                     CollectionEmptyState(
@@ -248,41 +248,106 @@ private fun ShareCollectionMenu(
 }
 
 /**
- * Owned and wanted as two tabs, the same shape of control as the category row
- * above it. Owned is the collection proper and comes first; the tab is a mode
- * rather than a filter, so switching it clears the value filters.
+ * The category picker. It sits in the app bar rather than the body because a
+ * phone has room for one row of controls above the grid, not several. The app
+ * bar title names the current category, so the button is a control rather than
+ * the sign of what is selected; only categories the user hasn't hidden in
+ * settings are offered.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun StatusSegmentedRow(
-    selected: Status,
-    onStatusSelected: (Status) -> Unit,
-    modifier: Modifier = Modifier,
+private fun CategoryMenu(
+    selected: Category,
+    visible: List<Category>,
+    onCategorySelected: (Category) -> Unit,
 ) {
-    val options = Status.entries
-    val groupLabel = stringResource(R.string.collection_status_tabs_a11y)
-    SingleChoiceSegmentedButtonRow(
-        modifier = modifier
-            .padding(horizontal = 16.dp, vertical = 4.dp)
-            .semantics { contentDescription = groupLabel },
+    var expanded by remember { mutableStateOf(false) }
+    if (visible.isEmpty()) return
+
+    IconButton(onClick = { expanded = true }) {
+        Icon(
+            imageVector = Icons.Outlined.Category,
+            contentDescription = stringResource(
+                R.string.collection_category_button,
+                stringResource(selected.labelRes),
+            ),
+        )
+    }
+    DropdownMenu(
+        expanded = expanded,
+        onDismissRequest = { expanded = false },
     ) {
-        options.forEachIndexed { index, status ->
-            SegmentedButton(
-                selected = status == selected,
-                onClick = { onStatusSelected(status) },
-                shape = SegmentedButtonDefaults.itemShape(
-                    index = index,
-                    count = options.size,
-                ),
-            ) {
-                Text(stringResource(status.labelRes))
-            }
+        visible.forEach { category ->
+            val label = stringResource(category.labelRes)
+            DropdownMenuItem(
+                text = {
+                    Text(
+                        if (category == selected) {
+                            stringResource(R.string.category_option_selected, label)
+                        } else {
+                            label
+                        },
+                    )
+                },
+                onClick = {
+                    onCategorySelected(category)
+                    expanded = false
+                },
+            )
         }
     }
 }
 
 /**
- * The empty collection, worded for the tab it is empty on and for whether a
+ * Owned / wanted, the mode the list is in. Unlike the category, no other piece
+ * of chrome names it, so the button carries the state itself: a filled bookmark
+ * in the accent colour for the wanted list against an outline for the
+ * collection, and a content description that reads the current mode out.
+ */
+@Composable
+private fun StatusMenu(
+    selected: Status,
+    onStatusSelected: (Status) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val wanted = selected == Status.Wanted
+
+    IconButton(onClick = { expanded = true }) {
+        Icon(
+            imageVector = if (wanted) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
+            contentDescription = stringResource(
+                R.string.collection_status_button,
+                stringResource(selected.labelRes),
+            ),
+            tint = if (wanted) MaterialTheme.colorScheme.primary else LocalContentColor.current,
+        )
+    }
+    DropdownMenu(
+        expanded = expanded,
+        onDismissRequest = { expanded = false },
+    ) {
+        Status.entries.forEach { status ->
+            val label = stringResource(status.labelRes)
+            DropdownMenuItem(
+                text = {
+                    Text(
+                        if (status == selected) {
+                            stringResource(R.string.status_option_selected, label)
+                        } else {
+                            label
+                        },
+                    )
+                },
+                onClick = {
+                    onStatusSelected(status)
+                    expanded = false
+                },
+            )
+        }
+    }
+}
+
+/**
+ * The empty collection, worded for the status it is empty on and for whether a
  * filter is what emptied it — a filtered-empty list gets the way out of it
  * rather than an invitation to add something.
  */

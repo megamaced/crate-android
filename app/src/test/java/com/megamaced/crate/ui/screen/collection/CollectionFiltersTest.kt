@@ -88,10 +88,10 @@ class CollectionFiltersTest {
     }
 
     @Test
-    fun `buckets built over one tab don't offer the other tab's values`() {
+    fun `buckets built over one status don't offer the other status's values`() {
         // The order is what matters here: status narrows the list before the
         // option lists are built, so a genre or a decade that only the wanted
-        // list carries is never offered on the owned tab, where selecting it
+        // list carries is never offered on the owned list, where selecting it
         // would empty the list.
         val items = listOf(
             item(1, genres = "Rock", year = 1997),

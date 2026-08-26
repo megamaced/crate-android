@@ -160,7 +160,10 @@
     <string name="collection_empty_filtered_collection">No %1$s items in your collection.</string>
     <string name="collection_empty_filtered_wanted">No %1$s items in your wanted list.</string>
     <string name="collection_clear_filters">Clear filters</string>
-    <string name="collection_status_tabs_a11y">Collection or wanted list</string>
+    <string name="collection_category_button">Category: %1$s</string>
+    <string name="collection_status_button">Status: %1$s</string>
+    <string name="category_option_selected">"%1$s  ✓"</string>
+    <string name="status_option_selected">"%1$s  ✓"</string>
     <string name="collection_share_category">Share %1$s…</string>
     <string name="collection_share_library">Share whole library…</string>
     <string name="collection_view_switch_to_list">Switch to list view</string>

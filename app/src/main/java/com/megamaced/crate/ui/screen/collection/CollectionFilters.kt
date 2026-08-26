@@ -87,13 +87,14 @@ internal fun decadeBuckets(items: List<MediaItem>): List<FilterBucket> =
         .sortedBy { it.value.dropLast(1).toIntOrNull() ?: 0 }
 
 /**
- * The items on one status tab. Owned and wanted are separate lists rather than
+ * The items with one status. Owned and wanted are separate lists rather than
  * one list with a filter, as they are in CollectionView.vue.
  *
  * Kept apart from [applyValueFilters] because of where it has to run: the
- * format / genre / decade option lists are built between the two, from the tab
- * alone, so no tab offers a bucket that matches nothing in it. Folding status
- * in alongside the value filters would build those options over both tabs.
+ * format / genre / decade option lists are built between the two, over one
+ * status alone, so neither list offers a bucket that matches nothing in it.
+ * Folding status in alongside the value filters would build those options over
+ * both lists at once.
  */
 internal fun filterByStatus(
     items: List<MediaItem>,

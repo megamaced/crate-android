@@ -1,0 +1,8 @@
+Less clutter above your collection.
+
+- Category and status are now buttons in the toolbar, next to view, sort
+  and share, instead of two rows of tabs.
+- That gives the grid back most of a screen's worth of space.
+- The status button fills in and changes colour while you are looking at
+  your wanted list.
+- The year, genre and format filters are unchanged.
