@@ -48,7 +48,7 @@ updates:
         versions: ['>=9.0.0']
       - dependency-name: 'com.android.library'
         versions: ['>=9.0.0']
-      - dependency-name: 'gradle'
+      - dependency-name: 'gradle-wrapper'
         versions: ['>=9.0.0']
 
   # Also keeps the commit-SHA pins in .github/workflows up to date, which is
