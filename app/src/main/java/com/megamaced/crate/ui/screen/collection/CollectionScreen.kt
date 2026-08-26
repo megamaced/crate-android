@@ -32,9 +32,13 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
@@ -63,6 +67,7 @@ import com.megamaced.crate.domain.model.Category
 import com.megamaced.crate.domain.model.MarketValue
 import com.megamaced.crate.domain.model.MediaItem
 import com.megamaced.crate.domain.model.SortField
+import com.megamaced.crate.domain.model.Status
 import com.megamaced.crate.ui.components.ArtworkImage
 import com.megamaced.crate.ui.components.CollectionFilterBar
 import com.megamaced.crate.ui.components.EmptyState
@@ -149,6 +154,10 @@ fun CollectionScreen(
                     onCategorySelected = viewModel::selectCategory,
                     visible = uiState.visibleCategories,
                 )
+                StatusSegmentedRow(
+                    selected = uiState.status,
+                    onStatusSelected = viewModel::selectStatus,
+                )
                 CollectionFilterBar(
                     formats = uiState.availableFormats,
                     totalCount = uiState.totalCount,
@@ -163,21 +172,33 @@ fun CollectionScreen(
                     onGenreSelected = viewModel::selectGenre,
                 )
                 val artistFirst = uiState.sort.axis == SortField.Artist
-                when (uiState.viewMode) {
-                    CollectionViewMode.Card -> CollectionGrid(
-                        groups = uiState.groups,
-                        onItemClick = onItemClick,
-                        widthSizeClass = widthSizeClass,
+                // The empty case is decided here rather than inside the grid and
+                // the list: what to say depends on the tab and on whether a
+                // filter emptied it, and neither of those reaches them.
+                if (uiState.groups.all { it.items.isEmpty() }) {
+                    CollectionEmptyState(
+                        status = uiState.status,
+                        filterDescription = activeFilterDescription(uiState),
+                        onClearFilters = viewModel::clearValueFilters,
                         modifier = Modifier.fillMaxSize(),
-                        artistFirst = artistFirst,
                     )
+                } else {
+                    when (uiState.viewMode) {
+                        CollectionViewMode.Card -> CollectionGrid(
+                            groups = uiState.groups,
+                            onItemClick = onItemClick,
+                            widthSizeClass = widthSizeClass,
+                            modifier = Modifier.fillMaxSize(),
+                            artistFirst = artistFirst,
+                        )
 
-                    CollectionViewMode.List -> CollectionList(
-                        groups = uiState.groups,
-                        onItemClick = onItemClick,
-                        modifier = Modifier.fillMaxSize(),
-                        artistFirst = artistFirst,
-                    )
+                        CollectionViewMode.List -> CollectionList(
+                            groups = uiState.groups,
+                            onItemClick = onItemClick,
+                            modifier = Modifier.fillMaxSize(),
+                            artistFirst = artistFirst,
+                        )
+                    }
                 }
             }
         }
@@ -225,6 +246,93 @@ private fun ShareCollectionMenu(
         )
     }
 }
+
+/**
+ * Owned and wanted as two tabs, the same shape of control as the category row
+ * above it. Owned is the collection proper and comes first; the tab is a mode
+ * rather than a filter, so switching it clears the value filters.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun StatusSegmentedRow(
+    selected: Status,
+    onStatusSelected: (Status) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val options = Status.entries
+    val groupLabel = stringResource(R.string.collection_status_tabs_a11y)
+    SingleChoiceSegmentedButtonRow(
+        modifier = modifier
+            .padding(horizontal = 16.dp, vertical = 4.dp)
+            .semantics { contentDescription = groupLabel },
+    ) {
+        options.forEachIndexed { index, status ->
+            SegmentedButton(
+                selected = status == selected,
+                onClick = { onStatusSelected(status) },
+                shape = SegmentedButtonDefaults.itemShape(
+                    index = index,
+                    count = options.size,
+                ),
+            ) {
+                Text(stringResource(status.labelRes))
+            }
+        }
+    }
+}
+
+/**
+ * The empty collection, worded for the tab it is empty on and for whether a
+ * filter is what emptied it — a filtered-empty list gets the way out of it
+ * rather than an invitation to add something.
+ */
+@Composable
+private fun CollectionEmptyState(
+    status: Status,
+    filterDescription: String?,
+    onClearFilters: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val wanted = status == Status.Wanted
+    if (filterDescription != null) {
+        EmptyState(
+            title = stringResource(
+                if (wanted) {
+                    R.string.collection_empty_filtered_wanted
+                } else {
+                    R.string.collection_empty_filtered_collection
+                },
+                filterDescription,
+            ),
+            modifier = modifier,
+            action = {
+                TextButton(onClick = onClearFilters) {
+                    Text(stringResource(R.string.collection_clear_filters))
+                }
+            },
+        )
+    } else {
+        EmptyState(
+            title = stringResource(
+                if (wanted) R.string.collection_empty_wanted_title else R.string.collection_empty_title,
+            ),
+            subtitle = stringResource(
+                if (wanted) R.string.collection_empty_wanted_subtitle else R.string.collection_empty_subtitle,
+            ),
+            modifier = modifier,
+        )
+    }
+}
+
+/**
+ * The active filters as one phrase — "1990s Rock LP" — for the empty state to
+ * read back. Null when nothing is filtered. Decade, genre then format, the
+ * order the web app reads them in.
+ */
+private fun activeFilterDescription(state: CollectionUiState): String? =
+    (listOfNotNull(state.selectedDecade, state.selectedGenre) + state.selectedFormats.sorted())
+        .takeIf { it.isNotEmpty() }
+        ?.joinToString(" ")
 
 @Composable
 internal fun ViewModeToggle(

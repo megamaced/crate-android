@@ -77,6 +77,33 @@ class CollectionFiltersTest {
     }
 
     @Test
+    fun `status splits the collection into two lists`() {
+        val items = listOf(
+            item(1, status = Status.Owned),
+            item(2, status = Status.Wanted),
+            item(3, status = Status.Owned),
+        )
+        assertEquals(listOf(1L, 3L), filterByStatus(items, Status.Owned).map { it.id })
+        assertEquals(listOf(2L), filterByStatus(items, Status.Wanted).map { it.id })
+    }
+
+    @Test
+    fun `buckets built over one tab don't offer the other tab's values`() {
+        // The order is what matters here: status narrows the list before the
+        // option lists are built, so a genre or a decade that only the wanted
+        // list carries is never offered on the owned tab, where selecting it
+        // would empty the list.
+        val items = listOf(
+            item(1, genres = "Rock", year = 1997),
+            item(2, genres = "Vaporwave", year = 2014, status = Status.Wanted),
+        )
+        val owned = filterByStatus(items, Status.Owned)
+        assertEquals(listOf("Rock"), genreBuckets(owned).map { it.value })
+        assertEquals(listOf("1990s"), decadeBuckets(owned).map { it.value })
+        assertTrue(applyValueFilters(owned, "Vaporwave", null).isEmpty())
+    }
+
+    @Test
     fun `genre and decade filters combine`() {
         val items = listOf(
             item(1, genres = "Rock", year = 1997),
@@ -93,6 +120,7 @@ class CollectionFiltersTest {
         id: Long,
         genres: String? = "Rock",
         year: Int? = 2000,
+        status: Status = Status.Owned,
     ) = MediaItem(
         id = id,
         userId = null,
@@ -102,7 +130,7 @@ class CollectionFiltersTest {
         year = year,
         barcode = null,
         notes = null,
-        status = Status.Owned,
+        status = status,
         category = Category.Music,
         discogsId = null,
         artworkPath = null,

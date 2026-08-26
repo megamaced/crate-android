@@ -26,6 +26,8 @@ import coil3.compose.AsyncImage
 import com.megamaced.crate.R
 import com.megamaced.crate.data.api.dto.SuggestionDto
 import com.megamaced.crate.domain.model.Category
+import com.megamaced.crate.ui.theme.SectionSpacing
+import com.megamaced.crate.ui.theme.WithinSectionSpacing
 
 /**
  * Artwork for one suggestion. A suggestion is either something already in the
@@ -77,6 +79,9 @@ data class SuggestionEntry(
  * are none. Rendering nothing is the point: both suggestion rows are extras,
  * so an empty one should be invisible rather than an empty state — the detail
  * screen has to look complete without them.
+ *
+ * The row carries its own leading section gap, so consecutive rows read as
+ * separate sections wherever they are stacked.
  */
 @Composable
 fun RecommendationRow(
@@ -88,7 +93,12 @@ fun RecommendationRow(
 ) {
     if (entries.isEmpty()) return
 
-    Column(modifier = modifier.fillMaxWidth()) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(top = SectionSpacing),
+        verticalArrangement = Arrangement.spacedBy(WithinSectionSpacing),
+    ) {
         Row(
             modifier = Modifier.padding(horizontal = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -105,7 +115,7 @@ fun RecommendationRow(
         }
 
         LazyRow(
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+            contentPadding = PaddingValues(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             items(entries, key = { it.key }) { entry ->
@@ -141,21 +151,28 @@ fun RecommendationRow(
                         }
                     }
 
+                    // Both lines are pinned to a fixed line count, and the
+                    // subtitle is laid out even when there is none: every tile
+                    // has to measure to the same height, or the row's height
+                    // changes as tiles are recycled during a horizontal scroll
+                    // and everything below it shifts. Line counts rather than a
+                    // fixed height in dp, so the reserved space still follows
+                    // the system font scale.
                     Text(
                         text = entry.title,
                         style = MaterialTheme.typography.bodySmall,
+                        minLines = 2,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    if (!entry.subtitle.isNullOrBlank()) {
-                        Text(
-                            text = entry.subtitle,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
+                    Text(
+                        text = entry.subtitle.orEmpty(),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        minLines = 1,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
             }
         }

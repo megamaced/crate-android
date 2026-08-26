@@ -12,12 +12,15 @@ sealed interface Destination {
     // category as before. At most one of [genre], [format] and [decade] is ever
     // set: tapping a value means "show me everything like this", so it replaces
     // the other filters rather than narrowing what the list already showed.
+    // [status] carries the tapped item's own owned/wanted state, so the list
+    // opens on the tab that holds it; null selects owned, as a fresh open does.
     @Serializable
     data class Collection(
         val category: String? = null,
         val genre: String? = null,
         val format: String? = null,
         val decade: String? = null,
+        val status: String? = null,
     ) : Destination
 
     @Serializable

@@ -26,11 +26,17 @@ fun LoadingState(modifier: Modifier = Modifier) {
     }
 }
 
+/**
+ * [action] is the way out of the state, for an empty view the user can do
+ * something about — clearing the filters that emptied it, say. Omitted where
+ * there is nothing to undo.
+ */
 @Composable
 fun EmptyState(
     title: String,
     subtitle: String? = null,
     modifier: Modifier = Modifier,
+    action: (@Composable () -> Unit)? = null,
 ) {
     Column(
         modifier = modifier
@@ -52,6 +58,10 @@ fun EmptyState(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
             )
+        }
+        if (action != null) {
+            Spacer(modifier = Modifier.height(8.dp))
+            action()
         }
     }
 }

@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -26,7 +27,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -69,6 +69,7 @@ import com.megamaced.crate.R
 import com.megamaced.crate.data.api.dto.SuggestionDto
 import com.megamaced.crate.domain.model.Category
 import com.megamaced.crate.domain.model.MediaItem
+import com.megamaced.crate.domain.model.Status
 import com.megamaced.crate.domain.model.Track
 import com.megamaced.crate.ui.components.ArtworkImage
 import com.megamaced.crate.ui.components.ArtworkSize
@@ -80,6 +81,8 @@ import com.megamaced.crate.ui.screen.collection.decadeOf
 import com.megamaced.crate.ui.screen.collection.genreTokens
 import com.megamaced.crate.ui.screen.share.ShareSheet
 import com.megamaced.crate.ui.screen.share.ShareTarget
+import com.megamaced.crate.ui.theme.SectionSpacing
+import com.megamaced.crate.ui.theme.WithinSectionSpacing
 import com.megamaced.crate.ui.theme.crateColors
 import com.megamaced.crate.util.resolve
 
@@ -104,17 +107,17 @@ data class CollectionFilterTarget(
     val isShared: Boolean,
     val axis: DetailFilterAxis,
     val value: String,
+    // The item's own owned/wanted state, so the list opens on the tab that
+    // holds it rather than on a tab the item isn't in.
+    val status: Status,
 )
 
 /**
- * Gap between one section of the detail view and the next. Every section takes
- * its separation from the section columns' arrangement rather than from its own
- * padding, so no section can end up spaced differently from its neighbours.
+ * Height every badge in the detail view measures at least, whether or not it
+ * is tappable. Material's own chip height, so the badges line up with the
+ * chips used elsewhere in the app.
  */
-private val SectionSpacing = 20.dp
-
-/** Gap inside a section — a heading and its body, a caption and its chips. */
-private val WithinSectionSpacing = 8.dp
+private val BadgeMinHeight = AssistChipDefaults.Height
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -358,6 +361,7 @@ private fun ItemDetailContent(
                 isShared = isShared,
                 axis = axis,
                 value = value,
+                status = item.status,
             ),
         )
     }
@@ -577,10 +581,11 @@ private fun TrackRow(
 }
 
 /**
- * The badges under the artist. Format and year are tappable and take the user
- * to that slice of the collection, as they do in the web app. The year filters
- * by DECADE: that is the only year axis the collection has, and "everything
- * from the 1990s" is the cut worth offering.
+ * The badges under the artist, in the web app's order: format, year, status,
+ * country. Format and year are tappable and take the user to that slice of the
+ * collection, as they do there. The year filters by DECADE: that is the only
+ * year axis the collection has, and "everything from the 1990s" is the cut
+ * worth offering.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -593,72 +598,105 @@ private fun ChipRow(
     // Read off the same year field as [year], so the two appear together.
     val decade = decadeOf(item)
     val country = item.country?.takeIf { it.isNotBlank() }
-    if (format == null && year == null && country == null) return
+    // Anything not explicitly wanted reads as owned, matching the web app and
+    // the mapper, which already lands an unknown API status on [Status.Owned].
+    val wanted = item.status == Status.Wanted
     FlowRow(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
+        itemVerticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth(),
     ) {
         if (format != null) {
-            FilterValueChip(
+            ValueBadge(
                 value = format,
                 a11y = stringResource(R.string.detail_format_filter_a11y, format),
                 onClick = { onFilter(DetailFilterAxis.Format, format) },
             )
         }
         if (year != null && decade != null) {
-            FilterValueChip(
+            ValueBadge(
                 value = year,
                 a11y = stringResource(R.string.detail_year_filter_a11y, decade),
                 onClick = { onFilter(DetailFilterAxis.Decade, decade) },
             )
         }
+        // A state rather than an axis the collection can be sliced by, so it
+        // is inert like the country. Wanted is the state worth noticing and
+        // takes a filled container; owned keeps the muted default, as the two
+        // do in the web app.
+        ValueBadge(
+            value = stringResource(if (wanted) R.string.status_wanted else R.string.status_owned),
+            containerColor = if (wanted) {
+                MaterialTheme.colorScheme.tertiaryContainer
+            } else {
+                MaterialTheme.colorScheme.surface
+            },
+        )
         if (country != null) {
-            StaticValueChip(country)
+            ValueBadge(value = country)
         }
     }
 }
 
 /**
- * A value that narrows the collection when tapped. AssistChip gives it the
- * tappable look and the button role; [a11y] replaces the bare value with what
- * the tap will actually do.
+ * One pill in the detail view's badge rows. Format, year, status, country and
+ * genre all render through here, so they share a shape, a text style and a
+ * height and cannot drift apart from one another.
+ *
+ * [onClick] is the only thing that separates them: a badge with one narrows the
+ * collection to that value and is announced as a button, and [a11y] replaces
+ * the bare value with what the tap will actually do. A badge without one is
+ * inert — deliberately not a clickable with an empty handler, which would take
+ * focus and be announced as a button indistinguishable from the ones that
+ * navigate.
+ *
+ * [containerColor] is the one visual axis a caller may vary, for a value whose
+ * state deserves emphasis. Its text colour follows from it, and every other
+ * axis stays shared so the badges keep lining up whatever colour they carry.
  */
 @Composable
-private fun FilterValueChip(
+private fun ValueBadge(
     value: String,
-    a11y: String,
-    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    a11y: String? = null,
+    containerColor: Color = MaterialTheme.colorScheme.surface,
+    onClick: (() -> Unit)? = null,
 ) {
-    AssistChip(
-        onClick = onClick,
-        label = { Text(text = value, maxLines = 1, softWrap = false) },
-        shape = AssistChipDefaults.shape,
-        modifier = Modifier.semantics {
-            contentDescription = a11y
-            role = Role.Button
-        },
-    )
-}
-
-/**
- * A value with no filter axis behind it. Deliberately not an AssistChip: a chip
- * with an empty onClick is announced as a button and takes keyboard focus,
- * indistinguishable from the chips that do navigate.
- */
-@Composable
-private fun StaticValueChip(value: String) {
-    Surface(
-        shape = AssistChipDefaults.shape,
-        color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-    ) {
-        Text(
-            text = value,
-            style = MaterialTheme.typography.labelLarge,
-            maxLines = 1,
-            softWrap = false,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+    val label: @Composable () -> Unit = {
+        Box(
+            // A minimum height rather than a fixed one: the label still grows
+            // with the system font scale instead of being clipped by it.
+            modifier = Modifier
+                .defaultMinSize(minHeight = BadgeMinHeight)
+                .padding(horizontal = 12.dp, vertical = 6.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = value,
+                style = MaterialTheme.typography.labelLarge,
+                maxLines = 1,
+                softWrap = false,
+            )
+        }
+    }
+    val shape = AssistChipDefaults.shape
+    val border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+    if (onClick == null) {
+        Surface(modifier = modifier, shape = shape, color = containerColor, border = border, content = label)
+    } else {
+        Surface(
+            onClick = onClick,
+            modifier = modifier.semantics {
+                if (a11y != null) {
+                    contentDescription = a11y
+                }
+                role = Role.Button
+            },
+            shape = shape,
+            color = containerColor,
+            border = border,
+            content = label,
         )
     }
 }
@@ -685,10 +723,11 @@ private fun GenreChips(
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
+            itemVerticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.fillMaxWidth(),
         ) {
             genres.forEach { genre ->
-                FilterValueChip(
+                ValueBadge(
                     value = genre,
                     a11y = stringResource(R.string.detail_genre_filter_a11y, genre),
                     onClick = { onFilter(DetailFilterAxis.Genre, genre) },

@@ -137,6 +137,7 @@ fun CrateNavHost(
                                 genre = genre,
                                 format = format,
                                 decade = decade,
+                                status = target.status.apiValue,
                             ),
                         ) {
                             popUpTo<Destination.Collection> { inclusive = true }

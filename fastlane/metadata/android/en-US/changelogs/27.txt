@@ -1,0 +1,8 @@
+Collection and layout release.
+
+- New Owned / Wanted tabs in the collection view.
+- Item pages now show an Owned or Wanted badge.
+- Suggestion rows no longer shift about while you scroll them.
+- More breathing room between the two suggestion rows.
+- Cards line up at a consistent height in grids and rows.
+- Format, year, status and country badges now align with each other.

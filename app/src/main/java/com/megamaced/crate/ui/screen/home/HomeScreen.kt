@@ -333,19 +333,23 @@ private fun MostValuableCard(
                 Text(
                     text = item.title,
                     style = MaterialTheme.typography.titleSmall,
+                    minLines = 1,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                formatMarketValue(item.marketValue)?.let { value ->
-                    Text(
-                        text = value,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
+                // Laid out even for an item whose stored valuation has no
+                // figure in it: every card in the rail reserves the same text
+                // height, so recycling one during a scroll cannot change the
+                // rail's height and move what sits below it.
+                Text(
+                    text = formatMarketValue(item.marketValue).orEmpty(),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.SemiBold,
+                    minLines = 1,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
         }
     }

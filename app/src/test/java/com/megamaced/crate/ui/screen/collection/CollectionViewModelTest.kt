@@ -218,6 +218,92 @@ class CollectionViewModelTest {
         }
 
     @Test
+    fun `the owned tab is the default and wanted items stay out of it`() =
+        runTest {
+            val repo = FakeMediaRepository().apply {
+                seed(
+                    listOf(
+                        item(1, "OK Computer", format = "LP"),
+                        item(2, "Kid A", format = "CD"),
+                        item(3, "Amnesiac", format = "Cassette", status = Status.Wanted),
+                    ),
+                )
+            }
+            val vm = CollectionViewModel(SavedStateHandle(), repo, FakeCollectionPrefs(), StubSettingsRepository(), dispatcher)
+
+            vm.uiState.test {
+                var current = awaitItem()
+                while (current.items.isEmpty()) current = awaitItem()
+                assertEquals(Status.Owned, current.status)
+                assertEquals(listOf(1L, 2L), current.items.map { it.id }.sorted())
+                assertEquals(2, current.totalCount)
+                // The chips describe the tab on screen, not the whole category:
+                // Cassette is only on the wanted list, so offering it here would
+                // be a filter that matches nothing.
+                assertEquals(listOf("CD", "LP"), current.availableFormats.map { it.value })
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `switching tab swaps the list and drops the value filters`() =
+        runTest {
+            val repo = FakeMediaRepository().apply {
+                seed(
+                    listOf(
+                        item(1, "OK Computer", format = "LP"),
+                        item(2, "Kid A", format = "CD"),
+                        item(3, "Amnesiac", format = "LP", status = Status.Wanted),
+                        item(4, "In Rainbows", format = "CD", status = Status.Wanted),
+                    ),
+                )
+            }
+            val vm = CollectionViewModel(SavedStateHandle(), repo, FakeCollectionPrefs(), StubSettingsRepository(), dispatcher)
+
+            vm.uiState.test {
+                var current = awaitItem()
+                while (current.items.isEmpty()) current = awaitItem()
+
+                vm.toggleFormat("LP")
+                while (current.selectedFormats.isEmpty()) current = awaitItem()
+                assertEquals(listOf(1L), current.items.map { it.id })
+
+                vm.selectStatus(Status.Wanted)
+                while (current.status != Status.Wanted) current = awaitItem()
+                // The tab switch and the cleared filters can arrive as separate
+                // emissions; settle on the one carrying both. LP exists on both
+                // tabs, so a filter that survived would show item 3 alone.
+                while (current.selectedFormats.isNotEmpty()) current = awaitItem()
+                assertEquals(listOf(3L, 4L), current.items.map { it.id }.sorted())
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `a wanted status nav arg opens the list on the wanted tab`() =
+        runTest {
+            val repo = FakeMediaRepository().apply {
+                seed(
+                    listOf(
+                        item(1, "OK Computer", genres = "Art Rock"),
+                        item(2, "Amnesiac", genres = "Art Rock", status = Status.Wanted),
+                    ),
+                )
+            }
+            val args = SavedStateHandle(mapOf("genre" to "Art Rock", "status" to "wanted"))
+            val vm = CollectionViewModel(args, repo, FakeCollectionPrefs(), StubSettingsRepository(), dispatcher)
+
+            vm.uiState.test {
+                var current = awaitItem()
+                while (current.items.isEmpty()) current = awaitItem()
+                assertEquals(Status.Wanted, current.status)
+                // The tapped item's own tab, not the owned copy of that genre.
+                assertEquals(listOf(2L), current.items.map { it.id })
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
     fun `changing category clears format filter and triggers refresh`() =
         runTest {
             val repo = FakeMediaRepository().apply {
@@ -330,6 +416,7 @@ private fun item(
     updatedAt: String? = "2025-01-0$id",
     category: Category = Category.Music,
     genres: String? = null,
+    status: Status = Status.Owned,
 ) = MediaItem(
     id = id,
     userId = null,
@@ -339,7 +426,7 @@ private fun item(
     year = year,
     barcode = null,
     notes = null,
-    status = Status.Owned,
+    status = status,
     category = category,
     discogsId = null,
     artworkPath = null,

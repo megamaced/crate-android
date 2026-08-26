@@ -13,6 +13,7 @@ import com.megamaced.crate.domain.model.Category
 import com.megamaced.crate.domain.model.CategorySortConfig
 import com.megamaced.crate.domain.model.CollectionSort
 import com.megamaced.crate.domain.model.MediaItem
+import com.megamaced.crate.domain.model.Status
 import com.megamaced.crate.domain.repository.MediaRepository
 import com.megamaced.crate.domain.repository.SettingsRepository
 import com.megamaced.crate.util.UiText
@@ -35,6 +36,9 @@ import javax.inject.Inject
 
 data class CollectionUiState(
     val category: Category = Category.Music,
+    // The tab on screen. Owned and wanted are separate lists, not a filter over
+    // one list, mirroring CollectionView.vue.
+    val status: Status = Status.Owned,
     val sort: CollectionSort = CollectionSort.Default,
     val selectedFormats: Set<String> = emptySet(),
     // Single-select, unlike formats: a dropdown per axis rather than chips,
@@ -64,6 +68,7 @@ data class ItemGroup(
 
 private data class Filters(
     val category: Category,
+    val status: Status,
     val sort: CollectionSort,
     val selectedFormats: Set<String>,
     val genre: String?,
@@ -87,11 +92,21 @@ class CollectionViewModel
         // instead.
         private val argCategory = savedStateHandle.get<String>("category")?.let { Category.fromApi(it) }
 
+        // The tapped item's own status, sent along with the filter arg so the
+        // list lands on the tab that actually contains that item rather than
+        // filtering the owned tab down to nothing.
+        private val argStatus = savedStateHandle.get<String>("status")?.let { Status.fromApi(it) }
+
         // category is initialised optimistically to Music — the init block
         // resolves the persisted last category (if any) and updates it before
         // the first user interaction. If the persisted category is now hidden
         // we fall back to the first visible category instead.
         private val category = MutableStateFlow(argCategory ?: Category.Music)
+
+        // Not persisted, and reset to owned on every launch as the web app
+        // does: a wanted list left selected days ago would otherwise read as an
+        // empty collection on the next open.
+        private val status = MutableStateFlow(argStatus ?: Status.Owned)
         private val sort = MutableStateFlow(CollectionSort.Default)
 
         // The detail view applies one filter at a time, so at most one of these
@@ -108,7 +123,19 @@ class CollectionViewModel
         // persisted-category restore must not overwrite it.
         private var initialCategoryRestored = argCategory != null
 
-        private val filters = combine(category, sort, selectedFormats, selectedGenre, selectedDecade, ::Filters)
+        // Typed combine tops out at five flows, so the two that decide which
+        // items are in play at all pair up before the three that narrow them.
+        private val categoryAndStatus = combine(category, status, ::Pair)
+        private val filters =
+            combine(
+                categoryAndStatus,
+                sort,
+                selectedFormats,
+                selectedGenre,
+                selectedDecade,
+            ) { (category, status), sort, formats, genre, decade ->
+                Filters(category, status, sort, formats, genre, decade)
+            }
         private val itemsForCategory = category.flatMapLatest { mediaRepository.observeByCategory(it) }
         private val viewMode = collectionPrefs.collectionViewModeFlow
         private val hiddenCategories = settingsRepository.hiddenCategoriesFlow
@@ -135,25 +162,32 @@ class CollectionViewModel
 
                 @Suppress("UNCHECKED_CAST")
                 val hidden = args[5] as Set<Category>
-                val buckets = formatBuckets(items)
+                // Status narrows the list before anything else, as it does in
+                // CollectionView.vue: every option list below is built from the
+                // active tab alone, so no tab offers a format, genre or decade
+                // that matches nothing in it.
+                val inTab = filterByStatus(items, f.status)
+                val buckets = formatBuckets(inTab)
                 val availableSet = buckets.map { it.value }.toSet()
                 val activeFormats = f.selectedFormats.intersect(availableSet)
-                // Option lists are built from the unfiltered category so picking
-                // a genre doesn't reshuffle every other option's count. A
-                // selection that no longer exists (item deleted, category
-                // switched) drops back to "any" rather than hiding everything.
-                val genres = genreBuckets(items)
-                val decades = decadeBuckets(items)
+                // Option lists are built from the tab's unfiltered items so
+                // picking a genre doesn't reshuffle every other option's count.
+                // A selection that no longer exists (item deleted, category or
+                // tab switched) drops back to "any" rather than hiding
+                // everything.
+                val genres = genreBuckets(inTab)
+                val decades = decadeBuckets(inTab)
                 val activeGenre = f.genre?.takeIf { g -> genres.any { it.value.equals(g, ignoreCase = true) } }
                 val activeDecade = f.decade?.takeIf { d -> decades.any { it.value == d } }
                 val byFormat =
-                    if (activeFormats.isEmpty()) items else items.filter { it.format in activeFormats }
+                    if (activeFormats.isEmpty()) inTab else inTab.filter { it.format in activeFormats }
                 val filtered = applyValueFilters(byFormat, activeGenre, activeDecade)
                 val sorted = filtered.sortedWith(comparatorForSort(f.sort))
                 val groups = groupItemsForSort(sorted, f.sort.axis)
 
                 CollectionUiState(
                     category = f.category,
+                    status = f.status,
                     sort = f.sort,
                     selectedFormats = activeFormats,
                     selectedGenre = activeGenre,
@@ -163,7 +197,7 @@ class CollectionViewModel
                     availableFormats = buckets,
                     availableGenres = genres,
                     availableDecades = decades,
-                    totalCount = items.size,
+                    totalCount = inTab.size,
                     viewMode = mode,
                     visibleCategories = Category.entries.filter { it !in hidden },
                     isRefreshing = refreshing,
@@ -227,9 +261,7 @@ class CollectionViewModel
             initialCategoryRestored = true
             if (value != category.value) {
                 category.value = value
-                selectedFormats.value = emptySet()
-                selectedGenre.value = null
-                selectedDecade.value = null
+                clearValueFilters()
                 // If the active sort axis isn't supported by the new category
                 // (e.g. coming from Games' "Format" axis to Music), fall back
                 // to the default — mirrors CollectionView.vue's reset logic.
@@ -241,6 +273,24 @@ class CollectionViewModel
                 viewModelScope.launch { collectionPrefs.setLastCategory(value) }
                 refresh()
             }
+        }
+
+        /**
+         * Switches tab. Drops the value filters with it, as clicking a status
+         * tab does in the web app: they were chosen against the other tab's
+         * options and would usually narrow this one to nothing.
+         */
+        fun selectStatus(value: Status) {
+            if (value == status.value) return
+            status.value = value
+            clearValueFilters()
+        }
+
+        /** Drops the format / genre / decade selections, keeping the tab. */
+        fun clearValueFilters() {
+            selectedFormats.value = emptySet()
+            selectedGenre.value = null
+            selectedDecade.value = null
         }
 
         fun toggleFormat(format: String) {

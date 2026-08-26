@@ -155,6 +155,12 @@
     <!-- Collection -->
     <string name="collection_empty_title">Nothing here yet</string>
     <string name="collection_empty_subtitle">Pull to refresh, or add an item from the + button on the next screen.</string>
+    <string name="collection_empty_wanted_title">Your wanted list is empty.</string>
+    <string name="collection_empty_wanted_subtitle">Items you save as wanted show up here.</string>
+    <string name="collection_empty_filtered_collection">No %1$s items in your collection.</string>
+    <string name="collection_empty_filtered_wanted">No %1$s items in your wanted list.</string>
+    <string name="collection_clear_filters">Clear filters</string>
+    <string name="collection_status_tabs_a11y">Collection or wanted list</string>
     <string name="collection_share_category">Share %1$s…</string>
     <string name="collection_share_library">Share whole library…</string>
     <string name="collection_view_switch_to_list">Switch to list view</string>
