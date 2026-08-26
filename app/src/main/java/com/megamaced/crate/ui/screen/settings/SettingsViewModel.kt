@@ -2,7 +2,9 @@ package com.megamaced.crate.ui.screen.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.megamaced.crate.R
 import com.megamaced.crate.data.api.ApiResult
+import com.megamaced.crate.data.api.toUiText
 import com.megamaced.crate.data.auth.SessionManager
 import com.megamaced.crate.data.prefs.ThemeMode
 import com.megamaced.crate.data.prefs.UserPreferences
@@ -12,6 +14,7 @@ import com.megamaced.crate.domain.model.UserProfile
 import com.megamaced.crate.domain.repository.EnrichmentRepository
 import com.megamaced.crate.domain.repository.MediaRepository
 import com.megamaced.crate.domain.repository.SettingsRepository
+import com.megamaced.crate.util.UiText
 import com.megamaced.crate.util.UpdateChecker
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.async
@@ -55,7 +58,7 @@ data class SettingsUiState(
     val categoryWritesInFlight: Set<Category> = emptySet(),
     val onlineRecommendations: Boolean = false,
     val updateCheck: UpdateCheckState = UpdateCheckState.Idle,
-    val errorMessage: String? = null,
+    val errorMessage: UiText? = null,
 )
 
 /**
@@ -96,7 +99,7 @@ class SettingsViewModel
         private val refreshProgress = MutableStateFlow<RefreshAllProgress?>(null)
         private val enrichProgress = MutableStateFlow<RefreshAllProgress?>(null)
         private val updateCheck = MutableStateFlow<UpdateCheckState>(UpdateCheckState.Idle)
-        private val errorMessage = MutableStateFlow<String?>(null)
+        private val errorMessage = MutableStateFlow<UiText?>(null)
         private val hiddenCategoryEditor = HiddenCategoryEditor(settingsRepository::setHiddenCategories)
 
         val uiState: StateFlow<SettingsUiState> =
@@ -159,13 +162,13 @@ class SettingsViewModel
                     }
 
                     ApiResult.NetworkError -> {
-                        reportError("Couldn't reach the server.").also {
+                        reportError(UiText.Res(R.string.error_network)).also {
                             profile.update { it.copy(isLoading = false) }
                         }
                     }
 
                     is ApiResult.HttpError -> {
-                        reportError(result.message ?: "Server error (${result.code}).").also {
+                        reportError(result.toUiText()).also {
                             profile.update { it.copy(isLoading = false) }
                         }
                     }
@@ -203,7 +206,7 @@ class SettingsViewModel
                 val currencies = (currenciesResult as? ApiResult.Success)?.value.orEmpty()
                 market.value = MarketState(settings = settings, currencies = currencies, isLoading = false)
                 if (settingsResult is ApiResult.HttpError) {
-                    reportError(settingsResult.message ?: "Server error (${settingsResult.code}).")
+                    reportError(settingsResult.toUiText())
                 }
             }
         }
@@ -254,11 +257,11 @@ class SettingsViewModel
                     is ApiResult.Success -> { /* persisted */ }
 
                     ApiResult.NetworkError -> {
-                        reportError("Couldn't reach the server.")
+                        reportError(UiText.Res(R.string.error_network))
                     }
 
                     is ApiResult.HttpError -> {
-                        reportError(result.message ?: "Server error (${result.code}).")
+                        reportError(result.toUiText())
                     }
 
                     ApiResult.Unauthorised -> { /* SessionManager handles */ }
@@ -277,13 +280,13 @@ class SettingsViewModel
                         }
 
                         ApiResult.NetworkError -> {
-                            reportError("Couldn't reach the server.")
+                            reportError(UiText.Res(R.string.error_network))
                             refreshProgress.value = null
                             return@launch
                         }
 
                         is ApiResult.HttpError -> {
-                            reportError(refreshResult.message ?: "Server error (${refreshResult.code}).")
+                            reportError(refreshResult.toUiText())
                             refreshProgress.value = null
                             return@launch
                         }
@@ -319,7 +322,7 @@ class SettingsViewModel
         fun setOnlineRecommendations(enabled: Boolean) {
             viewModelScope.launch {
                 if (settingsRepository.setOnlineRecommendations(enabled) !is ApiResult.Success) {
-                    errorMessage.value = "Couldn't save the recommendations setting."
+                    errorMessage.value = UiText.Res(R.string.settings_recommendations_save_failed)
                 }
             }
         }
@@ -334,13 +337,13 @@ class SettingsViewModel
                     }
 
                     ApiResult.NetworkError -> {
-                        reportError("Couldn't reach the server.")
+                        reportError(UiText.Res(R.string.error_network))
                         enrichProgress.value = null
                         return@launch
                     }
 
                     is ApiResult.HttpError -> {
-                        reportError(mediaResult.message ?: "Server error (${mediaResult.code}).")
+                        reportError(mediaResult.toUiText())
                         enrichProgress.value = null
                         return@launch
                     }
@@ -382,11 +385,11 @@ class SettingsViewModel
                     is ApiResult.Success -> { /* userPreferences cache updated inside repo */ }
 
                     ApiResult.NetworkError -> {
-                        reportError("Couldn't reach the server.")
+                        reportError(UiText.Res(R.string.error_network))
                     }
 
                     is ApiResult.HttpError -> {
-                        reportError(result.message ?: "Server error (${result.code}).")
+                        reportError(result.toUiText())
                     }
 
                     ApiResult.Unauthorised -> { /* SessionManager already handled */ }
@@ -429,11 +432,11 @@ class SettingsViewModel
                     is ApiResult.Success -> { /* local DB also cleared by repo */ }
 
                     ApiResult.NetworkError -> {
-                        reportError("Couldn't reach the server.")
+                        reportError(UiText.Res(R.string.error_network))
                     }
 
                     is ApiResult.HttpError -> {
-                        reportError(result.message ?: "Server error (${result.code}).")
+                        reportError(result.toUiText())
                     }
 
                     ApiResult.Unauthorised -> { /* SessionManager handles */ }
@@ -456,11 +459,11 @@ class SettingsViewModel
                     }
 
                     ApiResult.NetworkError -> {
-                        reportError("Couldn't reach the server.")
+                        reportError(UiText.Res(R.string.error_network))
                     }
 
                     is ApiResult.HttpError -> {
-                        reportError(result.message ?: "Server error (${result.code}).")
+                        reportError(result.toUiText())
                     }
 
                     ApiResult.Unauthorised -> { /* SessionManager handles */ }
@@ -468,7 +471,7 @@ class SettingsViewModel
             }
         }
 
-        private fun reportError(message: String) {
+        private fun reportError(message: UiText) {
             errorMessage.value = message
         }
 

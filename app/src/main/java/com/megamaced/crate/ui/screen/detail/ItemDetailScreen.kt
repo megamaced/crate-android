@@ -1,5 +1,6 @@
 package com.megamaced.crate.ui.screen.detail
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -57,7 +58,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -73,18 +76,52 @@ import com.megamaced.crate.ui.components.LoadingState
 import com.megamaced.crate.ui.components.PhotoImage
 import com.megamaced.crate.ui.components.RecommendationRow
 import com.megamaced.crate.ui.components.SuggestionTarget
+import com.megamaced.crate.ui.screen.collection.decadeOf
 import com.megamaced.crate.ui.screen.collection.genreTokens
 import com.megamaced.crate.ui.screen.share.ShareSheet
 import com.megamaced.crate.ui.screen.share.ShareTarget
 import com.megamaced.crate.ui.theme.crateColors
+import com.megamaced.crate.util.resolve
+
+/** The collection filter axis a tapped value in the detail view narrows to. */
+enum class DetailFilterAxis {
+    Genre,
+    Format,
+    Decade,
+}
+
+/**
+ * The list a tapped value in the detail view jumps to, and the filter it
+ * arrives with. One axis at a time, mirroring the web app, which clears every
+ * other filter before applying the tapped one: a tap means "show me everything
+ * like this", not "narrow what I was already looking at".
+ *
+ * [isShared] sends an item that came from a share to its shared-category page
+ * rather than to the user's own collection.
+ */
+data class CollectionFilterTarget(
+    val categoryApiValue: String,
+    val isShared: Boolean,
+    val axis: DetailFilterAxis,
+    val value: String,
+)
+
+/**
+ * Gap between one section of the detail view and the next. Every section takes
+ * its separation from the section columns' arrangement rather than from its own
+ * padding, so no section can end up spaced differently from its neighbours.
+ */
+private val SectionSpacing = 20.dp
+
+/** Gap inside a section — a heading and its body, a caption and its chips. */
+private val WithinSectionSpacing = 8.dp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ItemDetailScreen(
     onBack: () -> Unit,
     onEdit: (Long, String) -> Unit,
-    // category apiValue, genre, whether the item came from a share
-    onGenreClick: (String, String, Boolean) -> Unit,
+    onFilterCollection: (CollectionFilterTarget) -> Unit,
     onOpenItem: (Long) -> Unit,
     onAddSuggestion: (Category, SuggestionDto) -> Unit,
     modifier: Modifier = Modifier,
@@ -94,8 +131,9 @@ fun ItemDetailScreen(
     val recommendations by viewModel.recommendations.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
 
-    LaunchedEffect(uiState.errorMessage) {
-        uiState.errorMessage?.let { msg ->
+    val errorText = uiState.errorMessage?.resolve()
+    LaunchedEffect(errorText) {
+        errorText?.let { msg ->
             snackbarHostState.showSnackbar(msg)
             viewModel.dismissError()
         }
@@ -118,7 +156,7 @@ fun ItemDetailScreen(
                     IconButton(onClick = onBack) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back",
+                            contentDescription = stringResource(R.string.action_back),
                         )
                     }
                 },
@@ -130,7 +168,7 @@ fun ItemDetailScreen(
                         IconButton(onClick = { menuExpanded = true }) {
                             Icon(
                                 imageVector = Icons.Filled.MoreVert,
-                                contentDescription = "More",
+                                contentDescription = stringResource(R.string.action_more),
                             )
                         }
                         DetailMenu(
@@ -182,7 +220,7 @@ fun ItemDetailScreen(
                         .padding(innerPadding),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text("Item not found", style = MaterialTheme.typography.bodyLarge)
+                    Text(stringResource(R.string.detail_not_found), style = MaterialTheme.typography.bodyLarge)
                 }
             }
 
@@ -192,9 +230,8 @@ fun ItemDetailScreen(
                     activeAction = uiState.activeAction,
                     sharedByUser = uiState.sharedByUser,
                     canWrite = uiState.canWrite,
-                    onGenreClick = { genre ->
-                        onGenreClick(item.category.apiValue, genre, uiState.isShared)
-                    },
+                    isShared = uiState.isShared,
+                    onFilterCollection = onFilterCollection,
                     recommendations = recommendations,
                     onOpenItem = onOpenItem,
                     onAddSuggestion = { suggestion ->
@@ -220,16 +257,16 @@ fun ItemDetailScreen(
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
             icon = { Icon(Icons.Filled.Delete, contentDescription = null) },
-            title = { Text("Delete this item?") },
-            text = { Text("This removes it from your collection on the server. This cannot be undone.") },
+            title = { Text(stringResource(R.string.detail_delete_title)) },
+            text = { Text(stringResource(R.string.detail_delete_message)) },
             confirmButton = {
                 TextButton(onClick = {
                     confirmDelete = false
                     viewModel.delete()
-                }) { Text("Delete") }
+                }) { Text(stringResource(R.string.action_delete)) }
             },
             dismissButton = {
-                TextButton(onClick = { confirmDelete = false }) { Text("Cancel") }
+                TextButton(onClick = { confirmDelete = false }) { Text(stringResource(R.string.action_cancel)) }
             },
         )
     }
@@ -256,36 +293,42 @@ private fun DetailMenu(
     DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
         // Edit + enrichment + market are available to anyone who can write.
         DropdownMenuItem(
-            text = { Text("Edit") },
+            text = { Text(stringResource(R.string.action_edit)) },
             onClick = onEdit,
         )
         // Re-sharing is owner-only.
         if (isOwner) {
             DropdownMenuItem(
-                text = { Text("Share") },
+                text = { Text(stringResource(R.string.action_share)) },
                 onClick = onShare,
             )
         }
         DropdownMenuItem(
-            text = { Text(if (isEnriched) "Re-enrich" else "Enrich") },
+            text = {
+                Text(
+                    stringResource(
+                        if (isEnriched) R.string.detail_menu_re_enrich else R.string.detail_menu_enrich,
+                    ),
+                )
+            },
             onClick = onEnrich,
         )
         if (isEnriched) {
             DropdownMenuItem(
-                text = { Text("Remove enrichment") },
+                text = { Text(stringResource(R.string.detail_menu_remove_enrichment)) },
                 onClick = onStrip,
             )
         }
         if (supportsMarketValue) {
             DropdownMenuItem(
-                text = { Text("Fetch market rate") },
+                text = { Text(stringResource(R.string.detail_menu_fetch_market_rate)) },
                 onClick = onFetchMarketValue,
             )
         }
         // Deletion is owner-only — a sharee gets a 403 server-side anyway.
         if (isOwner) {
             DropdownMenuItem(
-                text = { Text("Delete") },
+                text = { Text(stringResource(R.string.action_delete)) },
                 onClick = onDelete,
             )
         }
@@ -298,12 +341,27 @@ private fun ItemDetailContent(
     activeAction: DetailAction?,
     sharedByUser: String?,
     canWrite: Boolean,
-    onGenreClick: (String) -> Unit,
+    isShared: Boolean,
+    onFilterCollection: (CollectionFilterTarget) -> Unit,
     recommendations: RecommendationsUiState,
     onOpenItem: (Long) -> Unit,
     onAddSuggestion: (SuggestionDto) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // Every tapped value lands on the same list — this item's category, or its
+    // shared-category page when the item came from a share — so the sections
+    // below only have to choose the axis.
+    val onFilter: (DetailFilterAxis, String) -> Unit = { axis, value ->
+        onFilterCollection(
+            CollectionFilterTarget(
+                categoryApiValue = item.category.apiValue,
+                isShared = isShared,
+                axis = axis,
+                value = value,
+            ),
+        )
+    }
+
     // LazyColumn rather than a scrolling Column: a box set's tracklist is
     // dozens of rows, and a Column composes and measures every one of them
     // before the first frame can be drawn.
@@ -334,41 +392,64 @@ private fun ItemDetailContent(
         }
 
         item(key = "metadata") {
+            // Section order mirrors ItemDetailView.vue: the badges, then the
+            // price blocks, then the metadata grid (label, genres, barcode),
+            // then the photos.
             Column(
                 modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(SectionSpacing),
             ) {
-                if (sharedByUser != null) {
+                // Provenance, title and artist read as one heading block, so
+                // they stay tight instead of taking a section gap each.
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    if (sharedByUser != null) {
+                        Text(
+                            text = stringResource(
+                                R.string.detail_shared_by,
+                                sharedByUser,
+                                stringResource(
+                                    if (canWrite) {
+                                        R.string.detail_share_can_edit
+                                    } else {
+                                        R.string.detail_share_read_only
+                                    },
+                                ),
+                            ),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                     Text(
-                        text = "Shared by $sharedByUser · ${if (canWrite) "can edit" else "read-only"}",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        text = item.title,
+                        style = MaterialTheme.typography.headlineSmall,
                     )
-                }
-                Text(
-                    text = item.title,
-                    style = MaterialTheme.typography.headlineSmall,
-                )
-                item.artist?.takeIf { it.isNotBlank() }?.let {
-                    Text(
-                        text = it,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    item.artist?.takeIf { it.isNotBlank() }?.let {
+                        Text(
+                            text = it,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
 
-                ChipRow(item)
+                ChipRow(item = item, onFilter = onFilter)
 
-                GenreChips(item = item, onGenreClick = onGenreClick)
-
-                CategorySpecificFacts(item)
+                if (item.purchasePrice.isPresent) {
+                    PurchasePriceRow(item)
+                }
 
                 if (item.marketValue.isPresent) {
                     MarketValueCard(item)
                 }
 
-                if (item.purchasePrice.isPresent) {
-                    PurchasePriceRow(item)
+                item.label?.takeIf { it.isNotBlank() }?.let { label ->
+                    FactRow(label = stringResource(labelFieldNameRes(item.category)), value = label)
+                }
+
+                GenreChips(item = item, onFilter = onFilter)
+
+                item.barcode?.takeIf { it.isNotBlank() }?.let { barcode ->
+                    FactRow(label = stringResource(R.string.field_barcode), value = barcode)
                 }
 
                 if (item.hasPhoto1 || item.hasPhoto2) {
@@ -380,8 +461,8 @@ private fun ItemDetailContent(
         if (item.tracklist.isNotEmpty()) {
             item(key = "tracklist-header") {
                 SectionHeader(
-                    text = "Tracklist",
-                    modifier = Modifier.padding(horizontal = 16.dp),
+                    text = stringResource(R.string.detail_tracklist),
+                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = SectionSpacing),
                 )
             }
             // Positional keys: the tracklist is a fixed, replaced-wholesale list
@@ -397,28 +478,36 @@ private fun ItemDetailContent(
 
         item(key = "prose") {
             Column(
-                modifier = Modifier.padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.padding(
+                    start = 16.dp,
+                    end = 16.dp,
+                    top = SectionSpacing,
+                    bottom = SectionSpacing,
+                ),
+                verticalArrangement = Arrangement.spacedBy(SectionSpacing),
             ) {
+                item.pressingNotes?.takeIf { it.isNotBlank() }?.let { notes ->
+                    ProseSection(title = stringResource(R.string.detail_pressing_notes), body = notes)
+                }
+
                 item.artistBio?.takeIf { it.isNotBlank() }?.let { bio ->
-                    SectionHeader(
-                        when (item.category) {
-                            Category.Films -> "About the director"
-                            Category.Books -> "About the author"
-                            Category.Games -> "About the developer"
-                            Category.Comics -> "About the publisher"
-                            Category.Music -> "About the artist"
-                        },
+                    ProseSection(
+                        title = stringResource(
+                            when (item.category) {
+                                Category.Films -> R.string.detail_about_director
+                                Category.Books -> R.string.detail_about_author
+                                Category.Games -> R.string.detail_about_developer
+                                Category.Comics -> R.string.detail_about_publisher
+                                Category.Music -> R.string.detail_about_artist
+                            },
+                        ),
+                        body = bio,
                     )
-                    Text(text = bio, style = MaterialTheme.typography.bodyMedium)
                 }
 
                 item.notes?.takeIf { it.isNotBlank() }?.let { notes ->
-                    SectionHeader("Notes")
-                    Text(text = notes, style = MaterialTheme.typography.bodyMedium)
+                    ProseSection(title = stringResource(R.string.detail_notes), body = notes)
                 }
-
-                Spacer(Modifier.height(24.dp))
             }
         }
 
@@ -426,7 +515,7 @@ private fun ItemDetailContent(
         // horizontal padding so its LazyRow can scroll edge to edge.
         item(key = "local-suggestions") {
             RecommendationRow(
-                title = "More from your crate",
+                title = stringResource(R.string.detail_more_from_your_crate),
                 entries = recommendations.local,
                 onClick = { entry ->
                     (entry.target as? SuggestionTarget.Owned)?.let { onOpenItem(it.itemId) }
@@ -436,7 +525,7 @@ private fun ItemDetailContent(
 
         item(key = "online-suggestions") {
             RecommendationRow(
-                title = "If you like this…",
+                title = stringResource(R.string.detail_if_you_like_this),
                 source = recommendations.onlineSource,
                 entries = recommendations.online,
                 onClick = { entry ->
@@ -487,39 +576,90 @@ private fun TrackRow(
     }
 }
 
+/**
+ * The badges under the artist. Format and year are tappable and take the user
+ * to that slice of the collection, as they do in the web app. The year filters
+ * by DECADE: that is the only year axis the collection has, and "everything
+ * from the 1990s" is the cut worth offering.
+ */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun ChipRow(item: MediaItem) {
-    val chips = buildList {
-        item.format?.takeIf { it.isNotBlank() }?.let { add(it) }
-        item.year?.let { add(it.toString()) }
-        item.label?.takeIf { it.isNotBlank() }?.let { add(it) }
-        item.country?.takeIf { it.isNotBlank() }?.let { add(it) }
-    }
-    if (chips.isEmpty()) return
+private fun ChipRow(
+    item: MediaItem,
+    onFilter: (DetailFilterAxis, String) -> Unit,
+) {
+    val format = item.format?.takeIf { it.isNotBlank() }
+    val year = item.year?.takeIf { it != 0 }?.toString()
+    // Read off the same year field as [year], so the two appear together.
+    val decade = decadeOf(item)
+    val country = item.country?.takeIf { it.isNotBlank() }
+    if (format == null && year == null && country == null) return
     FlowRow(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
         modifier = Modifier.fillMaxWidth(),
     ) {
-        chips.forEach { value ->
-            // Deliberately not an AssistChip: these carry no action, and a chip
-            // with an empty onClick is announced as a button and takes keyboard
-            // focus, indistinguishable from the genre chips that do navigate.
-            Surface(
-                shape = AssistChipDefaults.shape,
-                color = MaterialTheme.colorScheme.surface,
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-            ) {
-                Text(
-                    text = value,
-                    style = MaterialTheme.typography.labelLarge,
-                    maxLines = 1,
-                    softWrap = false,
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                )
-            }
+        if (format != null) {
+            FilterValueChip(
+                value = format,
+                a11y = stringResource(R.string.detail_format_filter_a11y, format),
+                onClick = { onFilter(DetailFilterAxis.Format, format) },
+            )
         }
+        if (year != null && decade != null) {
+            FilterValueChip(
+                value = year,
+                a11y = stringResource(R.string.detail_year_filter_a11y, decade),
+                onClick = { onFilter(DetailFilterAxis.Decade, decade) },
+            )
+        }
+        if (country != null) {
+            StaticValueChip(country)
+        }
+    }
+}
+
+/**
+ * A value that narrows the collection when tapped. AssistChip gives it the
+ * tappable look and the button role; [a11y] replaces the bare value with what
+ * the tap will actually do.
+ */
+@Composable
+private fun FilterValueChip(
+    value: String,
+    a11y: String,
+    onClick: () -> Unit,
+) {
+    AssistChip(
+        onClick = onClick,
+        label = { Text(text = value, maxLines = 1, softWrap = false) },
+        shape = AssistChipDefaults.shape,
+        modifier = Modifier.semantics {
+            contentDescription = a11y
+            role = Role.Button
+        },
+    )
+}
+
+/**
+ * A value with no filter axis behind it. Deliberately not an AssistChip: a chip
+ * with an empty onClick is announced as a button and takes keyboard focus,
+ * indistinguishable from the chips that do navigate.
+ */
+@Composable
+private fun StaticValueChip(value: String) {
+    Surface(
+        shape = AssistChipDefaults.shape,
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+    ) {
+        Text(
+            text = value,
+            style = MaterialTheme.typography.labelLarge,
+            maxLines = 1,
+            softWrap = false,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+        )
     }
 }
 
@@ -532,13 +672,13 @@ private fun ChipRow(item: MediaItem) {
 @Composable
 private fun GenreChips(
     item: MediaItem,
-    onGenreClick: (String) -> Unit,
+    onFilter: (DetailFilterAxis, String) -> Unit,
 ) {
     val genres = genreTokens(item)
     if (genres.isEmpty()) return
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(WithinSectionSpacing)) {
         Text(
-            text = "Genres",
+            text = stringResource(R.string.detail_genres),
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -548,32 +688,35 @@ private fun GenreChips(
             modifier = Modifier.fillMaxWidth(),
         ) {
             genres.forEach { genre ->
-                val a11y = stringResource(R.string.detail_genre_filter_a11y, genre)
-                AssistChip(
-                    onClick = { onGenreClick(genre) },
-                    label = { Text(text = genre, maxLines = 1, softWrap = false) },
-                    shape = AssistChipDefaults.shape,
-                    modifier = Modifier.semantics { contentDescription = a11y },
+                FilterValueChip(
+                    value = genre,
+                    a11y = stringResource(R.string.detail_genre_filter_a11y, genre),
+                    onClick = { onFilter(DetailFilterAxis.Genre, genre) },
                 )
             }
         }
     }
 }
 
-@Composable
-private fun CategorySpecificFacts(item: MediaItem) {
-    val facts = buildList {
-        item.barcode?.takeIf { it.isNotBlank() }?.let { add("Barcode" to it) }
-        item.pressingNotes?.takeIf { it.isNotBlank() }?.let { add("Pressing notes" to it) }
+/**
+ * What the record-label field is called for a category — the same names the add
+ * form uses, and the same ones the web app derives in labelFieldLabel.
+ */
+@StringRes
+private fun labelFieldNameRes(category: Category): Int =
+    when (category) {
+        Category.Films -> R.string.field_label_films
+        Category.Books -> R.string.field_label_books
+        Category.Games -> R.string.field_label_games
+        Category.Comics -> R.string.field_label_comics
+        Category.Music -> R.string.field_label_music
     }
-    if (facts.isEmpty()) return
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        facts.forEach { (label, value) ->
-            FactRow(label = label, value = value)
-        }
-    }
-}
 
+/**
+ * One row of the metadata grid: a name in a fixed-width column with its value
+ * beside it. For short values only — prose belongs in a [ProseSection], where
+ * the text starts under its heading instead of in the second column.
+ */
 @Composable
 private fun FactRow(
     label: String,
@@ -604,7 +747,7 @@ private fun MarketValueCard(item: MediaItem) {
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             Text(
-                text = "Market value",
+                text = stringResource(R.string.detail_market_value),
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSecondaryContainer,
             )
@@ -617,8 +760,12 @@ private fun MarketValueCard(item: MediaItem) {
                 )
             }
             val subValues = listOfNotNull(
-                item.marketValue.loose?.let { "Loose ${formatMoney(it, item.marketValue.currency)}" },
-                item.marketValue.new?.let { "New ${formatMoney(it, item.marketValue.currency)}" },
+                item.marketValue.loose?.let {
+                    stringResource(R.string.detail_market_loose, formatMoney(it, item.marketValue.currency))
+                },
+                item.marketValue.new?.let {
+                    stringResource(R.string.detail_market_new, formatMoney(it, item.marketValue.currency))
+                },
             )
             if (subValues.isNotEmpty()) {
                 Text(
@@ -629,7 +776,7 @@ private fun MarketValueCard(item: MediaItem) {
             }
             item.marketValue.fetchedAt?.let {
                 Text(
-                    text = "Fetched $it",
+                    text = stringResource(R.string.detail_market_fetched, it),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSecondaryContainer,
                 )
@@ -646,10 +793,24 @@ private fun SectionHeader(
     Text(
         text = text,
         style = MaterialTheme.typography.titleMedium,
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(top = 8.dp),
+        modifier = modifier.fillMaxWidth(),
     )
+}
+
+/**
+ * A heading with its body directly beneath it, both starting at the same left
+ * edge. Every prose section goes through this so none of them can drift into a
+ * label/value layout and end up indented away from its own heading.
+ */
+@Composable
+private fun ProseSection(
+    title: String,
+    body: String,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(WithinSectionSpacing)) {
+        SectionHeader(title)
+        Text(text = body, style = MaterialTheme.typography.bodyMedium)
+    }
 }
 
 private fun formatMoney(
@@ -681,9 +842,7 @@ private fun PurchasePriceRow(item: MediaItem) {
     val marketCurrency = item.marketValue.currency
 
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 8.dp),
+        modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text(
@@ -721,7 +880,7 @@ private fun PurchasePriceRow(item: MediaItem) {
 
             market != null -> {
                 Text(
-                    text = "currencies differ",
+                    text = stringResource(R.string.detail_currencies_differ),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -738,10 +897,7 @@ private fun PurchasePriceRow(item: MediaItem) {
 @Composable
 private fun PhotoGallery(item: MediaItem) {
     var fullSlot by remember { mutableStateOf<Int?>(null) }
-    Column(
-        modifier = Modifier.padding(top = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
+    Column(verticalArrangement = Arrangement.spacedBy(WithinSectionSpacing)) {
         SectionHeader(stringResource(R.string.photos_section))
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             if (item.hasPhoto1) {
@@ -765,7 +921,7 @@ private fun PhotoGallery(item: MediaItem) {
                 PhotoImage(
                     itemId = item.id,
                     slot = visibleSlot,
-                    contentDescription = "Photo $visibleSlot",
+                    contentDescription = stringResource(R.string.detail_photo_a11y, visibleSlot),
                     size = ArtworkSize.Full,
                     updatedAt = item.updatedAt,
                     contentScale = ContentScale.Fit,
@@ -787,7 +943,7 @@ private fun PhotoThumb(
     PhotoImage(
         itemId = item.id,
         slot = slot,
-        contentDescription = "Photo $slot",
+        contentDescription = stringResource(R.string.detail_photo_a11y, slot),
         size = ArtworkSize.Thumb,
         updatedAt = item.updatedAt,
         modifier = Modifier

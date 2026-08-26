@@ -34,10 +34,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import com.megamaced.crate.R
 import com.megamaced.crate.domain.model.Category
 import com.megamaced.crate.domain.model.CategoryFeed
 import com.megamaced.crate.domain.model.HomeFeed
@@ -48,6 +50,7 @@ import com.megamaced.crate.ui.components.ArtworkSize
 import com.megamaced.crate.ui.components.EmptyState
 import com.megamaced.crate.ui.components.LoadingState
 import com.megamaced.crate.ui.components.MediaCard
+import com.megamaced.crate.util.resolve
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -59,8 +62,9 @@ fun HomeScreen(
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
 
-    LaunchedEffect(uiState.errorMessage) {
-        uiState.errorMessage?.let { msg ->
+    val errorText = uiState.errorMessage?.resolve()
+    LaunchedEffect(errorText) {
+        errorText?.let { msg ->
             snackbarHostState.showSnackbar(msg)
             viewModel.dismissError()
         }
@@ -68,7 +72,7 @@ fun HomeScreen(
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
-        topBar = { TopAppBar(title = { Text("Home") }) },
+        topBar = { TopAppBar(title = { Text(stringResource(R.string.nav_home)) }) },
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { innerPadding ->
         PullToRefreshBox(
@@ -85,8 +89,8 @@ fun HomeScreen(
 
                 uiState.feed == null -> {
                     EmptyState(
-                        title = "Nothing to show",
-                        subtitle = "Pull to refresh once your collection has items.",
+                        title = stringResource(R.string.home_empty_title),
+                        subtitle = stringResource(R.string.home_empty_subtitle),
                     )
                 }
 
@@ -168,7 +172,7 @@ private fun HeroItemOfTheDay(
                 contentAlignment = Alignment.CenterStart,
             ) {
                 Text(
-                    text = "${category.label} · Item of the Day",
+                    text = stringResource(R.string.home_item_of_the_day, stringResource(category.labelRes)),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                 )
@@ -225,7 +229,7 @@ private fun RecentlyAddedSection(
     onItemClick: (Long) -> Unit,
 ) {
     SectionHeader(
-        title = "Recently Added",
+        title = stringResource(R.string.home_recently_added),
         modifier = Modifier.padding(horizontal = 16.dp),
     )
     LazyRow(
@@ -251,7 +255,7 @@ private fun CategoryRecentSection(
     onItemClick: (Long) -> Unit,
 ) {
     SectionHeader(
-        title = "${categoryFeed.category.label} · Recent",
+        title = stringResource(R.string.home_category_recent, stringResource(categoryFeed.category.labelRes)),
         modifier = Modifier.padding(horizontal = 16.dp),
     )
     LazyRow(
@@ -277,7 +281,7 @@ private fun MostValuableSection(
     onItemClick: (Long) -> Unit,
 ) {
     SectionHeader(
-        title = "Most Valuable",
+        title = stringResource(R.string.home_most_valuable),
         modifier = Modifier.padding(horizontal = 16.dp),
     )
     LazyRow(

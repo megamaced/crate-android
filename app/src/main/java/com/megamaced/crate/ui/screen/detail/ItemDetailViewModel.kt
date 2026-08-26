@@ -3,10 +3,12 @@ package com.megamaced.crate.ui.screen.detail
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.megamaced.crate.R
 import com.megamaced.crate.data.api.ApiResult
 import com.megamaced.crate.data.api.CrateApiService
 import com.megamaced.crate.data.api.apiCall
 import com.megamaced.crate.data.api.dto.SuggestionDto
+import com.megamaced.crate.data.api.toUiText
 import com.megamaced.crate.data.auth.CurrentSession
 import com.megamaced.crate.di.DefaultDispatcher
 import com.megamaced.crate.domain.LocalSimilarity
@@ -18,6 +20,7 @@ import com.megamaced.crate.domain.repository.SettingsRepository
 import com.megamaced.crate.ui.components.SuggestionArt
 import com.megamaced.crate.ui.components.SuggestionEntry
 import com.megamaced.crate.ui.components.SuggestionTarget
+import com.megamaced.crate.util.UiText
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -38,7 +41,7 @@ data class ItemDetailUiState(
     val item: MediaItem? = null,
     val isLoading: Boolean = true,
     val activeAction: DetailAction? = null,
-    val errorMessage: String? = null,
+    val errorMessage: UiText? = null,
     val deleted: Boolean = false,
     // True when the loaded item belongs to another user — i.e. visible to us
     // only via a share. Ownership is a superset of write permission.
@@ -94,7 +97,7 @@ class ItemDetailViewModel
         }
 
         private val activeAction = MutableStateFlow<DetailAction?>(null)
-        private val errorMessage = MutableStateFlow<String?>(null)
+        private val errorMessage = MutableStateFlow<UiText?>(null)
         private val deleted = MutableStateFlow(false)
 
         // Write permission for a shared item, learned from the network fetch
@@ -269,11 +272,11 @@ class ItemDetailViewModel
                     }
 
                     ApiResult.NetworkError -> {
-                        errorMessage.value = "Couldn't reach the server."
+                        errorMessage.value = UiText.Res(R.string.error_network)
                     }
 
                     is ApiResult.HttpError -> {
-                        errorMessage.value = result.message ?: "Server error (${result.code})."
+                        errorMessage.value = result.toUiText()
                     }
 
                     ApiResult.Unauthorised -> { /* SessionManager already handled */ }
@@ -297,11 +300,11 @@ class ItemDetailViewModel
                     is ApiResult.Success -> { /* Repository writes through to Room */ }
 
                     ApiResult.NetworkError -> {
-                        errorMessage.value = "Couldn't reach the server."
+                        errorMessage.value = UiText.Res(R.string.error_network)
                     }
 
                     is ApiResult.HttpError -> {
-                        errorMessage.value = result.message ?: "Server error (${result.code})."
+                        errorMessage.value = result.toUiText()
                     }
 
                     ApiResult.Unauthorised -> { /* SessionManager already handled */ }

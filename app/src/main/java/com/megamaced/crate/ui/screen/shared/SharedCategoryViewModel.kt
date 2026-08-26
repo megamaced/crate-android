@@ -1,8 +1,10 @@
 package com.megamaced.crate.ui.screen.shared
 
+import androidx.annotation.StringRes
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.megamaced.crate.R
 import com.megamaced.crate.data.prefs.CollectionPrefs
 import com.megamaced.crate.data.prefs.CollectionViewMode
 import com.megamaced.crate.data.repository.SharedContentStore
@@ -19,6 +21,7 @@ import com.megamaced.crate.ui.screen.collection.decadeBuckets
 import com.megamaced.crate.ui.screen.collection.formatBuckets
 import com.megamaced.crate.ui.screen.collection.genreBuckets
 import com.megamaced.crate.ui.screen.collection.groupItemsForSort
+import com.megamaced.crate.util.UiText
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -34,7 +37,7 @@ import javax.inject.Inject
 
 data class SharedCategoryUiState(
     val category: Category,
-    val label: String,
+    @param:StringRes val labelRes: Int,
     val sort: CollectionSort = CollectionSort.Default,
     val selectedFormats: Set<String> = emptySet(),
     val selectedGenre: String? = null,
@@ -51,10 +54,10 @@ data class SharedCategoryUiState(
     // Toolbar subtitle giving provenance: "Shared by alice" for a single owner,
     // "Shared by 2 people" when the category spans multiple owners. Null when
     // there are no items yet.
-    val ownerCaption: String? = null,
+    val ownerCaption: UiText? = null,
     val isLoading: Boolean = true,
     val isRefreshing: Boolean = false,
-    val error: String? = null,
+    val error: UiText? = null,
 )
 
 /**
@@ -76,11 +79,14 @@ class SharedCategoryViewModel
             Category.fromApi(savedStateHandle.get<String>("category")) ?: Category.Music
 
         private val sort = MutableStateFlow(CollectionSort.Default)
-        private val selectedFormats = MutableStateFlow<Set<String>>(emptySet())
 
-        // Seeded from the nav arg when arriving via a genre chip in item detail.
+        // Seeded from the nav args when arriving from a tapped value in item
+        // detail. That view applies one filter at a time, so at most one of
+        // these is seeded.
+        private val selectedFormats =
+            MutableStateFlow(savedStateHandle.get<String>("format")?.let { setOf(it) }.orEmpty())
         private val selectedGenre = MutableStateFlow(savedStateHandle.get<String>("genre"))
-        private val selectedDecade = MutableStateFlow<String?>(null)
+        private val selectedDecade = MutableStateFlow(savedStateHandle.get<String>("decade"))
         private val isRefreshing = MutableStateFlow(false)
 
         val uiState: StateFlow<SharedCategoryUiState> =
@@ -120,7 +126,7 @@ class SharedCategoryViewModel
                 val owners = summary?.owners.orEmpty()
                 SharedCategoryUiState(
                     category = category,
-                    label = category.label,
+                    labelRes = category.labelRes,
                     sort = sortValue,
                     selectedFormats = activeFormats,
                     selectedGenre = activeGenre,
@@ -145,7 +151,7 @@ class SharedCategoryViewModel
             ).stateIn(
                 scope = viewModelScope,
                 started = SharingStarted.WhileSubscribed(5_000),
-                initialValue = SharedCategoryUiState(category = category, label = category.label),
+                initialValue = SharedCategoryUiState(category = category, labelRes = category.labelRes),
             )
 
         init {
@@ -196,9 +202,13 @@ class SharedCategoryViewModel
         }
     }
 
-private fun ownerCaptionFor(owners: List<String>): String? =
+private fun ownerCaptionFor(owners: List<String>): UiText? =
     when (owners.size) {
         0 -> null
-        1 -> "Shared by ${owners.first()}"
-        else -> "Shared by ${owners.size} people"
+
+        1 -> UiText.Res(R.string.shared_by_owner, listOf(owners.first()))
+
+        // A named owner reads better than "1 person", so the plural only covers
+        // the case where the category spans several of them.
+        else -> UiText.Plural(R.plurals.shared_by_owner_count, owners.size)
     }

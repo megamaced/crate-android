@@ -41,6 +41,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
@@ -51,9 +52,11 @@ import com.journeyapps.barcodescanner.BarcodeCallback
 import com.journeyapps.barcodescanner.BarcodeResult
 import com.journeyapps.barcodescanner.DecoratedBarcodeView
 import com.journeyapps.barcodescanner.DefaultDecoderFactory
+import com.megamaced.crate.R
 import com.megamaced.crate.ui.screen.addedit.ExternalResultRow
 import com.megamaced.crate.ui.screen.addedit.ExternalSearchResult
 import com.megamaced.crate.ui.screen.addedit.listKey
+import com.megamaced.crate.util.resolve
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -85,10 +88,13 @@ fun BarcodeScanScreen(
         modifier = modifier.fillMaxSize(),
         topBar = {
             TopAppBar(
-                title = { Text("Scan barcode") },
+                title = { Text(stringResource(R.string.action_scan_barcode)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.action_back),
+                        )
                     }
                 },
             )
@@ -132,8 +138,9 @@ private fun CameraPreview(
     onBarcode: (String) -> Unit,
 ) {
     val context = LocalContext.current
+    val statusText = stringResource(R.string.scan_status_hint)
     val barcodeView =
-        remember {
+        remember(statusText) {
             DecoratedBarcodeView(context).apply {
                 barcodeView.decoderFactory = DefaultDecoderFactory()
                 // Continuous autofocus — without it, the preview comes up
@@ -142,7 +149,7 @@ private fun CameraPreview(
                     isAutoFocusEnabled = true
                     isContinuousFocusEnabled = true
                 }
-                setStatusText("Point at a barcode")
+                setStatusText(statusText)
             }
         }
 
@@ -200,11 +207,11 @@ private fun PermissionPrompt(onRequest: () -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(
-            text = "Camera permission is needed to scan barcodes.",
+            text = stringResource(R.string.scan_permission_required),
             style = MaterialTheme.typography.bodyLarge,
         )
         Button(onClick = onRequest, modifier = Modifier.padding(top = 16.dp)) {
-            Text("Grant access")
+            Text(stringResource(R.string.scan_grant_access))
         }
     }
 }
@@ -229,7 +236,9 @@ private fun CandidateSheet(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
-                text = state.barcode?.let { "Barcode: $it" } ?: "Scanning…",
+                text = state.barcode
+                    ?.let { stringResource(R.string.scan_barcode_value, it) }
+                    ?: stringResource(R.string.scan_scanning),
                 style = MaterialTheme.typography.titleMedium,
             )
             Box(
@@ -245,7 +254,7 @@ private fun CandidateSheet(
 
                     state.errorMessage != null -> {
                         Text(
-                            text = state.errorMessage,
+                            text = state.errorMessage.resolve(),
                             color = MaterialTheme.colorScheme.error,
                             style = MaterialTheme.typography.bodyMedium,
                         )
@@ -268,7 +277,7 @@ private fun CandidateSheet(
 
                     else -> {
                         Text(
-                            text = "No matches. Use the raw barcode and fill the form manually.",
+                            text = stringResource(R.string.scan_no_candidates),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -282,11 +291,11 @@ private fun CandidateSheet(
                     },
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Text("Use raw barcode")
+                    Text(stringResource(R.string.scan_use_raw_barcode))
                 }
             }
             TextButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
-                Text("Keep scanning")
+                Text(stringResource(R.string.scan_keep_scanning))
             }
         }
     }

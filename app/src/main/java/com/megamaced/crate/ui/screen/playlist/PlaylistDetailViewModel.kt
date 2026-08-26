@@ -3,13 +3,16 @@ package com.megamaced.crate.ui.screen.playlist
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.megamaced.crate.R
 import com.megamaced.crate.data.api.ApiResult
+import com.megamaced.crate.data.api.toUiText
 import com.megamaced.crate.data.auth.CurrentSession
 import com.megamaced.crate.di.DefaultDispatcher
 import com.megamaced.crate.domain.model.MediaItem
 import com.megamaced.crate.domain.model.Playlist
 import com.megamaced.crate.domain.repository.MediaRepository
 import com.megamaced.crate.domain.repository.PlaylistRepository
+import com.megamaced.crate.util.UiText
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -29,7 +32,7 @@ data class PlaylistDetailUiState(
     val playlist: Playlist? = null,
     val candidates: List<MediaItem> = emptyList(),
     val isLoading: Boolean = true,
-    val errorMessage: String? = null,
+    val errorMessage: UiText? = null,
     val deleted: Boolean = false,
     // True for our own playlist — grants delete + re-share.
     val isOwner: Boolean = false,
@@ -55,7 +58,7 @@ class PlaylistDetailViewModel
 
         private val currentLoginName: String? = currentSession.loginName()
 
-        private val errorMessage = MutableStateFlow<String?>(null)
+        private val errorMessage = MutableStateFlow<UiText?>(null)
         private val deleted = MutableStateFlow(false)
 
         // Write permission for a shared playlist, learned from the network
@@ -143,11 +146,11 @@ class PlaylistDetailViewModel
                         }
 
                         ApiResult.NetworkError -> {
-                            errorMessage.value = "Couldn't reach the server."
+                            errorMessage.value = UiText.Res(R.string.error_network)
                         }
 
                         is ApiResult.HttpError -> {
-                            errorMessage.value = result.message ?: "Server error (${result.code})."
+                            errorMessage.value = result.toUiText()
                         }
 
                         ApiResult.Unauthorised -> { /* SessionManager handles */ }
@@ -182,11 +185,11 @@ class PlaylistDetailViewModel
                 is ApiResult.Success -> { /* Repository writes through to Room */ }
 
                 ApiResult.NetworkError -> {
-                    errorMessage.value = "Couldn't reach the server."
+                    errorMessage.value = UiText.Res(R.string.error_network)
                 }
 
                 is ApiResult.HttpError -> {
-                    errorMessage.value = result.message ?: "Server error (${result.code})."
+                    errorMessage.value = result.toUiText()
                 }
 
                 ApiResult.Unauthorised -> { /* SessionManager handles */ }

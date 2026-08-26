@@ -15,7 +15,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.megamaced.crate.R
 
 @Composable
 fun OfflineBanner(
@@ -41,7 +43,7 @@ fun OfflineBanner(
                 tint = MaterialTheme.colorScheme.onErrorContainer,
             )
             Text(
-                text = "Offline — showing cached items. Edits are disabled.",
+                text = stringResource(R.string.offline_banner),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onErrorContainer,
                 modifier = Modifier.padding(start = 8.dp),

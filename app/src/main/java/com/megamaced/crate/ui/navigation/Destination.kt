@@ -7,13 +7,17 @@ sealed interface Destination {
     @Serializable
     data object Home : Destination
 
-    // Args are set only when arriving from a genre chip in item detail; the
-    // bottom-bar tab navigates with both null and restores the persisted
-    // category as before.
+    // Args are set only when arriving from a tapped value in item detail; the
+    // bottom-bar tab navigates with all of them null and restores the persisted
+    // category as before. At most one of [genre], [format] and [decade] is ever
+    // set: tapping a value means "show me everything like this", so it replaces
+    // the other filters rather than narrowing what the list already showed.
     @Serializable
     data class Collection(
         val category: String? = null,
         val genre: String? = null,
+        val format: String? = null,
+        val decade: String? = null,
     ) : Destination
 
     @Serializable
@@ -65,10 +69,14 @@ sealed interface Destination {
     data object SharedWithMe : Destination
 
     // A single shared category subpage (apiValue: music/film/book/game/comic).
-    // [genre] pre-filters the view, set when arriving from a genre chip.
+    // [genre], [format] and [decade] pre-filter the view, set when arriving
+    // from a tapped value in item detail. At most one is ever set (see
+    // [Collection]).
     @Serializable
     data class SharedCategory(
         val category: String,
         val genre: String? = null,
+        val format: String? = null,
+        val decade: String? = null,
     ) : Destination
 }

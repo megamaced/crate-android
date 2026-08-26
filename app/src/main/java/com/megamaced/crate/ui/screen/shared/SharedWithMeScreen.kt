@@ -33,14 +33,18 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import com.megamaced.crate.R
 import com.megamaced.crate.domain.model.Playlist
 import com.megamaced.crate.domain.model.SharedCategorySummary
 import com.megamaced.crate.ui.components.CategoryBadge
 import com.megamaced.crate.ui.components.EmptyState
 import com.megamaced.crate.ui.components.LoadingState
+import com.megamaced.crate.util.resolve
 
 /**
  * "Shared with me" landing — a home-style overview. Each category shared with
@@ -60,8 +64,9 @@ fun SharedWithMeScreen(
     val state by viewModel.state.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
 
-    LaunchedEffect(state.errorMessage) {
-        state.errorMessage?.let { msg ->
+    val errorText = state.errorMessage?.resolve()
+    LaunchedEffect(errorText) {
+        errorText?.let { msg ->
             snackbarHostState.showSnackbar(msg)
             viewModel.dismissError()
         }
@@ -71,10 +76,13 @@ fun SharedWithMeScreen(
         modifier = modifier.fillMaxSize(),
         topBar = {
             TopAppBar(
-                title = { Text("Shared with me") },
+                title = { Text(stringResource(R.string.shared_with_me_title)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.action_back),
+                        )
                     }
                 },
             )
@@ -95,8 +103,8 @@ fun SharedWithMeScreen(
 
                 state.isEmpty -> {
                     EmptyState(
-                        title = "Nothing shared with you",
-                        subtitle = "Ask a Nextcloud user to share something from their collection.",
+                        title = stringResource(R.string.shared_empty_title),
+                        subtitle = stringResource(R.string.shared_empty_subtitle),
                     )
                 }
 
@@ -106,7 +114,9 @@ fun SharedWithMeScreen(
                         contentPadding = PaddingValues(vertical = 8.dp),
                     ) {
                         if (state.categories.isNotEmpty()) {
-                            item(key = "hdr-categories") { SectionHeader("Categories") }
+                            item(key = "hdr-categories") {
+                                SectionHeader(stringResource(R.string.shared_section_categories))
+                            }
                             items(state.categories, key = { "cat-${it.category.apiValue}" }) { summary ->
                                 CategoryTile(
                                     summary = summary,
@@ -116,7 +126,9 @@ fun SharedWithMeScreen(
                             }
                         }
                         if (state.playlists.isNotEmpty()) {
-                            item(key = "hdr-playlists") { SectionHeader("Playlists") }
+                            item(key = "hdr-playlists") {
+                                SectionHeader(stringResource(R.string.shared_section_playlists))
+                            }
                             items(state.playlists, key = { "playlist-${it.id}" }) { playlist ->
                                 SharedPlaylistRow(
                                     playlist = playlist,
@@ -162,17 +174,19 @@ private fun CategoryTile(
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
             Text(
-                text = summary.label,
+                text = stringResource(summary.labelRes),
                 style = MaterialTheme.typography.titleMedium,
             )
             val owners = summary.owners
+            // A named owner reads better than "1 person", so the plural only
+            // covers the case where the category spans several of them.
             val ownerText =
                 when (owners.size) {
                     0 -> null
-                    1 -> "from ${owners.first()}"
-                    else -> "from ${owners.size} people"
+                    1 -> stringResource(R.string.shared_from_owner, owners.first())
+                    else -> pluralStringResource(R.plurals.shared_from_owner_count, owners.size, owners.size)
                 }
-            val countText = "${summary.count} item${if (summary.count == 1) "" else "s"}"
+            val countText = pluralStringResource(R.plurals.item_count, summary.count, summary.count)
             Text(
                 text = listOfNotNull(countText, ownerText).joinToString(" · "),
                 style = MaterialTheme.typography.bodySmall,
@@ -221,7 +235,7 @@ private fun SharedPlaylistRow(
             )
             val sub =
                 listOfNotNull(
-                    "${playlist.itemCount} item${if (playlist.itemCount == 1) "" else "s"}",
+                    pluralStringResource(R.plurals.item_count, playlist.itemCount, playlist.itemCount),
                     playlist.userId,
                 ).joinToString(" · ")
             Text(

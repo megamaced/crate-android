@@ -2,6 +2,7 @@ package com.megamaced.crate.ui.screen.search
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.megamaced.crate.R
 import com.megamaced.crate.data.api.ApiResult
 import com.megamaced.crate.data.api.CrateApiService
 import com.megamaced.crate.data.api.apiCall
@@ -10,11 +11,13 @@ import com.megamaced.crate.data.api.dto.DiscogsSearchResultDto
 import com.megamaced.crate.data.api.dto.OpenLibraryResultDto
 import com.megamaced.crate.data.api.dto.RawgSearchResultDto
 import com.megamaced.crate.data.api.dto.TmdbSearchResultDto
+import com.megamaced.crate.data.api.toUiText
 import com.megamaced.crate.domain.model.Category
 import com.megamaced.crate.domain.model.MediaItem
 import com.megamaced.crate.domain.repository.MediaRepository
 import com.megamaced.crate.domain.repository.SettingsRepository
 import com.megamaced.crate.ui.screen.addedit.ExternalSearchResult
+import com.megamaced.crate.util.UiText
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
@@ -40,7 +43,7 @@ data class SearchUiState(
     val collectionResults: List<MediaItem> = emptyList(),
     val externalResults: List<ExternalSearchResult> = emptyList(),
     val isExternalLoading: Boolean = false,
-    val externalError: String? = null,
+    val externalError: UiText? = null,
     val externalHasSearched: Boolean = false,
     val visibleCategories: List<Category> = Category.entries,
 )
@@ -59,7 +62,7 @@ class SearchViewModel
         private val externalCategory = MutableStateFlow(Category.Music)
         private val externalResults = MutableStateFlow<List<ExternalSearchResult>>(emptyList())
         private val isExternalLoading = MutableStateFlow(false)
-        private val externalError = MutableStateFlow<String?>(null)
+        private val externalError = MutableStateFlow<UiText?>(null)
         private val externalHasSearched = MutableStateFlow(false)
 
         private val collectionResults: StateFlow<List<MediaItem>> =
@@ -175,14 +178,14 @@ class SearchViewModel
                     }
 
                     ApiResult.NetworkError -> {
-                        externalError.value = "Couldn't reach the server."
+                        externalError.value = UiText.Res(R.string.error_network)
                     }
 
                     is ApiResult.HttpError -> {
                         externalError.value =
                             when (result.code) {
-                                400 -> "Provider token missing. Add it in Settings."
-                                else -> result.message ?: "Server error (${result.code})."
+                                400 -> UiText.Res(R.string.error_provider_token_missing)
+                                else -> result.toUiText()
                             }
                     }
 

@@ -1,8 +1,11 @@
 package com.megamaced.crate.data.repository
 
+import com.megamaced.crate.R
 import com.megamaced.crate.data.api.ApiResult
+import com.megamaced.crate.data.api.toUiText
 import com.megamaced.crate.domain.model.SharedWithMe
 import com.megamaced.crate.domain.repository.ShareRepository
+import com.megamaced.crate.util.UiText
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -28,7 +31,7 @@ class SharedContentStore
         data class State(
             val data: SharedWithMe? = null,
             val isLoading: Boolean = false,
-            val error: String? = null,
+            val error: UiText? = null,
         )
 
         private val _state = MutableStateFlow(State())
@@ -73,12 +76,12 @@ class SharedContentStore
                 }
 
                 ApiResult.NetworkError -> {
-                    _state.update { it.copy(isLoading = false, error = "Couldn't reach the server.") }
+                    _state.update { it.copy(isLoading = false, error = UiText.Res(R.string.error_network)) }
                 }
 
                 is ApiResult.HttpError -> {
                     _state.update {
-                        it.copy(isLoading = false, error = result.message ?: "Server error (${result.code}).")
+                        it.copy(isLoading = false, error = result.toUiText())
                     }
                 }
 

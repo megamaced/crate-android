@@ -1,5 +1,7 @@
 package com.megamaced.crate.data.auth
 
+import com.megamaced.crate.R
+import com.megamaced.crate.util.UiText
 import kotlinx.coroutines.delay
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -39,7 +41,7 @@ sealed interface LoginFlowStatus {
     ) : LoginFlowStatus
 
     data class Error(
-        val message: String,
+        val reason: UiText,
     ) : LoginFlowStatus
 }
 
@@ -53,7 +55,7 @@ class NextcloudLoginFlow
         fun initiate(host: String): Result<LoginFlowInitResponse> {
             val url = "${host.trimEnd('/')}/index.php/login/v2"
             val origin = url.toHttpUrlOrNull()
-                ?: return Result.failure(LoginFlowException("Not a valid server address"))
+                ?: return Result.failure(LoginFlowException(UiText.Res(R.string.login_error_invalid_address)))
             val request = Request
                 .Builder()
                 .url(url)
@@ -65,11 +67,13 @@ class NextcloudLoginFlow
                 val response = client.newCall(request).execute()
                 if (!response.isSuccessful) {
                     return Result.failure(
-                        LoginFlowException("Server returned ${response.code}"),
+                        LoginFlowException(
+                            UiText.Res(R.string.login_error_server_returned, listOf(response.code)),
+                        ),
                     )
                 }
                 val body = response.body?.string()
-                    ?: return Result.failure(LoginFlowException("Empty response"))
+                    ?: return Result.failure(LoginFlowException(UiText.Res(R.string.login_error_empty_response)))
                 val initResponse = json.decodeFromString<LoginFlowInitResponse>(body)
                 // Both URLs come from the response body, so a hostile or
                 // compromised server could point them at an origin the user
@@ -80,13 +84,18 @@ class NextcloudLoginFlow
                     !isSameOrigin(origin, initResponse.login)
                 ) {
                     return Result.failure(
-                        LoginFlowException("Server returned a login URL for a different host"),
+                        LoginFlowException(UiText.Res(R.string.login_error_foreign_login_url)),
                     )
                 }
                 Result.success(initResponse)
             } catch (e: Exception) {
                 Timber.e(e, "Login flow initiation failed")
-                Result.failure(LoginFlowException("Failed to connect: ${e.message}", e))
+                Result.failure(
+                    LoginFlowException(
+                        UiText.Res(R.string.login_error_connect_failed, listOf(e.message.toString())),
+                        e,
+                    ),
+                )
             }
         }
 
@@ -102,9 +111,9 @@ class NextcloudLoginFlow
             expectedOrigin: String,
         ): LoginFlowStatus {
             val origin = expectedOrigin.toHttpUrlOrNull()
-                ?: return LoginFlowStatus.Error("Not a valid server address")
+                ?: return LoginFlowStatus.Error(UiText.Res(R.string.login_error_invalid_address))
             if (!isSameOrigin(origin, endpoint)) {
-                return LoginFlowStatus.Error("Server returned a login URL for a different host")
+                return LoginFlowStatus.Error(UiText.Res(R.string.login_error_foreign_login_url))
             }
             val body = FormBody
                 .Builder()
@@ -122,7 +131,8 @@ class NextcloudLoginFlow
                     val response = client.newCall(request).execute()
                     when (response.code) {
                         200 -> {
-                            val responseBody = response.body?.string() ?: return LoginFlowStatus.Error("Empty response")
+                            val responseBody = response.body?.string()
+                                ?: return LoginFlowStatus.Error(UiText.Res(R.string.login_error_empty_response))
                             val result = json.decodeFromString<LoginFlowResult>(responseBody)
                             // The app password is about to be bound to whatever
                             // `server` says. Refuse an origin the user never
@@ -131,7 +141,7 @@ class NextcloudLoginFlow
                             // Basic header attached — somewhere else.
                             if (!isSameOrigin(origin, result.server)) {
                                 return LoginFlowStatus.Error(
-                                    "Server returned credentials for a different host",
+                                    UiText.Res(R.string.login_error_foreign_credentials),
                                 )
                             }
                             return LoginFlowStatus.Success(result)
@@ -142,7 +152,9 @@ class NextcloudLoginFlow
                         }
 
                         else -> {
-                            return LoginFlowStatus.Error("Server returned ${response.code}")
+                            return LoginFlowStatus.Error(
+                                UiText.Res(R.string.login_error_server_returned, listOf(response.code)),
+                            )
                         }
                     }
                 } catch (e: Exception) {
@@ -150,7 +162,7 @@ class NextcloudLoginFlow
                 }
                 delay(POLL_INTERVAL_MS)
             }
-            return LoginFlowStatus.Error("Login timed out")
+            return LoginFlowStatus.Error(UiText.Res(R.string.login_error_timed_out))
         }
 
         /**
@@ -175,7 +187,12 @@ class NextcloudLoginFlow
         }
     }
 
+/**
+ * A login attempt that could not complete. [reason] is what the login screen
+ * shows: the flow runs without a Context, so it names the wording rather than
+ * spelling it out.
+ */
 class LoginFlowException(
-    message: String,
+    val reason: UiText,
     cause: Throwable? = null,
-) : Exception(message, cause)
+) : Exception(cause)

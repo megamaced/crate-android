@@ -1,5 +1,7 @@
 package com.megamaced.crate.data.auth
 
+import com.megamaced.crate.R
+import com.megamaced.crate.util.UiText
 import kotlinx.coroutines.test.runTest
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
@@ -79,8 +81,9 @@ class NextcloudLoginFlowTest {
         val result = loginFlow.initiate(origin())
 
         assertTrue(result.isFailure)
-        assertTrue(
-            result.exceptionOrNull()?.message?.contains("different host") == true,
+        assertEquals(
+            UiText.Res(R.string.login_error_foreign_login_url),
+            (result.exceptionOrNull() as LoginFlowException).reason,
         )
     }
 
@@ -194,8 +197,9 @@ class NextcloudLoginFlowTest {
             )
 
             assertTrue(status is LoginFlowStatus.Error)
-            assertTrue(
-                (status as LoginFlowStatus.Error).message.contains("different host"),
+            assertEquals(
+                UiText.Res(R.string.login_error_foreign_credentials),
+                (status as LoginFlowStatus.Error).reason,
             )
         }
 

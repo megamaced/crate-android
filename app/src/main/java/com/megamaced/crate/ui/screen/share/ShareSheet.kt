@@ -29,11 +29,14 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import com.megamaced.crate.R
 import com.megamaced.crate.domain.model.Share
 import com.megamaced.crate.domain.model.UserSearchResult
+import com.megamaced.crate.util.resolve
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -65,10 +68,16 @@ fun ShareSheet(
             Text(
                 text =
                     when (target) {
-                        ShareTarget.Album -> "Share item"
-                        ShareTarget.Playlist -> "Share playlist"
-                        ShareTarget.Library -> "Share whole library"
-                        ShareTarget.Category -> "Share ${category.replaceFirstChar { it.uppercase() }}"
+                        ShareTarget.Album -> stringResource(R.string.share_item_title)
+
+                        ShareTarget.Playlist -> stringResource(R.string.share_playlist_title)
+
+                        ShareTarget.Library -> stringResource(R.string.share_library_title)
+
+                        ShareTarget.Category -> stringResource(
+                            R.string.share_category_title,
+                            category.replaceFirstChar { it.uppercase() },
+                        )
                     },
                 style = MaterialTheme.typography.titleLarge,
             )
@@ -79,16 +88,17 @@ fun ShareSheet(
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "Allow editing",
+                        text = stringResource(R.string.share_allow_editing),
                         style = MaterialTheme.typography.bodyLarge,
                     )
                     Text(
-                        text =
+                        text = stringResource(
                             if (state.grantCanWrite) {
-                                "Can add and edit items. Can't delete or re-share."
+                                R.string.share_permission_write
                             } else {
-                                "Read-only — can view but not change anything."
+                                R.string.share_permission_read
                             },
+                        ),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -104,13 +114,13 @@ fun ShareSheet(
                 onValueChange = viewModel::onQueryChange,
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
-                label = { Text("Find a Nextcloud user") },
-                supportingText = { Text("Type at least two characters.") },
+                label = { Text(stringResource(R.string.share_find_user_label)) },
+                supportingText = { Text(stringResource(R.string.share_find_user_hint)) },
             )
 
             state.errorMessage?.let { msg ->
                 Text(
-                    text = msg,
+                    text = msg.resolve(),
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodySmall,
                 )
@@ -138,7 +148,7 @@ fun ShareSheet(
             }
 
             Text(
-                text = "Already shared with",
+                text = stringResource(R.string.share_already_shared),
                 style = MaterialTheme.typography.titleSmall,
                 modifier = Modifier.padding(top = 8.dp),
             )
@@ -155,7 +165,7 @@ fun ShareSheet(
 
                     state.existingShares.isEmpty() -> {
                         Text(
-                            text = "No one yet.",
+                            text = stringResource(R.string.share_no_one_yet),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -242,13 +252,15 @@ private fun ExistingShareRow(
                 )
             }
             Text(
-                text = if (share.canWrite) "Can edit" else "Read-only",
+                text = stringResource(
+                    if (share.canWrite) R.string.share_can_edit else R.string.share_read_only,
+                ),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
         IconButton(onClick = onRevoke, enabled = enabled) {
-            Icon(Icons.Filled.Close, contentDescription = "Revoke share")
+            Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.share_revoke))
         }
     }
 }

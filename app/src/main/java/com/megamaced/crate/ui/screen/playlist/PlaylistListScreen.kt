@@ -43,13 +43,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import com.megamaced.crate.R
 import com.megamaced.crate.domain.model.Playlist
 import com.megamaced.crate.ui.components.ArtworkImage
 import com.megamaced.crate.ui.components.EmptyState
 import com.megamaced.crate.ui.network.LocalIsOnline
+import com.megamaced.crate.util.resolve
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -66,8 +70,9 @@ fun PlaylistListScreen(
     var renameTarget by remember { mutableStateOf<Playlist?>(null) }
     var deleteTarget by remember { mutableStateOf<Playlist?>(null) }
 
-    LaunchedEffect(state.errorMessage) {
-        state.errorMessage?.let { msg ->
+    val errorText = state.errorMessage?.resolve()
+    LaunchedEffect(errorText) {
+        errorText?.let { msg ->
             snackbarHostState.showSnackbar(msg)
             viewModel.dismissError()
         }
@@ -77,10 +82,13 @@ fun PlaylistListScreen(
         modifier = modifier.fillMaxSize(),
         topBar = {
             TopAppBar(
-                title = { Text("Playlists") },
+                title = { Text(stringResource(R.string.nav_playlists)) },
                 actions = {
                     IconButton(onClick = onOpenSharedWithMe) {
-                        Icon(Icons.Filled.PeopleOutline, contentDescription = "Shared with me")
+                        Icon(
+                            Icons.Filled.PeopleOutline,
+                            contentDescription = stringResource(R.string.shared_with_me_title),
+                        )
                     }
                 },
             )
@@ -89,7 +97,7 @@ fun PlaylistListScreen(
         floatingActionButton = {
             if (isOnline) {
                 FloatingActionButton(onClick = { createOpen = true }) {
-                    Icon(Icons.Filled.Add, contentDescription = "New playlist")
+                    Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.playlist_new))
                 }
             }
         },
@@ -103,8 +111,8 @@ fun PlaylistListScreen(
         ) {
             if (state.playlists.isEmpty() && !state.isRefreshing) {
                 EmptyState(
-                    title = "No playlists yet",
-                    subtitle = "Tap + to create your first playlist.",
+                    title = stringResource(R.string.playlist_empty_title),
+                    subtitle = stringResource(R.string.playlist_empty_subtitle),
                 )
             } else {
                 LazyColumn(
@@ -127,9 +135,9 @@ fun PlaylistListScreen(
 
     if (createOpen) {
         NameDialog(
-            title = "New playlist",
+            title = stringResource(R.string.playlist_new),
             initialValue = "",
-            confirmLabel = "Create",
+            confirmLabel = stringResource(R.string.action_create),
             onDismiss = { createOpen = false },
             onConfirm = { name ->
                 createOpen = false
@@ -140,9 +148,9 @@ fun PlaylistListScreen(
 
     renameTarget?.let { target ->
         NameDialog(
-            title = "Rename playlist",
+            title = stringResource(R.string.playlist_rename),
             initialValue = target.name,
-            confirmLabel = "Save",
+            confirmLabel = stringResource(R.string.action_save),
             onDismiss = { renameTarget = null },
             onConfirm = { name ->
                 renameTarget = null
@@ -155,17 +163,17 @@ fun PlaylistListScreen(
         AlertDialog(
             onDismissRequest = { deleteTarget = null },
             icon = { Icon(Icons.Filled.Delete, contentDescription = null) },
-            title = { Text("Delete \"${target.name}\"?") },
-            text = { Text("This removes the playlist from the server. Tracks themselves are not affected.") },
+            title = { Text(stringResource(R.string.playlist_delete_title, target.name)) },
+            text = { Text(stringResource(R.string.playlist_delete_message)) },
             confirmButton = {
                 TextButton(onClick = {
                     val id = target.id
                     deleteTarget = null
                     viewModel.delete(id)
-                }) { Text("Delete") }
+                }) { Text(stringResource(R.string.action_delete)) }
             },
             dismissButton = {
-                TextButton(onClick = { deleteTarget = null }) { Text("Cancel") }
+                TextButton(onClick = { deleteTarget = null }) { Text(stringResource(R.string.action_cancel)) }
             },
         )
     }
@@ -206,16 +214,16 @@ private fun PlaylistRow(
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                text = "${playlist.itemCount} item${if (playlist.itemCount == 1) "" else "s"}",
+                text = pluralStringResource(R.plurals.item_count, playlist.itemCount, playlist.itemCount),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
         IconButton(onClick = onRename) {
-            Icon(Icons.Filled.Edit, contentDescription = "Rename")
+            Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.action_rename))
         }
         IconButton(onClick = onDelete) {
-            Icon(Icons.Filled.Delete, contentDescription = "Delete")
+            Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.action_delete))
         }
     }
 }
@@ -238,7 +246,7 @@ private fun NameDialog(
                     value = name,
                     onValueChange = { name = it },
                     singleLine = true,
-                    label = { Text("Name") },
+                    label = { Text(stringResource(R.string.field_name)) },
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
@@ -250,7 +258,7 @@ private fun NameDialog(
             ) { Text(confirmLabel) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
         },
     )
 }

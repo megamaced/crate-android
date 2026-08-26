@@ -1,14 +1,17 @@
 package com.megamaced.crate.domain.model
 
+import androidx.annotation.StringRes
+import com.megamaced.crate.R
+
 enum class Category(
     val apiValue: String,
-    val label: String,
+    @param:StringRes val labelRes: Int,
 ) {
-    Books("book", "Books"),
-    Comics("comic", "Comics"),
-    Films("film", "Films"),
-    Games("game", "Games"),
-    Music("music", "Music"),
+    Books("book", R.string.category_books),
+    Comics("comic", R.string.category_comics),
+    Films("film", R.string.category_films),
+    Games("game", R.string.category_games),
+    Music("music", R.string.category_music),
     ;
 
     companion object {
@@ -18,9 +21,10 @@ enum class Category(
 
 enum class Status(
     val apiValue: String,
+    @param:StringRes val labelRes: Int,
 ) {
-    Owned("owned"),
-    Wanted("wanted"),
+    Owned("owned", R.string.status_owned),
+    Wanted("wanted", R.string.status_wanted),
     ;
 
     companion object {

@@ -41,10 +41,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import com.megamaced.crate.R
 import com.megamaced.crate.domain.model.Category
 import com.megamaced.crate.domain.model.MediaItem
 import com.megamaced.crate.ui.components.ArtworkImage
@@ -52,7 +54,8 @@ import com.megamaced.crate.ui.components.CategoryBadge
 import com.megamaced.crate.ui.screen.addedit.ExternalResultRow
 import com.megamaced.crate.ui.screen.addedit.ExternalSearchResult
 import com.megamaced.crate.ui.screen.addedit.listKey
-import com.megamaced.crate.ui.screen.addedit.providerName
+import com.megamaced.crate.ui.screen.addedit.providerNameRes
+import com.megamaced.crate.util.resolve
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -65,8 +68,9 @@ fun SearchScreen(
     val state by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
 
-    LaunchedEffect(state.externalError) {
-        state.externalError?.let { msg ->
+    val errorText = state.externalError?.resolve()
+    LaunchedEffect(errorText) {
+        errorText?.let { msg ->
             snackbarHostState.showSnackbar(msg)
             viewModel.dismissExternalError()
         }
@@ -74,7 +78,7 @@ fun SearchScreen(
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
-        topBar = { TopAppBar(title = { Text("Search") }) },
+        topBar = { TopAppBar(title = { Text(stringResource(R.string.nav_search)) }) },
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { innerPadding ->
         Column(
@@ -126,10 +130,10 @@ private fun QueryBar(
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp),
         singleLine = true,
-        label = { Text("Search") },
+        label = { Text(stringResource(R.string.search_field_label)) },
         trailingIcon = {
             IconButton(onClick = onSubmit) {
-                Icon(Icons.Filled.Search, contentDescription = "Search")
+                Icon(Icons.Filled.Search, contentDescription = stringResource(R.string.action_search))
             }
         },
         keyboardActions = KeyboardActions(onSearch = { onSubmit() }),
@@ -155,7 +159,15 @@ private fun TabRow(
                 onClick = { onSelect(option) },
                 shape = SegmentedButtonDefaults.itemShape(index = index, count = options.size),
             ) {
-                Text(if (option == SearchTab.Collection) "My collection" else "External")
+                Text(
+                    stringResource(
+                        if (option == SearchTab.Collection) {
+                            R.string.search_tab_collection
+                        } else {
+                            R.string.search_tab_external
+                        },
+                    ),
+                )
             }
         }
     }
@@ -169,11 +181,11 @@ private fun CollectionResults(
 ) {
     when {
         query.isBlank() -> {
-            Hint("Type to filter your local collection.")
+            Hint(stringResource(R.string.search_hint_filter_collection))
         }
 
         results.isEmpty() -> {
-            Hint("No matches in your collection.")
+            Hint(stringResource(R.string.search_hint_no_local_matches))
         }
 
         else -> {
@@ -198,6 +210,7 @@ private fun ExternalResults(
     onSearch: () -> Unit,
     onPick: (ExternalSearchResult) -> Unit,
 ) {
+    val provider = stringResource(providerNameRes(state.externalCategory))
     Column(modifier = Modifier.fillMaxSize()) {
         ProviderPicker(
             selected = state.externalCategory,
@@ -213,15 +226,19 @@ private fun ExternalResults(
                 }
 
                 state.query.isBlank() -> {
-                    Hint("Type a query then tap search to look up ${providerName(state.externalCategory)}.")
+                    Hint(stringResource(R.string.search_hint_type_then_search, provider))
                 }
 
                 state.externalResults.isEmpty() && state.externalHasSearched -> {
-                    Hint("No results from ${providerName(state.externalCategory)}.")
+                    Hint(stringResource(R.string.search_hint_no_provider_results, provider))
                 }
 
                 state.externalResults.isEmpty() -> {
-                    Hint("Tap search to look up ${providerName(state.externalCategory)}.", showSearch = true, onSearch = onSearch)
+                    Hint(
+                        stringResource(R.string.search_hint_tap_search, provider),
+                        showSearch = true,
+                        onSearch = onSearch,
+                    )
                 }
 
                 else -> {
@@ -266,7 +283,7 @@ private fun ProviderPicker(
                 onClick = { onSelected(category) },
                 shape = SegmentedButtonDefaults.itemShape(index = index, count = visible.size),
             ) {
-                Text(category.label)
+                Text(stringResource(category.labelRes))
             }
         }
     }

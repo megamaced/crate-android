@@ -1,5 +1,6 @@
 package com.megamaced.crate.ui.navigation
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
@@ -33,12 +34,14 @@ import androidx.compose.runtime.movableContentOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.megamaced.crate.R
 import com.megamaced.crate.data.auth.AuthState
 import com.megamaced.crate.data.auth.SessionManager
 import com.megamaced.crate.ui.components.OfflineBanner
@@ -46,18 +49,23 @@ import com.megamaced.crate.ui.network.LocalIsOnline
 import com.megamaced.crate.util.NetworkMonitor
 
 data class TopLevelRoute(
-    val label: String,
+    @param:StringRes val labelRes: Int,
     val destination: Destination,
     val selectedIcon: ImageVector,
     val unselectedIcon: ImageVector,
 )
 
 val topLevelRoutes = listOf(
-    TopLevelRoute("Home", Destination.Home, Icons.Filled.Home, Icons.Outlined.Home),
-    TopLevelRoute("Collection", Destination.Collection(), Icons.Filled.Album, Icons.Outlined.Album),
-    TopLevelRoute("Playlists", Destination.Playlists, Icons.AutoMirrored.Filled.QueueMusic, Icons.AutoMirrored.Outlined.QueueMusic),
-    TopLevelRoute("Search", Destination.Search, Icons.Filled.Search, Icons.Outlined.Search),
-    TopLevelRoute("Settings", Destination.Settings, Icons.Filled.Settings, Icons.Outlined.Settings),
+    TopLevelRoute(R.string.nav_home, Destination.Home, Icons.Filled.Home, Icons.Outlined.Home),
+    TopLevelRoute(R.string.nav_collection, Destination.Collection(), Icons.Filled.Album, Icons.Outlined.Album),
+    TopLevelRoute(
+        R.string.nav_playlists,
+        Destination.Playlists,
+        Icons.AutoMirrored.Filled.QueueMusic,
+        Icons.AutoMirrored.Outlined.QueueMusic,
+    ),
+    TopLevelRoute(R.string.nav_search, Destination.Search, Icons.Filled.Search, Icons.Outlined.Search),
+    TopLevelRoute(R.string.nav_settings, Destination.Settings, Icons.Filled.Settings, Icons.Outlined.Settings),
 )
 
 @Composable
@@ -118,16 +126,17 @@ fun CrateScaffold(
                             val selected = currentDestination?.hierarchy?.any {
                                 it.hasRoute(route.destination::class)
                             } == true
+                            val label = stringResource(route.labelRes)
                             NavigationRailItem(
                                 selected = selected,
                                 onClick = { navController.navigateTopLevel(route.destination) },
                                 icon = {
                                     Icon(
                                         imageVector = if (selected) route.selectedIcon else route.unselectedIcon,
-                                        contentDescription = route.label,
+                                        contentDescription = label,
                                     )
                                 },
-                                label = { Text(route.label) },
+                                label = { Text(label) },
                             )
                         }
                     }
@@ -147,16 +156,17 @@ fun CrateScaffold(
                                 val selected = currentDestination?.hierarchy?.any {
                                     it.hasRoute(route.destination::class)
                                 } == true
+                                val label = stringResource(route.labelRes)
                                 NavigationBarItem(
                                     selected = selected,
                                     onClick = { navController.navigateTopLevel(route.destination) },
                                     icon = {
                                         Icon(
                                             imageVector = if (selected) route.selectedIcon else route.unselectedIcon,
-                                            contentDescription = route.label,
+                                            contentDescription = label,
                                         )
                                     },
-                                    label = { Text(route.label) },
+                                    label = { Text(label) },
                                 )
                             }
                         }

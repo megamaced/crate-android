@@ -2,7 +2,7 @@ package com.megamaced.crate.data.repository
 
 import com.megamaced.crate.data.api.ApiResult
 import com.megamaced.crate.data.api.CrateApiService
-import com.megamaced.crate.data.api.PARSE_FAILURE_CODE
+import com.megamaced.crate.data.api.NON_HTTP_FAILURE_CODES
 import com.megamaced.crate.data.api.apiCall
 import com.megamaced.crate.data.db.dao.HomeFeedDao
 import com.megamaced.crate.data.mapper.MediaItemJsonCodec
@@ -32,7 +32,7 @@ class HomeRepositoryImpl
             // for either cause, and the cache is what offline use relies on.
             val serveCache =
                 result is ApiResult.NetworkError ||
-                    (result is ApiResult.HttpError && result.code == PARSE_FAILURE_CODE)
+                    (result is ApiResult.HttpError && result.code in NON_HTTP_FAILURE_CODES)
             return if (serveCache) ApiResult.Success(buildOfflineFeed()) else result
         }
 

@@ -1,5 +1,7 @@
 package com.megamaced.crate.domain.model
 
+import androidx.annotation.StringRes
+
 // Derived views over a [SharedWithMe] payload, mirroring
 // crate/src/composables/useSharedContent.js so the Android "Shared with me"
 // landing and per-category subpages bucket content exactly like the web app.
@@ -17,7 +19,7 @@ internal val CATEGORY_ORDER =
 
 data class SharedCategorySummary(
     val category: Category,
-    val label: String,
+    @param:StringRes val labelRes: Int,
     val count: Int,
     val items: List<MediaItem>,
     // Owners who granted write access covering this category — via a read/write
@@ -77,7 +79,7 @@ fun SharedWithMe.sharedCategories(): List<SharedCategorySummary> {
             val items = map.getValue(category)
             SharedCategorySummary(
                 category = category,
-                label = category.label,
+                labelRes = category.labelRes,
                 count = items.size,
                 items = items,
                 writeOwners = writeOwnersForCategory(category),

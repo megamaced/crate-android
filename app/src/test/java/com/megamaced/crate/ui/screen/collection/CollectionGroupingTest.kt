@@ -1,5 +1,6 @@
 package com.megamaced.crate.ui.screen.collection
 
+import com.megamaced.crate.R
 import com.megamaced.crate.domain.model.Category
 import com.megamaced.crate.domain.model.CollectionSort
 import com.megamaced.crate.domain.model.MarketValue
@@ -8,6 +9,7 @@ import com.megamaced.crate.domain.model.PurchasePrice
 import com.megamaced.crate.domain.model.SortDirection
 import com.megamaced.crate.domain.model.SortField
 import com.megamaced.crate.domain.model.Status
+import com.megamaced.crate.util.UiText
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -17,6 +19,12 @@ import java.time.LocalDate
 
 class CollectionGroupingTest {
     private val today = LocalDate.of(2026, 7, 19)
+
+    // Headers name a resource unless the value came from the item itself (a
+    // letter, a decade, a format), so the expectations are built the same way.
+    private val unknown = UiText.Res(R.string.group_header_unknown)
+
+    private fun raw(vararg values: String): List<UiText> = values.map(UiText::Raw)
 
     @Test
     fun `artist axis buckets by first letter and strips leading articles`() {
@@ -29,14 +37,14 @@ class CollectionGroupingTest {
         val groups = groupItemsForSort(items, SortField.Artist, today)
         val headers = groups.map { it.header }
         // "The Beatles" files under B, "808 State" under '#'.
-        assertEquals(listOf("R", "P", "B", "#"), headers)
+        assertEquals(raw("R", "P", "B", "#"), headers)
     }
 
     @Test
     fun `title axis does not strip articles`() {
         val items = listOf(item(1, "The Wall", artist = "Pink Floyd"))
         val groups = groupItemsForSort(items, SortField.Title, today)
-        assertEquals(listOf("T"), groups.map { it.header })
+        assertEquals(raw("T"), groups.map { it.header })
     }
 
     @Test
@@ -48,8 +56,11 @@ class CollectionGroupingTest {
             item(4, "D", year = null),
         )
         val groups = groupItemsForSort(items, SortField.Year, today)
-        assertEquals(listOf("1990s", "2000s", "Unknown"), groups.map { it.header })
-        assertEquals(2, groups.first { it.header == "1990s" }.items.size)
+        assertEquals(
+            listOf(UiText.Raw("1990s"), UiText.Raw("2000s"), unknown),
+            groups.map { it.header },
+        )
+        assertEquals(2, groups.first { it.header == UiText.Raw("1990s") }.items.size)
     }
 
     @Test
@@ -61,7 +72,7 @@ class CollectionGroupingTest {
             item(4, "D", format = null),
         )
         val groups = groupItemsForSort(items, SortField.Format, today)
-        assertEquals(listOf("LP", "CD", "Unknown"), groups.map { it.header })
+        assertEquals(listOf(UiText.Raw("LP"), UiText.Raw("CD"), unknown), groups.map { it.header })
     }
 
     @Test
@@ -84,7 +95,7 @@ class CollectionGroupingTest {
         // "The Beatles" sorts under B, between Adele and Cardigans.
         assertEquals(listOf("Adele", "The Beatles", "Cardigans"), sorted.map { it.artist })
         val groups = groupItemsForSort(sorted, SortField.Artist, today)
-        assertEquals(listOf("A", "B", "C"), groups.map { it.header })
+        assertEquals(raw("A", "B", "C"), groups.map { it.header })
     }
 
     @Test
@@ -94,7 +105,13 @@ class CollectionGroupingTest {
             item(2, "B", createdAt = "2026-07-18 10:00:00"),
         )
         val groups = groupItemsForSort(items, SortField.CreatedAt, today)
-        assertEquals(listOf("Today", "Yesterday"), groups.map { it.header })
+        assertEquals(
+            listOf(
+                UiText.Res(R.string.date_bucket_today),
+                UiText.Res(R.string.date_bucket_yesterday),
+            ),
+            groups.map { it.header },
+        )
     }
 
     @Test

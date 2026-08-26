@@ -72,6 +72,8 @@ import com.megamaced.crate.ui.navigation.CategorySegmentedRow
 import com.megamaced.crate.ui.network.LocalIsOnline
 import com.megamaced.crate.ui.screen.share.ShareSheet
 import com.megamaced.crate.ui.screen.share.ShareTarget
+import com.megamaced.crate.util.UiText
+import com.megamaced.crate.util.resolve
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -90,8 +92,9 @@ fun CollectionScreen(
     // not in Settings). Null = closed.
     var shareSheet by remember { mutableStateOf<Pair<ShareTarget, String>?>(null) }
 
-    LaunchedEffect(uiState.errorMessage) {
-        uiState.errorMessage?.let { msg ->
+    val errorText = uiState.errorMessage?.resolve()
+    LaunchedEffect(errorText) {
+        errorText?.let { msg ->
             snackbarHostState.showSnackbar(msg)
             viewModel.dismissError()
         }
@@ -101,7 +104,7 @@ fun CollectionScreen(
         modifier = modifier.fillMaxSize(),
         topBar = {
             TopAppBar(
-                title = { Text(uiState.category.label) },
+                title = { Text(stringResource(uiState.category.labelRes)) },
                 actions = {
                     ViewModeToggle(
                         current = uiState.viewMode,
@@ -128,7 +131,7 @@ fun CollectionScreen(
         floatingActionButton = {
             if (isOnline) {
                 FloatingActionButton(onClick = { onAddItem(uiState.category) }) {
-                    Icon(Icons.Filled.Add, contentDescription = "Add item")
+                    Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.action_add_item))
                 }
             }
         },
@@ -199,7 +202,7 @@ private fun ShareCollectionMenu(
     IconButton(onClick = { expanded = true }) {
         Icon(
             imageVector = Icons.Outlined.Share,
-            contentDescription = "Share",
+            contentDescription = stringResource(R.string.action_share),
         )
     }
     DropdownMenu(
@@ -207,14 +210,14 @@ private fun ShareCollectionMenu(
         onDismissRequest = { expanded = false },
     ) {
         DropdownMenuItem(
-            text = { Text("Share ${category.label}…") },
+            text = { Text(stringResource(R.string.collection_share_category, stringResource(category.labelRes))) },
             onClick = {
                 expanded = false
                 onShareCategory()
             },
         )
         DropdownMenuItem(
-            text = { Text("Share whole library…") },
+            text = { Text(stringResource(R.string.collection_share_library)) },
             onClick = {
                 expanded = false
                 onShareLibrary()
@@ -274,7 +277,7 @@ internal fun CollectionGrid(
                     key = "header:${group.header}",
                     span = { GridItemSpan(maxLineSpan) },
                 ) {
-                    GroupHeader(text = group.header)
+                    GroupHeader(header = group.header)
                 }
             }
             items(group.items, key = { it.id }) { item ->
@@ -312,7 +315,7 @@ internal fun CollectionList(
         for (group in groups) {
             if (group.header != null) {
                 item(key = "header:${group.header}") {
-                    GroupHeader(text = group.header)
+                    GroupHeader(header = group.header)
                 }
             }
             itemsIndexed(group.items, key = { _, item -> item.id }) { index, item ->
@@ -331,9 +334,9 @@ internal fun CollectionList(
 }
 
 @Composable
-private fun GroupHeader(text: String) {
+private fun GroupHeader(header: UiText) {
     Text(
-        text = text,
+        text = header.resolve(),
         style = MaterialTheme.typography.labelLarge,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier
@@ -438,8 +441,8 @@ private fun CollectionListRow(
 @Composable
 private fun EmptyCollection(modifier: Modifier) {
     EmptyState(
-        title = "Nothing here yet",
-        subtitle = "Pull to refresh, or add an item from the + button on the next screen.",
+        title = stringResource(R.string.collection_empty_title),
+        subtitle = stringResource(R.string.collection_empty_subtitle),
         modifier = modifier,
     )
 }

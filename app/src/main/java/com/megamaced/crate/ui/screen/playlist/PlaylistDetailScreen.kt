@@ -47,9 +47,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import com.megamaced.crate.R
 import com.megamaced.crate.domain.model.MediaItem
 import com.megamaced.crate.ui.components.ArtworkImage
 import com.megamaced.crate.ui.components.CategoryBadge
@@ -57,6 +59,7 @@ import com.megamaced.crate.ui.components.EmptyState
 import com.megamaced.crate.ui.components.LoadingState
 import com.megamaced.crate.ui.screen.share.ShareSheet
 import com.megamaced.crate.ui.screen.share.ShareTarget
+import com.megamaced.crate.util.resolve
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -73,8 +76,9 @@ fun PlaylistDetailScreen(
     var addOpen by remember { mutableStateOf(false) }
     var shareOpen by remember { mutableStateOf(false) }
 
-    LaunchedEffect(state.errorMessage) {
-        state.errorMessage?.let { msg ->
+    val errorText = state.errorMessage?.resolve()
+    LaunchedEffect(errorText) {
+        errorText?.let { msg ->
             snackbarHostState.showSnackbar(msg)
             viewModel.dismissError()
         }
@@ -90,26 +94,29 @@ fun PlaylistDetailScreen(
                 title = { Text(state.playlist?.name ?: "") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.action_back),
+                        )
                     }
                 },
                 actions = {
                     // Re-sharing is owner-only.
                     if (state.isOwner) {
                         IconButton(onClick = { shareOpen = true }, enabled = state.playlist != null) {
-                            Icon(Icons.Filled.Share, contentDescription = "Share")
+                            Icon(Icons.Filled.Share, contentDescription = stringResource(R.string.action_share))
                         }
                     }
                     // Rename is available to anyone who can write.
                     if (state.canWrite) {
                         IconButton(onClick = { renameOpen = true }) {
-                            Icon(Icons.Filled.Edit, contentDescription = "Rename")
+                            Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.action_rename))
                         }
                     }
                     // Deleting the playlist is owner-only.
                     if (state.isOwner) {
                         IconButton(onClick = { deleteOpen = true }) {
-                            Icon(Icons.Filled.Delete, contentDescription = "Delete")
+                            Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.action_delete))
                         }
                     }
                 },
@@ -121,7 +128,7 @@ fun PlaylistDetailScreen(
             // read/write share).
             if (state.playlist != null && state.canWrite) {
                 FloatingActionButton(onClick = { addOpen = true }) {
-                    Icon(Icons.Filled.Add, contentDescription = "Add items")
+                    Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.playlist_add_items))
                 }
             }
         },
@@ -133,15 +140,15 @@ fun PlaylistDetailScreen(
 
             state.playlist == null -> {
                 EmptyState(
-                    title = "Playlist not found",
+                    title = stringResource(R.string.playlist_not_found),
                     modifier = Modifier.padding(innerPadding),
                 )
             }
 
             state.playlist!!.items.isEmpty() -> {
                 EmptyState(
-                    title = "No items yet",
-                    subtitle = "Tap + to add tracks, films, books, games, or comics from your collection.",
+                    title = stringResource(R.string.playlist_empty_items_title),
+                    subtitle = stringResource(R.string.playlist_empty_items_subtitle),
                     modifier = Modifier.padding(innerPadding),
                 )
             }
@@ -182,16 +189,18 @@ fun PlaylistDetailScreen(
         AlertDialog(
             onDismissRequest = { deleteOpen = false },
             icon = { Icon(Icons.Filled.Delete, contentDescription = null) },
-            title = { Text("Delete \"${state.playlist?.name.orEmpty()}\"?") },
-            text = { Text("This removes the playlist from the server. Tracks themselves are not affected.") },
+            title = {
+                Text(stringResource(R.string.playlist_delete_title, state.playlist?.name.orEmpty()))
+            },
+            text = { Text(stringResource(R.string.playlist_delete_message)) },
             confirmButton = {
                 TextButton(onClick = {
                     deleteOpen = false
                     viewModel.delete()
-                }) { Text("Delete") }
+                }) { Text(stringResource(R.string.action_delete)) }
             },
             dismissButton = {
-                TextButton(onClick = { deleteOpen = false }) { Text("Cancel") }
+                TextButton(onClick = { deleteOpen = false }) { Text(stringResource(R.string.action_cancel)) }
             },
         )
     }
@@ -270,7 +279,7 @@ private fun PlaylistItemRow(
         // Removing tracks requires write access.
         if (canWrite) {
             IconButton(onClick = onRemove) {
-                Icon(Icons.Filled.Close, contentDescription = "Remove from playlist")
+                Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.playlist_remove_item))
             }
         }
     }
@@ -312,7 +321,7 @@ private fun AddItemSheet(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
-                text = "Add to playlist",
+                text = stringResource(R.string.playlist_add_to),
                 style = MaterialTheme.typography.titleLarge,
             )
             OutlinedTextField(
@@ -320,7 +329,7 @@ private fun AddItemSheet(
                 onValueChange = { query = it },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
-                label = { Text("Filter your collection") },
+                label = { Text(stringResource(R.string.playlist_filter_collection)) },
             )
             Box(
                 modifier = Modifier
@@ -329,11 +338,13 @@ private fun AddItemSheet(
             ) {
                 if (filtered.isEmpty()) {
                     Text(
-                        text = if (candidates.isEmpty()) {
-                            "Your collection is empty."
-                        } else {
-                            "No matches."
-                        },
+                        text = stringResource(
+                            if (candidates.isEmpty()) {
+                                R.string.playlist_collection_empty
+                            } else {
+                                R.string.playlist_no_matches
+                            },
+                        ),
                         modifier = Modifier.align(Alignment.Center),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -404,13 +415,13 @@ private fun RenameDialog(
     var name by remember { mutableStateOf(initialName) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Rename playlist") },
+        title = { Text(stringResource(R.string.playlist_rename)) },
         text = {
             OutlinedTextField(
                 value = name,
                 onValueChange = { name = it },
                 singleLine = true,
-                label = { Text("Name") },
+                label = { Text(stringResource(R.string.field_name)) },
                 modifier = Modifier.fillMaxWidth(),
             )
         },
@@ -418,10 +429,10 @@ private fun RenameDialog(
             TextButton(
                 onClick = { onConfirm(name) },
                 enabled = name.trim().isNotEmpty() && name != initialName,
-            ) { Text("Save") }
+            ) { Text(stringResource(R.string.action_save)) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
         },
     )
 }

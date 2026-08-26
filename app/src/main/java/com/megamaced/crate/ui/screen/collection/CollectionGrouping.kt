@@ -1,9 +1,11 @@
 package com.megamaced.crate.ui.screen.collection
 
+import com.megamaced.crate.R
 import com.megamaced.crate.domain.model.CollectionSort
 import com.megamaced.crate.domain.model.MediaItem
 import com.megamaced.crate.domain.model.SortDirection
 import com.megamaced.crate.domain.model.SortField
+import com.megamaced.crate.util.UiText
 import java.time.LocalDate
 
 // Group headers for the collection views, mirroring getGroupKey(item, field) in
@@ -12,7 +14,9 @@ import java.time.LocalDate
 //   Artist / Title  → first letter (A–Z), '#' for anything else. Artist strips a
 //                     leading article ("The Beatles" files under B) for the key
 //                     only, never for display.
-//   Year            → decade ("1990s"), or "Unknown" when absent.
+//   Year            → decade ("1990s"), or "Unknown" when absent. The decade
+//                     comes from [decadeOf], so a header and its filter chip
+//                     can never disagree.
 //   CreatedAt       → relative date bucket (Today / Last week / 2023 …) via
 //                     [DateBucket].
 //   Format          → the format name, or "Unknown".
@@ -23,10 +27,13 @@ private val ARTICLE_REGEX = Regex("^(the |a |an )\\s*", RegexOption.IGNORE_CASE)
 
 private fun stripArticle(value: String): String = value.replace(ARTICLE_REGEX, "")
 
-private fun alphaKey(value: String): String {
+private fun alphaKey(value: String): UiText {
     val first = value.trim().firstOrNull()?.uppercaseChar()
-    return if (first != null && first in 'A'..'Z') first.toString() else "#"
+    return UiText.Raw(if (first != null && first in 'A'..'Z') first.toString() else "#")
 }
+
+/** Header for items the active axis can't place — no year, no format, no date. */
+internal val UNKNOWN_BUCKET = UiText.Res(R.string.group_header_unknown)
 
 /**
  * The header label [item] falls under for the active [axis], or null when the
@@ -36,13 +43,13 @@ internal fun groupKeyFor(
     item: MediaItem,
     axis: SortField,
     today: LocalDate,
-): String? =
+): UiText? =
     when (axis) {
         SortField.Artist -> alphaKey(stripArticle(item.artist.orEmpty()))
         SortField.Title -> alphaKey(item.title)
-        SortField.Year -> item.year?.takeIf { it != 0 }?.let { "${(it / 10) * 10}s" } ?: "Unknown"
+        SortField.Year -> decadeOf(item)?.let(UiText::Raw) ?: UNKNOWN_BUCKET
         SortField.CreatedAt -> DateBucket.labelFor(item.createdAt, today)
-        SortField.Format -> item.format?.takeIf { it.isNotBlank() } ?: "Unknown"
+        SortField.Format -> item.format?.takeIf { it.isNotBlank() }?.let(UiText::Raw) ?: UNKNOWN_BUCKET
         SortField.MarketValue -> null
     }
 
@@ -60,9 +67,9 @@ internal fun groupItemsForSort(
     if (axis == SortField.MarketValue) return listOf(ItemGroup(header = null, items = items))
 
     val groups = mutableListOf<ItemGroup>()
-    val seen = HashMap<String, MutableList<MediaItem>>()
+    val seen = HashMap<UiText, MutableList<MediaItem>>()
     for (item in items) {
-        val key = groupKeyFor(item, axis, today) ?: ""
+        val key = groupKeyFor(item, axis, today) ?: UNKNOWN_BUCKET
         val bucket = seen[key]
         if (bucket == null) {
             val list = mutableListOf(item)

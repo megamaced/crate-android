@@ -2,10 +2,13 @@ package com.megamaced.crate.ui.screen.login
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.megamaced.crate.R
+import com.megamaced.crate.data.auth.LoginFlowException
 import com.megamaced.crate.data.auth.LoginFlowInitResponse
 import com.megamaced.crate.data.auth.LoginFlowStatus
 import com.megamaced.crate.data.auth.NextcloudLoginFlow
 import com.megamaced.crate.data.auth.SessionManager
+import com.megamaced.crate.util.UiText
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -20,7 +23,7 @@ import javax.inject.Inject
 data class LoginUiState(
     val hostInput: String = "",
     val isLoading: Boolean = false,
-    val error: String? = null,
+    val error: UiText? = null,
     val loginUrl: String? = null,
     val isPolling: Boolean = false,
     val loginSuccess: Boolean = false,
@@ -53,7 +56,7 @@ class LoginViewModel
             if (_uiState.value.isLoading || _uiState.value.isPolling) return
             val host = _uiState.value.hostInput.trim()
             if (host.isBlank()) {
-                _uiState.update { it.copy(error = "Enter your Nextcloud server URL") }
+                _uiState.update { it.copy(error = UiText.Res(R.string.login_error_enter_url)) }
                 return
             }
 
@@ -76,9 +79,9 @@ class LoginViewModel
                 result.fold(
                     onSuccess = { initResponse -> onFlowInitiated(initResponse, normalisedHost) },
                     onFailure = { e ->
-                        _uiState.update {
-                            it.copy(isLoading = false, error = e.message ?: "Connection failed")
-                        }
+                        val reason = (e as? LoginFlowException)?.reason
+                            ?: UiText.Res(R.string.login_error_connection_failed)
+                        _uiState.update { it.copy(isLoading = false, error = reason) }
                     },
                 )
             }
@@ -117,7 +120,7 @@ class LoginViewModel
                             _uiState.update {
                                 it.copy(
                                     isPolling = false,
-                                    error = "The server returned an address Crate can't use.",
+                                    error = UiText.Res(R.string.login_error_unusable_address),
                                 )
                             }
                         }
@@ -125,7 +128,7 @@ class LoginViewModel
 
                     is LoginFlowStatus.Error -> {
                         _uiState.update {
-                            it.copy(isPolling = false, error = status.message)
+                            it.copy(isPolling = false, error = status.reason)
                         }
                     }
 

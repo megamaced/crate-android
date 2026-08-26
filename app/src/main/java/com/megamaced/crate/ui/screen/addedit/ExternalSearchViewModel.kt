@@ -2,6 +2,7 @@ package com.megamaced.crate.ui.screen.addedit
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.megamaced.crate.R
 import com.megamaced.crate.data.api.ApiResult
 import com.megamaced.crate.data.api.CrateApiService
 import com.megamaced.crate.data.api.apiCall
@@ -10,7 +11,9 @@ import com.megamaced.crate.data.api.dto.DiscogsSearchResultDto
 import com.megamaced.crate.data.api.dto.OpenLibraryResultDto
 import com.megamaced.crate.data.api.dto.RawgSearchResultDto
 import com.megamaced.crate.data.api.dto.TmdbSearchResultDto
+import com.megamaced.crate.data.api.toUiText
 import com.megamaced.crate.domain.model.Category
+import com.megamaced.crate.util.UiText
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,7 +29,7 @@ data class ExternalSearchState(
     val results: List<ExternalSearchResult> = emptyList(),
     val isLoading: Boolean = false,
     val hasSearched: Boolean = false,
-    val errorMessage: String? = null,
+    val errorMessage: UiText? = null,
 )
 
 @HiltViewModel
@@ -87,15 +90,19 @@ class ExternalSearchViewModel
 
                     ApiResult.NetworkError -> {
                         _state.update {
-                            it.copy(isLoading = false, hasSearched = true, errorMessage = "Couldn't reach the server.")
+                            it.copy(
+                                isLoading = false,
+                                hasSearched = true,
+                                errorMessage = UiText.Res(R.string.error_network),
+                            )
                         }
                     }
 
                     is ApiResult.HttpError -> {
                         val msg =
                             when (result.code) {
-                                400 -> "Provider token missing. Add it in Settings."
-                                else -> result.message ?: "Server error (${result.code})."
+                                400 -> UiText.Res(R.string.error_provider_token_missing)
+                                else -> result.toUiText()
                             }
                         _state.update { it.copy(isLoading = false, hasSearched = true, errorMessage = msg) }
                     }

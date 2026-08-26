@@ -1,5 +1,7 @@
 package com.megamaced.crate.data.api
 
+import com.megamaced.crate.R
+import com.megamaced.crate.util.UiText
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
@@ -13,11 +15,21 @@ import java.io.IOException
 
 /**
  * [ApiResult.HttpError.code] used when the failure never reached the HTTP
- * layer — a response that didn't match the DTO contract, or an unexpected
- * exception. Callers that can degrade gracefully (serving a cached copy)
- * treat it like [ApiResult.NetworkError].
+ * layer — an unexpected exception. Callers that can degrade gracefully
+ * (serving a cached copy) treat it like [ApiResult.NetworkError].
  */
 const val PARSE_FAILURE_CODE = -1
+
+/**
+ * [ApiResult.HttpError.code] for a response the DTO contract couldn't read.
+ * Degrades like [PARSE_FAILURE_CODE] — see [NON_HTTP_FAILURE_CODES] — and is
+ * separate only so the UI can word it as a contract mismatch rather than as an
+ * anonymous failure.
+ */
+const val MALFORMED_RESPONSE_CODE = -2
+
+/** Every [ApiResult.HttpError.code] that never reached the HTTP layer. */
+val NON_HTTP_FAILURE_CODES = setOf(PARSE_FAILURE_CODE, MALFORMED_RESPONSE_CODE)
 
 sealed interface ApiResult<out T> {
     data class Success<T>(
@@ -48,6 +60,17 @@ fun ocsErrorMessage(e: HttpException): String? {
     val body = runCatching { e.response()?.errorBody()?.string() }.getOrNull()
     return body?.let(::parseOcsError) ?: e.message().orEmpty().ifBlank { null }
 }
+
+/**
+ * How a failed request reads to the user: the server's own explanation when it
+ * sent one, our own wording otherwise.
+ */
+fun ApiResult.HttpError.toUiText(): UiText =
+    when {
+        message != null -> UiText.Raw(message)
+        code == MALFORMED_RESPONSE_CODE -> UiText.Res(R.string.error_unexpected_response)
+        else -> UiText.Res(R.string.error_server, listOf(code))
+    }
 
 private val errorBodyJson = Json { ignoreUnknownKeys = true }
 
@@ -91,7 +114,7 @@ suspend inline fun <T> apiCall(crossinline block: suspend () -> T): ApiResult<T>
         // mismatch, backend drift). Distinguish it from a generic failure so
         // the user sees an intelligible message instead of "Server error (-1)".
         Timber.e(e, "Failed to parse server response")
-        ApiResult.HttpError(PARSE_FAILURE_CODE, "Unexpected response from server.")
+        ApiResult.HttpError(MALFORMED_RESPONSE_CODE, null)
     } catch (e: Exception) {
         Timber.e(e, "Unexpected API error")
         ApiResult.HttpError(PARSE_FAILURE_CODE, e.message)

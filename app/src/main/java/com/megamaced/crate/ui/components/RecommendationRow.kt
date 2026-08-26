@@ -19,9 +19,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import com.megamaced.crate.R
 import com.megamaced.crate.data.api.dto.SuggestionDto
 import com.megamaced.crate.domain.model.Category
 
@@ -95,7 +97,7 @@ fun RecommendationRow(
             Text(text = title, style = MaterialTheme.typography.titleSmall)
             if (source != null) {
                 Text(
-                    text = "via $source",
+                    text = stringResource(R.string.recommendation_via_source, source),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

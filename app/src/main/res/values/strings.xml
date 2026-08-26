@@ -1,18 +1,214 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <string name="app_name">Crate</string>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- App identity -->
+    <string name="app_name" translatable="false">Crate</string>
 
-    <string name="update_channel_name">App updates</string>
-    <string name="update_channel_description">Notifies you when a new version of Crate is available on GitHub.</string>
-    <string name="update_available_title">Crate update available</string>
-    <string name="update_available_text">Version %1$s is available — tap to download.</string>
-    <string name="update_available_big_text">Crate %1$s is available on GitHub. Tap to open the release page and download the new APK.</string>
+    <!-- Errors shared across screens -->
+    <string name="error_network">Couldn\'t reach the server.</string>
+    <string name="error_server">Server error (%1$d).</string>
+    <string name="error_unexpected_response">Unexpected response from server.</string>
+    <string name="error_provider_token_missing">Provider token missing. Add it in Settings.</string>
 
-    <!-- Phase A20 — purchase price -->
+    <!-- Actions and icon labels reused across screens -->
+    <string name="action_add_item">Add item</string>
+    <string name="action_back">Back</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_close">Close</string>
+    <string name="action_create">Create</string>
+    <string name="action_delete">Delete</string>
+    <string name="action_dismiss">Dismiss</string>
+    <string name="action_edit">Edit</string>
+    <string name="action_hide">Hide</string>
+    <string name="action_more">More</string>
+    <string name="action_remove">Remove</string>
+    <string name="action_rename">Rename</string>
+    <string name="action_replace">Replace</string>
+    <string name="action_save">Save</string>
+    <string name="action_scan_barcode">Scan barcode</string>
+    <string name="action_search">Search</string>
+    <string name="action_share">Share</string>
+    <string name="action_show">Show</string>
+    <string name="action_sort">Sort</string>
+    <string name="action_upload">Upload</string>
+
+    <!-- Bottom bar / navigation rail destinations -->
+    <string name="nav_home">Home</string>
+    <string name="nav_collection">Collection</string>
+    <string name="nav_playlists">Playlists</string>
+    <string name="nav_search">Search</string>
+    <string name="nav_settings">Settings</string>
+
+    <!-- Categories and ownership status -->
+    <string name="category_books">Books</string>
+    <string name="category_comics">Comics</string>
+    <string name="category_films">Films</string>
+    <string name="category_games">Games</string>
+    <string name="category_music">Music</string>
+    <string name="status_owned">Owned</string>
+    <string name="status_wanted">Wanted</string>
+
+    <!-- Enrichment providers backing each category's external search -->
+    <string name="provider_music" translatable="false">Discogs</string>
+    <string name="provider_films" translatable="false">TMDB</string>
+    <string name="provider_books" translatable="false">Open Library</string>
+    <string name="provider_games" translatable="false">RAWG</string>
+    <string name="provider_comics" translatable="false">ComicVine</string>
+
+    <!-- Item field names. Per-category because the same field is a director for
+         a film and an artist for a record; the detail view and the add/edit form
+         both read these so the two can never disagree. -->
+    <string name="field_artist_music">Artist</string>
+    <string name="field_artist_films">Director</string>
+    <string name="field_artist_books">Author</string>
+    <string name="field_artist_games">Developer</string>
+    <string name="field_artist_comics">Writer</string>
+    <string name="field_title_music">Album / Title</string>
+    <string name="field_title_films">Film Title</string>
+    <string name="field_title_books">Title</string>
+    <string name="field_title_games">Game Title</string>
+    <string name="field_title_comics">Series / Volume Title</string>
+    <string name="field_label_music">Label</string>
+    <string name="field_label_films">Studio</string>
+    <string name="field_label_books">Publisher</string>
+    <string name="field_label_games">Publisher</string>
+    <string name="field_label_comics">Publisher</string>
+    <string name="field_format">Format</string>
+    <string name="field_platform">Platform</string>
+    <string name="field_barcode">Barcode</string>
+    <string name="field_isbn">ISBN</string>
+    <string name="field_country">Country</string>
+    <string name="field_name">Name</string>
+    <string name="field_notes">Notes</string>
+    <string name="field_year">Year</string>
     <string name="purchase_price_label">Original price</string>
     <string name="purchase_currency_label">Currency</string>
 
-    <!-- Phase A21 — photo slots -->
+    <!-- Example values shown in empty form fields -->
+    <string name="hint_artist_music">e.g. Pink Floyd</string>
+    <string name="hint_artist_films">e.g. Christopher Nolan</string>
+    <string name="hint_artist_books">e.g. George Orwell</string>
+    <string name="hint_artist_games">e.g. Nintendo</string>
+    <string name="hint_artist_comics">e.g. Alan Moore</string>
+    <string name="hint_title_music">e.g. The Dark Side of the Moon</string>
+    <string name="hint_title_films">e.g. Inception</string>
+    <string name="hint_title_books">e.g. 1984</string>
+    <string name="hint_title_games">e.g. Super Mario Bros.</string>
+    <string name="hint_title_comics">e.g. Watchmen</string>
+    <string name="hint_label_music">e.g. EMI</string>
+    <string name="hint_label_films">e.g. Warner Bros.</string>
+    <string name="hint_label_books">e.g. Penguin</string>
+    <string name="hint_label_games">e.g. Nintendo</string>
+    <string name="hint_label_comics">e.g. DC Comics</string>
+    <string name="hint_barcode_music">e.g. 5099902987521</string>
+    <!-- The separators in an ISBN are hyphens, not en dashes. -->
+    <string name="hint_barcode_books" tools:ignore="TypographyDashes">e.g. 978-0451524935</string>
+    <string name="hint_year">e.g. 1973</string>
+    <string name="hint_purchase_price">e.g. 24.99</string>
+
+    <!-- Sort menu. The axis noun is a resource of its own so the direction and
+         the noun can be ordered however the language needs. -->
+    <string name="sort_newest_first">Newest First</string>
+    <string name="sort_oldest_first">Oldest First</string>
+    <string name="sort_a_to_z">%1$s A–Z</string>
+    <string name="sort_z_to_a">%1$s Z–A</string>
+    <string name="sort_year_oldest">Year (Oldest)</string>
+    <string name="sort_year_newest">Year (Newest)</string>
+    <string name="sort_value_highest">Value (Highest)</string>
+    <string name="sort_value_lowest">Value (Lowest)</string>
+    <string name="sort_noun_format">Format</string>
+    <string name="sort_noun_title_music">Album</string>
+    <string name="sort_noun_title_films">Film</string>
+    <string name="sort_noun_title_books">Title</string>
+    <string name="sort_noun_title_games">Game</string>
+    <string name="sort_noun_title_comics">Volume</string>
+    <!-- Marks the active option in a picker; quoted so the gap survives. -->
+    <string name="sort_option_selected">"%1$s  ✓"</string>
+
+    <!-- Section headers in a grouped collection list -->
+    <string name="group_header_unknown">Unknown</string>
+    <string name="date_bucket_today">Today</string>
+    <string name="date_bucket_yesterday">Yesterday</string>
+    <string name="date_bucket_earlier_this_week">Earlier this week</string>
+    <string name="date_bucket_last_week">Last week</string>
+    <string name="date_bucket_earlier_this_month">Earlier this month</string>
+    <string name="date_bucket_last_month">Last month</string>
+    <string name="date_bucket_earlier_this_year">Earlier this year</string>
+    <string name="date_bucket_last_year">Last year</string>
+
+    <!-- Counted quantities -->
+    <plurals name="item_count">
+        <item quantity="one">%1$d item</item>
+        <item quantity="other">%1$d items</item>
+    </plurals>
+
+    <!-- Offline banner -->
+    <string name="offline_banner">Offline — showing cached items. Edits are disabled.</string>
+
+    <!-- Home -->
+    <string name="home_empty_title">Nothing to show</string>
+    <string name="home_empty_subtitle">Pull to refresh once your collection has items.</string>
+    <string name="home_item_of_the_day">%1$s · Item of the Day</string>
+    <string name="home_recently_added">Recently Added</string>
+    <string name="home_category_recent">%1$s · Recent</string>
+    <string name="home_most_valuable">Most Valuable</string>
+
+    <!-- Collection -->
+    <string name="collection_empty_title">Nothing here yet</string>
+    <string name="collection_empty_subtitle">Pull to refresh, or add an item from the + button on the next screen.</string>
+    <string name="collection_share_category">Share %1$s…</string>
+    <string name="collection_share_library">Share whole library…</string>
+    <string name="collection_view_switch_to_list">Switch to list view</string>
+    <string name="collection_view_switch_to_card">Switch to card view</string>
+    <string name="collection_filter_all_chip">All (%1$d)</string>
+    <string name="collection_filter_format_chip">%1$s (%2$d)</string>
+    <string name="collection_chip_all_a11y">Show all items (%1$d)</string>
+    <plurals name="collection_chip_format_a11y">
+        <item quantity="one">Filter by %1$s (%2$d item)</item>
+        <item quantity="other">Filter by %1$s (%2$d items)</item>
+    </plurals>
+    <string name="collection_row_a11y">%1$s by %2$s</string>
+
+    <!-- Collection year (decade) + genre filters -->
+    <string name="collection_filter_any_year">Any year</string>
+    <string name="collection_filter_any_genre">Any genre</string>
+    <string name="collection_filter_any_year_count">Any year (%1$d)</string>
+    <string name="collection_filter_any_genre_count">Any genre (%1$d)</string>
+    <string name="collection_filter_value_option">%1$s (%2$d)</string>
+
+    <!-- Item detail -->
+    <string name="detail_not_found">Item not found</string>
+    <string name="detail_delete_title">Delete this item?</string>
+    <string name="detail_delete_message">This removes it from your collection on the server. This cannot be undone.</string>
+    <string name="detail_menu_enrich">Enrich</string>
+    <string name="detail_menu_re_enrich">Re-enrich</string>
+    <string name="detail_menu_remove_enrichment">Remove enrichment</string>
+    <string name="detail_menu_fetch_market_rate">Fetch market rate</string>
+    <string name="detail_shared_by">Shared by %1$s · %2$s</string>
+    <string name="detail_share_can_edit">can edit</string>
+    <string name="detail_share_read_only">read-only</string>
+    <string name="detail_tracklist">Tracklist</string>
+    <string name="detail_genres">Genres</string>
+    <string name="detail_pressing_notes">Pressing notes</string>
+    <string name="detail_notes">Notes</string>
+    <string name="detail_about_artist">About the artist</string>
+    <string name="detail_about_director">About the director</string>
+    <string name="detail_about_author">About the author</string>
+    <string name="detail_about_developer">About the developer</string>
+    <string name="detail_about_publisher">About the publisher</string>
+    <string name="detail_market_value">Market value</string>
+    <string name="detail_market_loose">Loose %1$s</string>
+    <string name="detail_market_new">New %1$s</string>
+    <string name="detail_market_fetched">Fetched %1$s</string>
+    <string name="detail_currencies_differ">currencies differ</string>
+    <string name="detail_more_from_your_crate">More from your crate</string>
+    <string name="detail_if_you_like_this">If you like this…</string>
+    <string name="detail_photo_a11y">Photo %1$d</string>
+    <string name="detail_genre_filter_a11y">Show all %1$s items</string>
+    <string name="detail_format_filter_a11y">Show all %1$s items</string>
+    <string name="detail_year_filter_a11y">Show all items from the %1$s</string>
+    <string name="recommendation_via_source">via %1$s</string>
+
+    <!-- Photo slots -->
     <string name="photos_section">Photos</string>
     <string name="additional_photos_section">Additional photos</string>
     <string name="photo_slot_label">Slot %1$d</string>
@@ -21,27 +217,226 @@
     <!-- Add / edit form -->
     <string name="add_edit_title_add">Add %1$s</string>
     <string name="add_edit_title_edit">Edit %1$s</string>
+    <string name="add_edit_noun_music">album</string>
+    <string name="add_edit_noun_films">film</string>
+    <string name="add_edit_noun_books">book</string>
+    <string name="add_edit_noun_games">game</string>
+    <string name="add_edit_noun_comics">comic</string>
+    <string name="add_edit_saving">Saving…</string>
+    <string name="add_edit_adding_to_collection">Adding to %1$s\'s collection</string>
+    <!-- Quoted: the leading gap separates the label from the button's icon. -->
+    <string name="add_edit_search_provider">"  Search %1$s"</string>
+    <string name="add_edit_pick_artwork">Pick artwork</string>
+    <string name="add_edit_replace_artwork">Replace artwork</string>
+    <string name="add_edit_remove_artwork">Remove artwork</string>
+    <string name="add_edit_selected_artwork_a11y">Selected artwork</string>
+    <string name="add_edit_tap_to_pick_artwork">Tap to pick artwork</string>
+    <string name="add_edit_year_error">Enter a year between 1800 and now.</string>
+    <string name="add_edit_look_up_isbn">Look up ISBN</string>
+    <string name="add_edit_looking_up_isbn">Looking up…</string>
+    <string name="add_edit_format_select">Select…</string>
+    <string name="add_edit_image_too_large">That image is too large — pick one under 25 MB.</string>
+    <string name="add_edit_isbn_not_found">ISBN not found in Open Library</string>
     <string name="format_unrecognised">Not a standard %1$s — pick one from the list.</string>
 
-    <!-- Theme picker -->
+    <!-- Headings in the format picker. The format values under them are what the
+         server stores, so they stay as they are. -->
+    <string name="format_group_vinyl">Vinyl</string>
+    <string name="format_group_tape">Tape</string>
+    <string name="format_group_disc">Disc</string>
+    <string name="format_group_physical">Physical</string>
+    <string name="format_group_print">Print</string>
+    <string name="format_group_audio">Audio</string>
+    <string name="format_group_single_issues">Single Issues</string>
+    <string name="format_group_collected">Collected</string>
+    <string name="format_group_sony" translatable="false">Sony</string>
+    <string name="format_group_microsoft" translatable="false">Microsoft</string>
+    <string name="format_group_nintendo" translatable="false">Nintendo</string>
+    <string name="format_group_sega" translatable="false">Sega</string>
+    <string name="format_group_atari" translatable="false">Atari</string>
+    <string name="format_group_snk" translatable="false">SNK</string>
+
+    <!-- Provider search sheet -->
+    <string name="external_search_title">Search %1$s</string>
+    <string name="external_search_query_label">Search query</string>
+    <string name="external_search_no_results">No results.</string>
+    <string name="external_search_prompt">Type a query and tap search.</string>
+    <string name="external_result_untitled">(untitled)</string>
+
+    <!-- Search -->
+    <string name="search_field_label">Search</string>
+    <string name="search_tab_collection">My collection</string>
+    <string name="search_tab_external">External</string>
+    <string name="search_hint_filter_collection">Type to filter your local collection.</string>
+    <string name="search_hint_no_local_matches">No matches in your collection.</string>
+    <string name="search_hint_type_then_search">Type a query then tap search to look up %1$s.</string>
+    <string name="search_hint_no_provider_results">No results from %1$s.</string>
+    <string name="search_hint_tap_search">Tap search to look up %1$s.</string>
+
+    <!-- Barcode scanner -->
+    <string name="scan_status_hint">Point at a barcode</string>
+    <string name="scan_permission_required">Camera permission is needed to scan barcodes.</string>
+    <string name="scan_grant_access">Grant access</string>
+    <string name="scan_barcode_value">Barcode: %1$s</string>
+    <string name="scan_scanning">Scanning…</string>
+    <string name="scan_no_matches">No matches for that barcode.</string>
+    <string name="scan_no_candidates">No matches. Use the raw barcode and fill the form manually.</string>
+    <string name="scan_use_raw_barcode">Use raw barcode</string>
+    <string name="scan_keep_scanning">Keep scanning</string>
+
+    <!-- Playlists -->
+    <string name="playlist_empty_title">No playlists yet</string>
+    <string name="playlist_empty_subtitle">Tap + to create your first playlist.</string>
+    <string name="playlist_new">New playlist</string>
+    <string name="playlist_rename">Rename playlist</string>
+    <string name="playlist_delete_title">Delete \"%1$s\"?</string>
+    <string name="playlist_delete_message">This removes the playlist from the server. Tracks themselves are not affected.</string>
+    <string name="playlist_not_found">Playlist not found</string>
+    <string name="playlist_empty_items_title">No items yet</string>
+    <string name="playlist_empty_items_subtitle">Tap + to add tracks, films, books, games, or comics from your collection.</string>
+    <string name="playlist_add_items">Add items</string>
+    <string name="playlist_add_to">Add to playlist</string>
+    <string name="playlist_filter_collection">Filter your collection</string>
+    <string name="playlist_collection_empty">Your collection is empty.</string>
+    <string name="playlist_no_matches">No matches.</string>
+    <string name="playlist_remove_item">Remove from playlist</string>
+
+    <!-- Share sheet -->
+    <string name="share_item_title">Share item</string>
+    <string name="share_playlist_title">Share playlist</string>
+    <string name="share_library_title">Share whole library</string>
+    <string name="share_category_title">Share %1$s</string>
+    <string name="share_allow_editing">Allow editing</string>
+    <string name="share_permission_write">Can add and edit items. Can\'t delete or re-share.</string>
+    <string name="share_permission_read">Read-only — can view but not change anything.</string>
+    <string name="share_find_user_label">Find a Nextcloud user</string>
+    <string name="share_find_user_hint">Type at least two characters.</string>
+    <string name="share_already_shared">Already shared with</string>
+    <string name="share_no_one_yet">No one yet.</string>
+    <string name="share_can_edit">Can edit</string>
+    <string name="share_read_only">Read-only</string>
+    <string name="share_revoke">Revoke share</string>
+
+    <!-- Shared with me -->
+    <string name="shared_with_me_title">Shared with me</string>
+    <string name="shared_empty_title">Nothing shared with you</string>
+    <string name="shared_empty_subtitle">Ask a Nextcloud user to share something from their collection.</string>
+    <string name="shared_section_categories">Categories</string>
+    <string name="shared_section_playlists">Playlists</string>
+    <string name="shared_from_owner">from %1$s</string>
+    <string name="shared_by_owner">Shared by %1$s</string>
+    <!-- Only reached for two owners or more: one owner is named instead. -->
+    <plurals name="shared_from_owner_count">
+        <item quantity="one">from %1$d person</item>
+        <item quantity="other">from %1$d people</item>
+    </plurals>
+    <plurals name="shared_by_owner_count">
+        <item quantity="one">Shared by %1$d person</item>
+        <item quantity="other">Shared by %1$d people</item>
+    </plurals>
+
+    <!-- Login -->
+    <string name="login_subtitle">Connect to your Nextcloud server</string>
+    <string name="login_server_url_label">Server URL</string>
+    <string name="login_server_url_hint" translatable="false">cloud.example.com</string>
+    <string name="login_action">Log in</string>
+    <string name="login_waiting">Waiting for authorisation…</string>
+    <string name="login_error_enter_url">Enter your Nextcloud server URL</string>
+    <string name="login_error_invalid_address">Not a valid server address</string>
+    <string name="login_error_server_returned">Server returned %1$d</string>
+    <string name="login_error_empty_response">Empty response</string>
+    <string name="login_error_foreign_login_url">Server returned a login URL for a different host</string>
+    <string name="login_error_foreign_credentials">Server returned credentials for a different host</string>
+    <string name="login_error_connect_failed">Failed to connect: %1$s</string>
+    <string name="login_error_connection_failed">Connection failed</string>
+    <string name="login_error_timed_out">Login timed out</string>
+    <string name="login_error_unusable_address">The server returned an address Crate can\'t use.</string>
+
+    <!-- Settings: section headers -->
+    <string name="settings_section_appearance">Appearance</string>
+    <string name="settings_section_categories">Categories</string>
+    <string name="settings_section_enrichment">Enrichment</string>
+    <string name="settings_section_recommendations">Recommendations</string>
+    <string name="settings_section_market">Market</string>
+    <string name="settings_section_tokens">Tokens</string>
+    <string name="settings_section_account">Account</string>
+    <string name="settings_section_danger_zone">Danger zone</string>
+    <string name="settings_section_about">About</string>
+
+    <!-- Settings: profile and appearance -->
+    <string name="settings_unknown_user">Unknown</string>
+    <string name="settings_theme_label">Theme</string>
     <string name="theme_mode_system">System</string>
     <string name="theme_mode_light">Light</string>
     <string name="theme_mode_dark">Dark</string>
+    <string name="settings_categories_body">Hide categories you don\'t use. Hidden categories disappear from navigation and search. At least one must remain visible.</string>
 
-    <!-- Phase A22.5 — collection view parity -->
-    <string name="collection_view_switch_to_list">Switch to list view</string>
-    <string name="collection_view_switch_to_card">Switch to card view</string>
-    <string name="collection_filter_all_chip">All (%1$d)</string>
-    <string name="collection_filter_format_chip">%1$s (%2$d)</string>
-    <string name="collection_chip_all_a11y">Show all items (%1$d)</string>
-    <string name="collection_chip_format_a11y">Filter by %1$s (%2$d items)</string>
-    <string name="collection_row_a11y">%1$s by %2$s</string>
+    <!-- Settings: enrichment -->
+    <string name="settings_enrichment_needs_token">Add tokens below to enrich music, films, games and comics. Books use Open Library, which needs no token.</string>
+    <string name="settings_auto_enrich_title">Auto-enrich when opened</string>
+    <string name="settings_auto_enrich_body">Automatically enrich an item when you view its details.</string>
+    <string name="settings_enrich_all_title">Enrich all items</string>
+    <string name="settings_enrich_all_body">Enrich all un-enriched items via their provider.</string>
+    <string name="settings_enriched_progress">Enriched %1$d of %2$d…</string>
+    <string name="settings_enrich_all_a11y">Enrich all</string>
 
-    <!-- Year (decade) + genre filters -->
-    <string name="collection_filter_any_year">Any year</string>
-    <string name="collection_filter_any_genre">Any genre</string>
-    <string name="collection_filter_any_year_count">Any year (%1$d)</string>
-    <string name="collection_filter_any_genre_count">Any genre (%1$d)</string>
-    <string name="collection_filter_value_option">%1$s (%2$d)</string>
-    <string name="detail_genre_filter_a11y">Show all %1$s items</string>
+    <!-- Settings: recommendations -->
+    <string name="settings_local_recommendations_body">Items show a \"More from your crate\" row, suggesting similar things you already own or want. That\'s worked out on this device from your own collection, so it works offline.</string>
+    <string name="settings_online_recommendations_title">Enable online recommendations</string>
+    <string name="settings_online_recommendations_body">Also suggest things you don\'t own yet, from the service that enriched the item — music, films, books and games. Only enriched items can have these, and they need a connection to your server. Comics aren\'t covered: ComicVine publishes no similarity data.</string>
+    <string name="settings_recommendations_needs_token">No provider tokens are set, so online suggestions will only appear for books. Add tokens below for music, films and games.</string>
+    <string name="settings_recommendations_save_failed">Couldn\'t save the recommendations setting.</string>
+
+    <!-- Settings: market values -->
+    <string name="settings_market_needs_token">Add a Discogs or PriceCharting token below to enable market values.</string>
+    <string name="settings_currency_label">Currency</string>
+    <string name="settings_no_currencies">No currencies returned by server.</string>
+    <string name="settings_auto_fetch_market_title">Auto-fetch market rates</string>
+    <string name="settings_auto_fetch_market_body">Fetch a fresh market value when an item is enriched.</string>
+    <string name="settings_refresh_all_title">Refresh all market rates</string>
+    <string name="settings_refresh_all_body">Re-fetches every item the server can price.</string>
+    <string name="settings_refreshed_progress">Refreshed %1$d of %2$d…</string>
+    <string name="settings_refresh_all_a11y">Refresh all</string>
+
+    <!-- Settings: provider tokens -->
+    <string name="settings_token_discogs">Discogs token</string>
+    <string name="settings_token_tmdb">TMDB v4 token</string>
+    <string name="settings_token_rawg">RAWG token</string>
+    <string name="settings_token_comicvine">ComicVine token</string>
+    <string name="settings_token_pricecharting">PriceCharting token</string>
+    <string name="settings_token_hint_personal_access">Personal access token</string>
+    <string name="settings_token_hint_bearer">Bearer token</string>
+    <string name="settings_token_hint_api">API token</string>
+    <string name="settings_token_loading">Loading…</string>
+    <string name="settings_token_configured">Configured.</string>
+    <string name="settings_token_not_set">Not set.</string>
+
+    <!-- Settings: account and danger zone -->
+    <string name="settings_log_out">Log out</string>
+    <string name="settings_log_out_title">Log out?</string>
+    <string name="settings_log_out_message">You\'ll need to enter your Nextcloud host and re-authenticate.</string>
+    <string name="settings_wipe_title">Wipe collection</string>
+    <string name="settings_wipe_body">Permanently delete selected data from your collection on the server. This cannot be undone.</string>
+    <string name="settings_wipe_action">Wipe data…</string>
+    <string name="settings_wipe_dialog_title">Wipe data</string>
+    <string name="settings_wipe_dialog_message">Select categories to permanently delete:</string>
+    <string name="settings_wipe_confirm">Wipe selected</string>
+
+    <!-- Settings: about and update check -->
+    <string name="settings_app_version">App version</string>
+    <string name="settings_server_version">Crate server version</string>
+    <string name="settings_version_unknown" translatable="false">—</string>
+    <string name="settings_check_updates">Check for updates</string>
+    <string name="settings_check">Check</string>
+    <string name="settings_open_release">Open %1$s</string>
+    <string name="settings_up_to_date">You\'re on the latest version.</string>
+    <string name="settings_update_check_failed">Couldn\'t reach GitHub. Check your connection and try again.</string>
+    <string name="settings_update_available">%1$s is available on GitHub.</string>
+
+    <!-- Update notification -->
+    <string name="update_channel_name">App updates</string>
+    <string name="update_channel_description">Notifies you when a new version of Crate is available on GitHub.</string>
+    <string name="update_available_title">Crate update available</string>
+    <string name="update_available_text">Version %1$s is available — tap to download.</string>
+    <string name="update_available_big_text">Crate %1$s is available on GitHub. Tap to open the release page and download the new APK.</string>
 </resources>

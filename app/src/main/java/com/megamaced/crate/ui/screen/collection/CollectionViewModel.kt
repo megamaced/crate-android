@@ -3,7 +3,9 @@ package com.megamaced.crate.ui.screen.collection
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.megamaced.crate.R
 import com.megamaced.crate.data.api.ApiResult
+import com.megamaced.crate.data.api.toUiText
 import com.megamaced.crate.data.prefs.CollectionPrefs
 import com.megamaced.crate.data.prefs.CollectionViewMode
 import com.megamaced.crate.di.DefaultDispatcher
@@ -13,6 +15,7 @@ import com.megamaced.crate.domain.model.CollectionSort
 import com.megamaced.crate.domain.model.MediaItem
 import com.megamaced.crate.domain.repository.MediaRepository
 import com.megamaced.crate.domain.repository.SettingsRepository
+import com.megamaced.crate.util.UiText
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -47,7 +50,7 @@ data class CollectionUiState(
     val viewMode: CollectionViewMode = CollectionViewMode.Card,
     val visibleCategories: List<Category> = Category.entries,
     val isRefreshing: Boolean = false,
-    val errorMessage: String? = null,
+    val errorMessage: UiText? = null,
 )
 
 // An ordered section of the collection list. `header` is the section label
@@ -55,7 +58,7 @@ data class CollectionUiState(
 // Grouping logic lives in CollectionGrouping.kt so the shared-category view can
 // reuse it verbatim.
 data class ItemGroup(
-    val header: String?,
+    val header: UiText?,
     val items: List<MediaItem>,
 )
 
@@ -78,9 +81,10 @@ class CollectionViewModel
         private val settingsRepository: SettingsRepository,
         @DefaultDispatcher private val computeDispatcher: CoroutineDispatcher,
     ) : ViewModel() {
-        // Nav args, set when arriving from a genre chip in the item detail view:
-        // the item's category plus the genre to narrow to. Absent for the
-        // bottom-bar tab, which restores the persisted category instead.
+        // Nav args, set when arriving from a tapped value in the item detail
+        // view: the item's category plus the one filter that value applies.
+        // Absent for the bottom-bar tab, which restores the persisted category
+        // instead.
         private val argCategory = savedStateHandle.get<String>("category")?.let { Category.fromApi(it) }
 
         // category is initialised optimistically to Music — the init block
@@ -89,11 +93,16 @@ class CollectionViewModel
         // we fall back to the first visible category instead.
         private val category = MutableStateFlow(argCategory ?: Category.Music)
         private val sort = MutableStateFlow(CollectionSort.Default)
-        private val selectedFormats = MutableStateFlow<Set<String>>(emptySet())
+
+        // The detail view applies one filter at a time, so at most one of these
+        // is seeded; a value the category no longer carries is dropped by the
+        // availability intersect below rather than hiding everything.
+        private val selectedFormats =
+            MutableStateFlow(savedStateHandle.get<String>("format")?.let { setOf(it) }.orEmpty())
         private val selectedGenre = MutableStateFlow(savedStateHandle.get<String>("genre"))
-        private val selectedDecade = MutableStateFlow<String?>(null)
+        private val selectedDecade = MutableStateFlow(savedStateHandle.get<String>("decade"))
         private val isRefreshing = MutableStateFlow(false)
-        private val errorMessage = MutableStateFlow<String?>(null)
+        private val errorMessage = MutableStateFlow<UiText?>(null)
 
         // An explicit category arg is the user's choice for this screen, so the
         // persisted-category restore must not overwrite it.
@@ -122,7 +131,7 @@ class CollectionViewModel
                 val refreshing = args[3] as Boolean
 
                 @Suppress("UNCHECKED_CAST")
-                val err = args[4] as String?
+                val err = args[4] as UiText?
 
                 @Suppress("UNCHECKED_CAST")
                 val hidden = args[5] as Set<Category>
@@ -270,11 +279,11 @@ class CollectionViewModel
                     is ApiResult.Success -> { /* DAO updates flow downstream */ }
 
                     ApiResult.NetworkError -> {
-                        errorMessage.value = "Couldn't reach the server."
+                        errorMessage.value = UiText.Res(R.string.error_network)
                     }
 
                     is ApiResult.HttpError -> {
-                        errorMessage.value = result.message ?: "Server error (${result.code})."
+                        errorMessage.value = result.toUiText()
                     }
 
                     ApiResult.Unauthorised -> { /* SessionManager already triggered logout */ }

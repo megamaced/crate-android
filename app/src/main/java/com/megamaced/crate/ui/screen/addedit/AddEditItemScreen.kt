@@ -3,6 +3,7 @@ package com.megamaced.crate.ui.screen.addedit
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -64,6 +65,7 @@ import com.megamaced.crate.ui.components.ArtworkSize
 import com.megamaced.crate.ui.components.LoadingState
 import com.megamaced.crate.ui.components.PhotoImage
 import com.megamaced.crate.ui.navigation.CategorySegmentedRow
+import com.megamaced.crate.util.resolve
 import kotlinx.serialization.json.Json
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -90,8 +92,9 @@ fun AddEditItemScreen(
         }
     }
 
-    LaunchedEffect(state.errorMessage) {
-        state.errorMessage?.let { msg ->
+    val errorText = state.errorMessage?.resolve()
+    LaunchedEffect(errorText) {
+        errorText?.let { msg ->
             snackbarHostState.showSnackbar(msg)
             viewModel.dismissError()
         }
@@ -138,13 +141,16 @@ fun AddEditItemScreen(
                     Text(
                         text = stringResource(
                             if (state.isEditing) R.string.add_edit_title_edit else R.string.add_edit_title_add,
-                            titleLabels.singularNoun,
+                            stringResource(titleLabels.singularNounRes),
                         ),
                     )
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.action_back),
+                        )
                     }
                 },
                 actions = {
@@ -153,7 +159,11 @@ fun AddEditItemScreen(
                         enabled = state.canSave,
                         modifier = Modifier.padding(end = 8.dp),
                     ) {
-                        Text(if (state.isSaving) "Saving…" else "Save")
+                        Text(
+                            stringResource(
+                                if (state.isSaving) R.string.add_edit_saving else R.string.action_save,
+                            ),
+                        )
                     }
                 },
             )
@@ -212,7 +222,7 @@ private fun FormContent(
         // where the item is going.
         state.owner?.let { owner ->
             Text(
-                text = "Adding to $owner's collection",
+                text = stringResource(R.string.add_edit_adding_to_collection, owner),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -241,23 +251,34 @@ private fun FormContent(
                 OutlinedButton(onClick = onOpenSearch, modifier = Modifier.fillMaxWidth()) {
                     Icon(Icons.Filled.Search, contentDescription = null)
                     Text(
-                        text = "  Search ${labels.providerName}",
+                        text = stringResource(
+                            R.string.add_edit_search_provider,
+                            stringResource(labels.providerNameRes),
+                        ),
                     )
                 }
                 if (state.category == Category.Music || state.category == Category.Books) {
                     OutlinedButton(onClick = onScan, modifier = Modifier.fillMaxWidth()) {
-                        Text("Scan barcode")
+                        Text(stringResource(R.string.action_scan_barcode))
                     }
                 }
                 OutlinedButton(onClick = onPickArtwork, modifier = Modifier.fillMaxWidth()) {
-                    Text(if (state.hasArtworkPreview) "Replace artwork" else "Pick artwork")
+                    Text(
+                        stringResource(
+                            if (state.hasArtworkPreview) {
+                                R.string.add_edit_replace_artwork
+                            } else {
+                                R.string.add_edit_pick_artwork
+                            },
+                        ),
+                    )
                 }
                 if (state.hasArtworkPreview) {
                     OutlinedButton(
                         onClick = viewModel::onRemoveArtwork,
                         modifier = Modifier.fillMaxWidth(),
                     ) {
-                        Text("Remove artwork")
+                        Text(stringResource(R.string.add_edit_remove_artwork))
                     }
                 }
             }
@@ -272,8 +293,8 @@ private fun FormContent(
             value = state.title,
             onValueChange = viewModel::onTitleChange,
             modifier = Modifier.fillMaxWidth(),
-            label = { Text(labels.title) },
-            placeholder = { Text(labels.titlePlaceholder) },
+            label = { Text(stringResource(labels.titleRes)) },
+            placeholder = { Text(stringResource(labels.titlePlaceholderRes)) },
             singleLine = true,
             isError = state.title.isBlank(),
         )
@@ -281,14 +302,14 @@ private fun FormContent(
             value = state.artist,
             onValueChange = viewModel::onArtistChange,
             modifier = Modifier.fillMaxWidth(),
-            label = { Text(labels.artist) },
-            placeholder = { Text(labels.artistPlaceholder) },
+            label = { Text(stringResource(labels.artistRes)) },
+            placeholder = { Text(stringResource(labels.artistPlaceholderRes)) },
             singleLine = true,
             isError = state.artist.isBlank(),
         )
 
         FormatField(
-            label = labels.format,
+            label = stringResource(labels.formatRes),
             category = state.category,
             value = state.format,
             unrecognised = state.formatUnrecognised,
@@ -303,12 +324,12 @@ private fun FormContent(
                 value = state.year,
                 onValueChange = viewModel::onYearChange,
                 modifier = Modifier.weight(1f),
-                label = { Text("Year") },
-                placeholder = { Text("e.g. 1973") },
+                label = { Text(stringResource(R.string.field_year)) },
+                placeholder = { Text(stringResource(R.string.hint_year)) },
                 singleLine = true,
                 isError = state.yearError,
                 supportingText = if (state.yearError) {
-                    { Text("Enter a year between 1800 and now.") }
+                    { Text(stringResource(R.string.add_edit_year_error)) }
                 } else {
                     null
                 },
@@ -322,8 +343,10 @@ private fun FormContent(
                 value = state.barcode,
                 onValueChange = viewModel::onBarcodeChange,
                 modifier = Modifier.weight(2f),
-                label = { Text(labels.barcode) },
-                placeholder = { Text(labels.barcodePlaceholder) },
+                label = { Text(stringResource(labels.barcodeRes)) },
+                // Only two categories carry a useful example; the rest render an
+                // empty placeholder rather than an empty resource.
+                placeholder = { Text(labels.barcodePlaceholderRes?.let { stringResource(it) }.orEmpty()) },
                 singleLine = true,
                 keyboardOptions =
                     KeyboardOptions(
@@ -339,7 +362,15 @@ private fun FormContent(
                 enabled = state.barcode.isNotBlank() && !state.isLookingUpIsbn,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text(if (state.isLookingUpIsbn) "Looking up…" else "Look up ISBN")
+                Text(
+                    stringResource(
+                        if (state.isLookingUpIsbn) {
+                            R.string.add_edit_looking_up_isbn
+                        } else {
+                            R.string.add_edit_look_up_isbn
+                        },
+                    ),
+                )
             }
         }
 
@@ -347,15 +378,15 @@ private fun FormContent(
             value = state.label,
             onValueChange = viewModel::onLabelChange,
             modifier = Modifier.fillMaxWidth(),
-            label = { Text(labels.label) },
-            placeholder = { Text(labels.labelPlaceholder) },
+            label = { Text(stringResource(labels.labelRes)) },
+            placeholder = { Text(stringResource(labels.labelPlaceholderRes)) },
             singleLine = true,
         )
         OutlinedTextField(
             value = state.country,
             onValueChange = viewModel::onCountryChange,
             modifier = Modifier.fillMaxWidth(),
-            label = { Text("Country") },
+            label = { Text(stringResource(R.string.field_country)) },
             singleLine = true,
         )
         // Original price paid (any category)
@@ -380,7 +411,7 @@ private fun FormContent(
             value = state.notes,
             onValueChange = viewModel::onNotesChange,
             modifier = Modifier.fillMaxWidth(),
-            label = { Text("Notes") },
+            label = { Text(stringResource(R.string.field_notes)) },
             minLines = 3,
             maxLines = 8,
         )
@@ -404,7 +435,7 @@ private fun PurchasePriceRow(
             onValueChange = onPriceChange,
             modifier = Modifier.weight(2f),
             label = { Text(stringResource(R.string.purchase_price_label)) },
-            placeholder = { Text("e.g. 24.99") },
+            placeholder = { Text(stringResource(R.string.hint_purchase_price)) },
             singleLine = true,
             keyboardOptions =
                 KeyboardOptions(
@@ -483,7 +514,7 @@ private fun StatusToggle(
                 onClick = { onStatusChange(option) },
                 shape = SegmentedButtonDefaults.itemShape(index = index, count = options.size),
             ) {
-                Text(if (option == Status.Owned) "Owned" else "Wanted")
+                Text(stringResource(option.labelRes))
             }
         }
     }
@@ -509,7 +540,7 @@ private fun FormatField(
             enabled = false,
             modifier = Modifier.fillMaxWidth(),
             label = { Text(label) },
-            placeholder = { Text("Select…") },
+            placeholder = { Text(stringResource(R.string.add_edit_format_select)) },
             singleLine = true,
             isError = value.isBlank(),
             supportingText = if (unrecognised) {
@@ -566,9 +597,9 @@ private fun FormatPickerSheet(
                 .padding(bottom = 16.dp),
         ) {
             groups.forEach { group ->
-                item(key = "header-${group.label}") {
+                item(key = "header-${group.labelRes}") {
                     Text(
-                        text = group.label,
+                        text = stringResource(group.labelRes),
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier
@@ -576,10 +607,10 @@ private fun FormatPickerSheet(
                             .padding(horizontal = 24.dp, vertical = 8.dp),
                     )
                 }
-                items(group.formats, key = { "${group.label}-$it" }) { fmt ->
+                items(group.formats, key = { "${group.labelRes}-$it" }) { fmt ->
                     val selected = fmt.equals(currentValue, ignoreCase = true)
                     Text(
-                        text = fmt + if (selected) "  ✓" else "",
+                        text = if (selected) stringResource(R.string.sort_option_selected, fmt) else fmt,
                         style = MaterialTheme.typography.bodyLarge,
                         modifier = Modifier
                             .fillMaxWidth()
@@ -610,7 +641,7 @@ private fun ArtworkPreview(
             state.pendingArtwork != null -> {
                 coil3.compose.AsyncImage(
                     model = state.pendingArtwork.uri,
-                    contentDescription = "Selected artwork",
+                    contentDescription = stringResource(R.string.add_edit_selected_artwork_a11y),
                     contentScale = androidx.compose.ui.layout.ContentScale.Crop,
                     modifier = Modifier.fillMaxSize(),
                 )
@@ -619,7 +650,7 @@ private fun ArtworkPreview(
             !state.pendingArtworkUrl.isNullOrBlank() -> {
                 coil3.compose.AsyncImage(
                     model = state.pendingArtworkUrl,
-                    contentDescription = "Selected artwork",
+                    contentDescription = stringResource(R.string.add_edit_selected_artwork_a11y),
                     contentScale = androidx.compose.ui.layout.ContentScale.Crop,
                     modifier = Modifier.fillMaxSize(),
                 )
@@ -638,7 +669,7 @@ private fun ArtworkPreview(
 
             else -> {
                 Text(
-                    text = "Tap to pick artwork",
+                    text = stringResource(R.string.add_edit_tap_to_pick_artwork),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -720,7 +751,7 @@ private fun PhotoSlotPreview(
                 pendingUri != null -> {
                     coil3.compose.AsyncImage(
                         model = pendingUri,
-                        contentDescription = "Photo $slot",
+                        contentDescription = stringResource(R.string.detail_photo_a11y, slot),
                         contentScale = androidx.compose.ui.layout.ContentScale.Crop,
                         modifier = Modifier.fillMaxSize(),
                     )
@@ -730,7 +761,7 @@ private fun PhotoSlotPreview(
                     PhotoImage(
                         itemId = editingItemId,
                         slot = slot,
-                        contentDescription = "Photo $slot",
+                        contentDescription = stringResource(R.string.detail_photo_a11y, slot),
                         updatedAt = updatedAt,
                         modifier = Modifier.fillMaxSize(),
                     )
@@ -746,28 +777,32 @@ private fun PhotoSlotPreview(
             }
         }
         OutlinedButton(onClick = onPick, modifier = Modifier.fillMaxWidth()) {
-            Text(if (hasPhoto) "Replace" else "Upload")
+            Text(stringResource(if (hasPhoto) R.string.action_replace else R.string.action_upload))
         }
         if (hasPhoto) {
             OutlinedButton(onClick = onRemove, modifier = Modifier.fillMaxWidth()) {
-                Text("Remove")
+                Text(stringResource(R.string.action_remove))
             }
         }
     }
 }
 
+/**
+ * Field names, placeholders and headings for one category. [barcodePlaceholderRes]
+ * is null where the category has no example worth showing.
+ */
 private data class CategoryLabels(
-    val artist: String,
-    val title: String,
-    val format: String,
-    val barcode: String,
-    val label: String,
-    val providerName: String,
-    val singularNoun: String,
-    val artistPlaceholder: String,
-    val titlePlaceholder: String,
-    val labelPlaceholder: String,
-    val barcodePlaceholder: String,
+    @param:StringRes val artistRes: Int,
+    @param:StringRes val titleRes: Int,
+    @param:StringRes val formatRes: Int,
+    @param:StringRes val barcodeRes: Int,
+    @param:StringRes val labelRes: Int,
+    @param:StringRes val providerNameRes: Int,
+    @param:StringRes val singularNounRes: Int,
+    @param:StringRes val artistPlaceholderRes: Int,
+    @param:StringRes val titlePlaceholderRes: Int,
+    @param:StringRes val labelPlaceholderRes: Int,
+    @param:StringRes val barcodePlaceholderRes: Int?,
 ) {
     companion object {
         // Mirror of crate/src/utils/categoryFormats.js FIELD_CONFIG plus the
@@ -775,73 +810,73 @@ private data class CategoryLabels(
         fun forCategory(category: Category): CategoryLabels =
             when (category) {
                 Category.Music -> CategoryLabels(
-                    artist = "Artist",
-                    title = "Album / Title",
-                    format = "Format",
-                    barcode = "Barcode",
-                    label = "Label",
-                    providerName = "Discogs",
-                    singularNoun = "album",
-                    artistPlaceholder = "e.g. Pink Floyd",
-                    titlePlaceholder = "e.g. The Dark Side of the Moon",
-                    labelPlaceholder = "e.g. EMI",
-                    barcodePlaceholder = "e.g. 5099902987521",
+                    artistRes = R.string.field_artist_music,
+                    titleRes = R.string.field_title_music,
+                    formatRes = R.string.field_format,
+                    barcodeRes = R.string.field_barcode,
+                    labelRes = R.string.field_label_music,
+                    providerNameRes = R.string.provider_music,
+                    singularNounRes = R.string.add_edit_noun_music,
+                    artistPlaceholderRes = R.string.hint_artist_music,
+                    titlePlaceholderRes = R.string.hint_title_music,
+                    labelPlaceholderRes = R.string.hint_label_music,
+                    barcodePlaceholderRes = R.string.hint_barcode_music,
                 )
 
                 Category.Films -> CategoryLabels(
-                    artist = "Director",
-                    title = "Film Title",
-                    format = "Format",
-                    barcode = "Barcode",
-                    label = "Studio",
-                    providerName = "TMDB",
-                    singularNoun = "film",
-                    artistPlaceholder = "e.g. Christopher Nolan",
-                    titlePlaceholder = "e.g. Inception",
-                    labelPlaceholder = "e.g. Warner Bros.",
-                    barcodePlaceholder = "",
+                    artistRes = R.string.field_artist_films,
+                    titleRes = R.string.field_title_films,
+                    formatRes = R.string.field_format,
+                    barcodeRes = R.string.field_barcode,
+                    labelRes = R.string.field_label_films,
+                    providerNameRes = R.string.provider_films,
+                    singularNounRes = R.string.add_edit_noun_films,
+                    artistPlaceholderRes = R.string.hint_artist_films,
+                    titlePlaceholderRes = R.string.hint_title_films,
+                    labelPlaceholderRes = R.string.hint_label_films,
+                    barcodePlaceholderRes = null,
                 )
 
                 Category.Books -> CategoryLabels(
-                    artist = "Author",
-                    title = "Title",
-                    format = "Format",
-                    barcode = "ISBN",
-                    label = "Publisher",
-                    providerName = "Open Library",
-                    singularNoun = "book",
-                    artistPlaceholder = "e.g. George Orwell",
-                    titlePlaceholder = "e.g. 1984",
-                    labelPlaceholder = "e.g. Penguin",
-                    barcodePlaceholder = "e.g. 978-0451524935",
+                    artistRes = R.string.field_artist_books,
+                    titleRes = R.string.field_title_books,
+                    formatRes = R.string.field_format,
+                    barcodeRes = R.string.field_isbn,
+                    labelRes = R.string.field_label_books,
+                    providerNameRes = R.string.provider_books,
+                    singularNounRes = R.string.add_edit_noun_books,
+                    artistPlaceholderRes = R.string.hint_artist_books,
+                    titlePlaceholderRes = R.string.hint_title_books,
+                    labelPlaceholderRes = R.string.hint_label_books,
+                    barcodePlaceholderRes = R.string.hint_barcode_books,
                 )
 
                 Category.Games -> CategoryLabels(
-                    artist = "Developer",
-                    title = "Game Title",
-                    format = "Platform",
-                    barcode = "Barcode",
-                    label = "Publisher",
-                    providerName = "RAWG",
-                    singularNoun = "game",
-                    artistPlaceholder = "e.g. Nintendo",
-                    titlePlaceholder = "e.g. Super Mario Bros.",
-                    labelPlaceholder = "e.g. Nintendo",
-                    barcodePlaceholder = "",
+                    artistRes = R.string.field_artist_games,
+                    titleRes = R.string.field_title_games,
+                    formatRes = R.string.field_platform,
+                    barcodeRes = R.string.field_barcode,
+                    labelRes = R.string.field_label_games,
+                    providerNameRes = R.string.provider_games,
+                    singularNounRes = R.string.add_edit_noun_games,
+                    artistPlaceholderRes = R.string.hint_artist_games,
+                    titlePlaceholderRes = R.string.hint_title_games,
+                    labelPlaceholderRes = R.string.hint_label_games,
+                    barcodePlaceholderRes = null,
                 )
 
                 Category.Comics -> CategoryLabels(
-                    artist = "Writer",
-                    title = "Series / Volume Title",
-                    format = "Format",
-                    barcode = "Barcode",
-                    label = "Publisher",
-                    providerName = "ComicVine",
-                    singularNoun = "comic",
-                    artistPlaceholder = "e.g. Alan Moore",
-                    titlePlaceholder = "e.g. Watchmen",
-                    labelPlaceholder = "e.g. DC Comics",
-                    barcodePlaceholder = "",
+                    artistRes = R.string.field_artist_comics,
+                    titleRes = R.string.field_title_comics,
+                    formatRes = R.string.field_format,
+                    barcodeRes = R.string.field_barcode,
+                    labelRes = R.string.field_label_comics,
+                    providerNameRes = R.string.provider_comics,
+                    singularNounRes = R.string.add_edit_noun_comics,
+                    artistPlaceholderRes = R.string.hint_artist_comics,
+                    titlePlaceholderRes = R.string.hint_title_comics,
+                    labelPlaceholderRes = R.string.hint_label_comics,
+                    barcodePlaceholderRes = null,
                 )
             }
     }

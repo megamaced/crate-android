@@ -29,10 +29,13 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import com.megamaced.crate.R
 import com.megamaced.crate.domain.model.Category
+import com.megamaced.crate.util.resolve
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -76,7 +79,7 @@ fun ExternalSearchSheet(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
-                text = "Search ${providerName(category)}",
+                text = stringResource(R.string.external_search_title, stringResource(providerNameRes(category))),
                 style = MaterialTheme.typography.titleLarge,
             )
             OutlinedTextField(
@@ -84,10 +87,10 @@ fun ExternalSearchSheet(
                 onValueChange = viewModel::onQueryChange,
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
-                label = { Text("Search query") },
+                label = { Text(stringResource(R.string.external_search_query_label)) },
                 trailingIcon = {
                     IconButton(onClick = viewModel::search) {
-                        Icon(Icons.Filled.Search, contentDescription = "Search")
+                        Icon(Icons.Filled.Search, contentDescription = stringResource(R.string.action_search))
                     }
                 },
                 keyboardActions = KeyboardActions(onSearch = { viewModel.search() }),
@@ -107,7 +110,7 @@ fun ExternalSearchSheet(
 
                     state.errorMessage != null -> {
                         Text(
-                            text = state.errorMessage!!,
+                            text = state.errorMessage!!.resolve(),
                             color = MaterialTheme.colorScheme.error,
                             style = MaterialTheme.typography.bodyMedium,
                         )
@@ -115,7 +118,7 @@ fun ExternalSearchSheet(
 
                     state.results.isEmpty() && state.hasSearched -> {
                         Text(
-                            text = "No results.",
+                            text = stringResource(R.string.external_search_no_results),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -144,7 +147,7 @@ fun ExternalSearchSheet(
 
                     else -> {
                         Text(
-                            text = "Type a query and tap search.",
+                            text = stringResource(R.string.external_search_prompt),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )

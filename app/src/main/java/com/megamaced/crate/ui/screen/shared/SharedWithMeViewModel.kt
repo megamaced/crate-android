@@ -6,6 +6,7 @@ import com.megamaced.crate.data.repository.SharedContentStore
 import com.megamaced.crate.domain.model.Playlist
 import com.megamaced.crate.domain.model.SharedCategorySummary
 import com.megamaced.crate.domain.model.sharedCategories
+import com.megamaced.crate.util.UiText
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -20,7 +21,7 @@ data class SharedLandingUiState(
     val playlists: List<Playlist> = emptyList(),
     val isLoading: Boolean = true,
     val isRefreshing: Boolean = false,
-    val errorMessage: String? = null,
+    val errorMessage: UiText? = null,
 ) {
     val isEmpty: Boolean get() = categories.isEmpty() && playlists.isEmpty()
 }

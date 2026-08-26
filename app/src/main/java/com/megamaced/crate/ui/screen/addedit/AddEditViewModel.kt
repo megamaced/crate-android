@@ -3,9 +3,11 @@ package com.megamaced.crate.ui.screen.addedit
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.megamaced.crate.R
 import com.megamaced.crate.data.api.ApiResult
 import com.megamaced.crate.data.api.CrateApiService
 import com.megamaced.crate.data.api.apiCall
+import com.megamaced.crate.data.api.toUiText
 import com.megamaced.crate.domain.model.Category
 import com.megamaced.crate.domain.model.MediaItem
 import com.megamaced.crate.domain.model.MediaItemDraft
@@ -16,6 +18,7 @@ import com.megamaced.crate.domain.repository.MediaRepository
 import com.megamaced.crate.domain.repository.SettingsRepository
 import com.megamaced.crate.util.MAX_PICKED_IMAGE_BYTES
 import com.megamaced.crate.util.PickedImageReader
+import com.megamaced.crate.util.UiText
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -23,6 +26,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 import kotlinx.serialization.json.Json
 import java.util.Calendar
 import javax.inject.Inject
@@ -106,7 +110,9 @@ data class AddEditUiState(
     val purchasePriceCurrency: String = DEFAULT_CURRENCY,
     /** Currency allowlist served from /settings/currencies; falls back to [DEFAULT_CURRENCIES]. */
     val availableCurrencies: List<String> = DEFAULT_CURRENCIES,
-    val errorMessage: String? = null,
+    // Transient because it is in-flight state, not form input: the coroutine
+    // that raised it died with the process, and [readSavedForm] drops it anyway.
+    @Transient val errorMessage: UiText? = null,
     val savedItemId: Long? = null,
     /**
      * True when the item saved but at least one photo slot didn't. Reported
@@ -301,14 +307,16 @@ class AddEditViewModel
                     }
 
                     ApiResult.NetworkError -> {
-                        update { copy(initialLoading = false, errorMessage = "Couldn't reach the server.") }
+                        update {
+                            copy(initialLoading = false, errorMessage = UiText.Res(R.string.error_network))
+                        }
                     }
 
                     is ApiResult.HttpError -> {
                         update {
                             copy(
                                 initialLoading = false,
-                                errorMessage = result.message ?: "Server error (${result.code}).",
+                                errorMessage = result.toUiText(),
                             )
                         }
                     }
@@ -459,7 +467,7 @@ class AddEditViewModel
             viewModelScope.launch {
                 val length = imageReader.length(uri)
                 if (length != null && length > MAX_PICKED_IMAGE_BYTES) {
-                    update { copy(errorMessage = "That image is too large — pick one under 25 MB.") }
+                    update { copy(errorMessage = UiText.Res(R.string.add_edit_image_too_large)) }
                     return@launch
                 }
                 val mime = imageReader.mimeType(uri) ?: "image/*"
@@ -518,14 +526,16 @@ class AddEditViewModel
                     }
 
                     ApiResult.NetworkError -> {
-                        update { copy(isLookingUpIsbn = false, errorMessage = "Couldn't reach the server.") }
+                        update {
+                            copy(isLookingUpIsbn = false, errorMessage = UiText.Res(R.string.error_network))
+                        }
                     }
 
                     is ApiResult.HttpError -> {
                         update {
                             copy(
                                 isLookingUpIsbn = false,
-                                errorMessage = "ISBN not found in Open Library",
+                                errorMessage = UiText.Res(R.string.add_edit_isbn_not_found),
                             )
                         }
                     }
@@ -553,8 +563,8 @@ class AddEditViewModel
                     }
                 when (saveResult) {
                     is ApiResult.Success -> handleSaved(saveResult.value, state)
-                    ApiResult.NetworkError -> setError("Couldn't reach the server.")
-                    is ApiResult.HttpError -> setError(saveResult.message ?: "Server error (${saveResult.code}).")
+                    ApiResult.NetworkError -> setError(UiText.Res(R.string.error_network))
+                    is ApiResult.HttpError -> setError(saveResult.toUiText())
                     ApiResult.Unauthorised -> update { copy(isSaving = false) }
                 }
             }
@@ -624,7 +634,7 @@ class AddEditViewModel
             return result is ApiResult.Success
         }
 
-        private fun setError(message: String) {
+        private fun setError(message: UiText) {
             update { copy(isSaving = false, errorMessage = message) }
         }
 

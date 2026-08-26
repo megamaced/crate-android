@@ -12,6 +12,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.res.stringResource
+import com.megamaced.crate.R
 import com.megamaced.crate.domain.model.Category
 import com.megamaced.crate.domain.model.CollectionSort
 import com.megamaced.crate.domain.model.sortOptionsFor
@@ -28,18 +30,32 @@ fun SortMenuButton(
     IconButton(onClick = { expanded = true }) {
         Icon(
             imageVector = Icons.AutoMirrored.Filled.Sort,
-            contentDescription = "Sort",
+            contentDescription = stringResource(R.string.action_sort),
         )
     }
     DropdownMenu(
         expanded = expanded,
         onDismissRequest = { expanded = false },
     ) {
-        options.forEach { (option, label) ->
+        options.forEach { option ->
+            // The noun ("Artist", "Album", …) is a resource of its own so the
+            // label can put it wherever the language wants it.
+            val label =
+                option.nounRes
+                    ?.let { stringResource(option.labelRes, stringResource(it)) }
+                    ?: stringResource(option.labelRes)
             DropdownMenuItem(
-                text = { Text(label + if (option == selected) "  ✓" else "") },
+                text = {
+                    Text(
+                        if (option.sort == selected) {
+                            stringResource(R.string.sort_option_selected, label)
+                        } else {
+                            label
+                        },
+                    )
+                },
                 onClick = {
-                    onSelected(option)
+                    onSelected(option.sort)
                     expanded = false
                 },
             )

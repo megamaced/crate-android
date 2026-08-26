@@ -19,6 +19,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -94,8 +95,9 @@ fun CollectionFilterBar(
                     bucket.value,
                     bucket.count,
                 )
-                val a11y = stringResource(
-                    R.string.collection_chip_format_a11y,
+                val a11y = pluralStringResource(
+                    R.plurals.collection_chip_format_a11y,
+                    bucket.count,
                     bucket.value,
                     bucket.count,
                 )

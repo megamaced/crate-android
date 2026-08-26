@@ -61,9 +61,11 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import coil3.compose.SubcomposeAsyncImage
+import com.megamaced.crate.R
 import com.megamaced.crate.data.prefs.ThemeMode
 import com.megamaced.crate.domain.model.Category
 import com.megamaced.crate.domain.model.UserProfile
+import com.megamaced.crate.util.resolve
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -76,8 +78,9 @@ fun SettingsScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     var confirmLogout by remember { mutableStateOf(false) }
 
-    LaunchedEffect(state.errorMessage) {
-        state.errorMessage?.let { msg ->
+    val errorText = state.errorMessage?.resolve()
+    LaunchedEffect(errorText) {
+        errorText?.let { msg ->
             snackbarHostState.showSnackbar(msg)
             viewModel.dismissError()
         }
@@ -85,7 +88,7 @@ fun SettingsScreen(
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
-        topBar = { TopAppBar(title = { Text("Settings") }) },
+        topBar = { TopAppBar(title = { Text(stringResource(R.string.nav_settings)) }) },
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { innerPadding ->
         Column(
@@ -97,20 +100,20 @@ fun SettingsScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             ProfileCard(state = state, onOpenSharedWithMe = onOpenSharedWithMe)
-            SectionHeader("Appearance")
+            SectionHeader(stringResource(R.string.settings_section_appearance))
             ThemeSection(
                 themeMode = state.themeMode,
                 onThemeChange = viewModel::setThemeMode,
             )
 
-            SectionHeader("Categories")
+            SectionHeader(stringResource(R.string.settings_section_categories))
             CategoriesSection(
                 hidden = state.hiddenCategories,
                 writesInFlight = state.categoryWritesInFlight,
                 onSetVisible = viewModel::setCategoryVisible,
             )
 
-            SectionHeader("Enrichment")
+            SectionHeader(stringResource(R.string.settings_section_enrichment))
             EnrichmentSection(
                 discogs = state.discogs,
                 tmdb = state.tmdb,
@@ -122,14 +125,14 @@ fun SettingsScreen(
                 onEnrichAll = viewModel::enrichAll,
             )
 
-            SectionHeader("Recommendations")
+            SectionHeader(stringResource(R.string.settings_section_recommendations))
             RecommendationsSection(
                 state = state,
                 onlineEnabled = state.onlineRecommendations,
                 onOnlineChange = viewModel::setOnlineRecommendations,
             )
 
-            SectionHeader("Market")
+            SectionHeader(stringResource(R.string.settings_section_market))
             MarketSection(
                 isLoading = state.isMarketLoading,
                 discogs = state.discogs,
@@ -143,50 +146,50 @@ fun SettingsScreen(
                 onRefreshAll = viewModel::refreshAllMarketRates,
             )
 
-            SectionHeader("Tokens")
+            SectionHeader(stringResource(R.string.settings_section_tokens))
             TokenEditor(
-                label = "Discogs token",
-                placeholder = "Personal access token",
+                label = stringResource(R.string.settings_token_discogs),
+                placeholder = stringResource(R.string.settings_token_hint_personal_access),
                 state = state.discogs,
                 onSave = viewModel::setDiscogsToken,
             )
             TokenEditor(
-                label = "TMDB v4 token",
-                placeholder = "Bearer token",
+                label = stringResource(R.string.settings_token_tmdb),
+                placeholder = stringResource(R.string.settings_token_hint_bearer),
                 state = state.tmdb,
                 onSave = viewModel::setTmdbToken,
             )
             TokenEditor(
-                label = "RAWG token",
-                placeholder = "API token",
+                label = stringResource(R.string.settings_token_rawg),
+                placeholder = stringResource(R.string.settings_token_hint_api),
                 state = state.rawg,
                 onSave = viewModel::setRawgKey,
             )
             TokenEditor(
-                label = "ComicVine token",
-                placeholder = "API token",
+                label = stringResource(R.string.settings_token_comicvine),
+                placeholder = stringResource(R.string.settings_token_hint_api),
                 state = state.comicVine,
                 onSave = viewModel::setComicVineKey,
             )
             TokenEditor(
-                label = "PriceCharting token",
-                placeholder = "API token",
+                label = stringResource(R.string.settings_token_pricecharting),
+                placeholder = stringResource(R.string.settings_token_hint_api),
                 state = state.priceCharting,
                 onSave = viewModel::setPriceChartingToken,
             )
 
-            SectionHeader("Account")
+            SectionHeader(stringResource(R.string.settings_section_account))
             Button(
                 onClick = { confirmLogout = true },
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text("Log out")
+                Text(stringResource(R.string.settings_log_out))
             }
 
-            SectionHeader("Danger zone")
+            SectionHeader(stringResource(R.string.settings_section_danger_zone))
             DangerZoneSection(onWipe = viewModel::wipeCollection)
 
-            SectionHeader("About")
+            SectionHeader(stringResource(R.string.settings_section_about))
             AboutSection(
                 state = state,
                 onCheckForUpdates = viewModel::checkForUpdates,
@@ -200,16 +203,16 @@ fun SettingsScreen(
     if (confirmLogout) {
         AlertDialog(
             onDismissRequest = { confirmLogout = false },
-            title = { Text("Log out?") },
-            text = { Text("You'll need to enter your Nextcloud host and re-authenticate.") },
+            title = { Text(stringResource(R.string.settings_log_out_title)) },
+            text = { Text(stringResource(R.string.settings_log_out_message)) },
             confirmButton = {
                 TextButton(onClick = {
                     confirmLogout = false
                     viewModel.logout()
-                }) { Text("Log out") }
+                }) { Text(stringResource(R.string.settings_log_out)) }
             },
             dismissButton = {
-                TextButton(onClick = { confirmLogout = false }) { Text("Cancel") }
+                TextButton(onClick = { confirmLogout = false }) { Text(stringResource(R.string.action_cancel)) }
             },
         )
     }
@@ -247,7 +250,7 @@ private fun ProfileCard(
                     CircularProgressIndicator(modifier = Modifier.size(20.dp))
                 } else {
                     Text(
-                        text = state.profile?.displayName ?: "Unknown",
+                        text = state.profile?.displayName ?: stringResource(R.string.settings_unknown_user),
                         style = MaterialTheme.typography.titleMedium,
                     )
                     Text(
@@ -257,7 +260,7 @@ private fun ProfileCard(
                     )
                 }
             }
-            TextButton(onClick = onOpenSharedWithMe) { Text("Shared with me") }
+            TextButton(onClick = onOpenSharedWithMe) { Text(stringResource(R.string.shared_with_me_title)) }
         }
     }
 }
@@ -322,18 +325,19 @@ private fun TokenEditor(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(text = label, style = MaterialTheme.typography.titleSmall)
                     Text(
-                        text =
+                        text = stringResource(
                             when {
-                                state.isLoading -> "Loading…"
-                                state.hasValue -> "Configured."
-                                else -> "Not set."
+                                state.isLoading -> R.string.settings_token_loading
+                                state.hasValue -> R.string.settings_token_configured
+                                else -> R.string.settings_token_not_set
                             },
+                        ),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
                 TextButton(onClick = { expanded = !expanded }) {
-                    Text(if (expanded) "Close" else "Edit")
+                    Text(stringResource(if (expanded) R.string.action_close else R.string.action_edit))
                 }
             }
             if (expanded) {
@@ -348,7 +352,9 @@ private fun TokenEditor(
                         IconButton(onClick = { revealed = !revealed }) {
                             Icon(
                                 imageVector = if (revealed) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
-                                contentDescription = if (revealed) "Hide" else "Show",
+                                contentDescription = stringResource(
+                                    if (revealed) R.string.action_hide else R.string.action_show,
+                                ),
                             )
                         }
                     },
@@ -360,13 +366,13 @@ private fun TokenEditor(
                             expanded = false
                         },
                         enabled = input.isNotBlank(),
-                    ) { Text("Save") }
+                    ) { Text(stringResource(R.string.action_save)) }
                     if (state.hasValue) {
                         TextButton(onClick = {
                             input = ""
                             onSave("")
                             expanded = false
-                        }) { Text("Remove") }
+                        }) { Text(stringResource(R.string.action_remove)) }
                     }
                 }
             }
@@ -422,9 +428,7 @@ private fun MarketSection(
                 !discogs.isLoading &&
                 !priceCharting.isLoading
             ) {
-                MissingTokenHint(
-                    "Add a Discogs or PriceCharting token below to enable market values.",
-                )
+                MissingTokenHint(stringResource(R.string.settings_market_needs_token))
             }
 
             CurrencyPicker(
@@ -436,11 +440,11 @@ private fun MarketSection(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "Auto-fetch market rates",
+                        text = stringResource(R.string.settings_auto_fetch_market_title),
                         style = MaterialTheme.typography.titleSmall,
                     )
                     Text(
-                        text = "Fetch a fresh market value when an item is enriched.",
+                        text = stringResource(R.string.settings_auto_fetch_market_body),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -457,19 +461,19 @@ private fun MarketSection(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "Refresh all market rates",
+                        text = stringResource(R.string.settings_refresh_all_title),
                         style = MaterialTheme.typography.titleSmall,
                     )
                     val progress = refreshAllProgress
                     if (progress != null) {
                         Text(
-                            text = "Refreshed ${progress.done} of ${progress.total}…",
+                            text = stringResource(R.string.settings_refreshed_progress, progress.done, progress.total),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     } else {
                         Text(
-                            text = "Re-fetches every item the server can price.",
+                            text = stringResource(R.string.settings_refresh_all_body),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -479,7 +483,7 @@ private fun MarketSection(
                     CircularProgressIndicator(modifier = Modifier.size(24.dp))
                 } else {
                     IconButton(onClick = onRefreshAll) {
-                        Icon(Icons.Filled.Refresh, contentDescription = "Refresh all")
+                        Icon(Icons.Filled.Refresh, contentDescription = stringResource(R.string.settings_refresh_all_a11y))
                     }
                 }
             }
@@ -505,20 +509,17 @@ private fun EnrichmentSection(
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             val enrichTokens = listOf(discogs, tmdb, rawg, comicVine)
             if (enrichTokens.none { it.hasValue } && enrichTokens.none { it.isLoading }) {
-                MissingTokenHint(
-                    "Add tokens below to enrich music, films, games and comics. Books use " +
-                        "Open Library, which needs no token.",
-                )
+                MissingTokenHint(stringResource(R.string.settings_enrichment_needs_token))
             }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "Auto-enrich when opened",
+                        text = stringResource(R.string.settings_auto_enrich_title),
                         style = MaterialTheme.typography.titleSmall,
                     )
                     Text(
-                        text = "Automatically enrich an item when you view its details.",
+                        text = stringResource(R.string.settings_auto_enrich_body),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -535,19 +536,19 @@ private fun EnrichmentSection(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "Enrich all items",
+                        text = stringResource(R.string.settings_enrich_all_title),
                         style = MaterialTheme.typography.titleSmall,
                     )
                     val progress = enrichAllProgress
                     if (progress != null) {
                         Text(
-                            text = "Enriched ${progress.done} of ${progress.total}…",
+                            text = stringResource(R.string.settings_enriched_progress, progress.done, progress.total),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     } else {
                         Text(
-                            text = "Enrich all un-enriched items via their provider.",
+                            text = stringResource(R.string.settings_enrich_all_body),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -557,7 +558,7 @@ private fun EnrichmentSection(
                     CircularProgressIndicator(modifier = Modifier.size(24.dp))
                 } else {
                     IconButton(onClick = onEnrichAll) {
-                        Icon(Icons.Filled.Refresh, contentDescription = "Enrich all")
+                        Icon(Icons.Filled.Refresh, contentDescription = stringResource(R.string.settings_enrich_all_a11y))
                     }
                 }
             }
@@ -581,7 +582,7 @@ private fun CurrencyPicker(
             value = selected.orEmpty(),
             onValueChange = {},
             readOnly = true,
-            label = { Text("Currency") },
+            label = { Text(stringResource(R.string.settings_currency_label)) },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
             modifier = Modifier
                 .fillMaxWidth()
@@ -602,7 +603,7 @@ private fun CurrencyPicker(
             }
             if (currencies.isEmpty()) {
                 DropdownMenuItem(
-                    text = { Text("No currencies returned by server.") },
+                    text = { Text(stringResource(R.string.settings_no_currencies)) },
                     onClick = { expanded = false },
                     enabled = false,
                 )
@@ -623,7 +624,7 @@ private fun ThemeSection(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(text = "Theme", style = MaterialTheme.typography.titleSmall)
+            Text(text = stringResource(R.string.settings_theme_label), style = MaterialTheme.typography.titleSmall)
             SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
                 options.forEachIndexed { index, mode ->
                     SegmentedButton(
@@ -651,10 +652,7 @@ private fun RecommendationsSection(
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(
-                text =
-                    "Items show a \"More from your crate\" row, suggesting similar things you " +
-                        "already own or want. That's worked out on this device from your own " +
-                        "collection, so it works offline.",
+                text = stringResource(R.string.settings_local_recommendations_body),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -664,16 +662,11 @@ private fun RecommendationsSection(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "Enable online recommendations",
+                        text = stringResource(R.string.settings_online_recommendations_title),
                         style = MaterialTheme.typography.titleSmall,
                     )
                     Text(
-                        text =
-                            "Also suggest things you don't own yet, from the service that " +
-                                "enriched the item — music, films, books and games. Only " +
-                                "enriched items can have these, and they need a connection to " +
-                                "your server. Comics aren't covered: ComicVine publishes no " +
-                                "similarity data.",
+                        text = stringResource(R.string.settings_online_recommendations_body),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -686,10 +679,7 @@ private fun RecommendationsSection(
 
             val recTokens = listOf(state.discogs, state.tmdb, state.rawg)
             if (onlineEnabled && recTokens.none { it.hasValue } && recTokens.none { it.isLoading }) {
-                MissingTokenHint(
-                    "No provider tokens are set, so online suggestions will only appear for " +
-                        "books. Add tokens below for music, films and games.",
-                )
+                MissingTokenHint(stringResource(R.string.settings_recommendations_needs_token))
             }
         }
     }
@@ -710,9 +700,7 @@ private fun CategoriesSection(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(
-                text =
-                    "Hide categories you don't use. Hidden categories disappear from navigation and search. " +
-                        "At least one must remain visible.",
+                text = stringResource(R.string.settings_categories_body),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -727,7 +715,7 @@ private fun CategoriesSection(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        text = cat.label,
+                        text = stringResource(cat.labelRes),
                         modifier = Modifier.weight(1f),
                         style = MaterialTheme.typography.bodyLarge,
                     )
@@ -751,7 +739,9 @@ private fun DangerZoneSection(onWipe: (List<String>) -> Unit) {
     // Derived from Category so the scopes and their labels can't drift from the
     // rest of the app — the api values are what the endpoint expects, and the
     // labels are the app's own plurals ("Films", not "Film").
-    val scopes = remember { Category.entries.map { it.apiValue to it.label } + (PLAYLISTS_SCOPE to "Playlists") }
+    val scopes = remember {
+        Category.entries.map { it.apiValue to it.labelRes } + (PLAYLISTS_SCOPE to R.string.nav_playlists)
+    }
     // Nothing pre-selected: this deletes from the server irreversibly, so every
     // scope is an explicit opt-in and the confirm button starts disabled.
     var selected by remember { mutableStateOf(emptySet<String>()) }
@@ -762,11 +752,11 @@ private fun DangerZoneSection(onWipe: (List<String>) -> Unit) {
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
-                text = "Wipe collection",
+                text = stringResource(R.string.settings_wipe_title),
                 style = MaterialTheme.typography.titleSmall,
             )
             Text(
-                text = "Permanently delete selected data from your collection on the server. This cannot be undone.",
+                text = stringResource(R.string.settings_wipe_body),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -777,7 +767,7 @@ private fun DangerZoneSection(onWipe: (List<String>) -> Unit) {
                     containerColor = MaterialTheme.colorScheme.error,
                 ),
             ) {
-                Text("Wipe data…")
+                Text(stringResource(R.string.settings_wipe_action))
             }
         }
     }
@@ -785,11 +775,11 @@ private fun DangerZoneSection(onWipe: (List<String>) -> Unit) {
     if (confirmWipe) {
         AlertDialog(
             onDismissRequest = { confirmWipe = false },
-            title = { Text("Wipe data") },
+            title = { Text(stringResource(R.string.settings_wipe_dialog_title)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("Select categories to permanently delete:")
-                    scopes.forEach { (scope, label) ->
+                    Text(stringResource(R.string.settings_wipe_dialog_message))
+                    scopes.forEach { (scope, labelRes) ->
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             androidx.compose.material3.Checkbox(
                                 checked = scope in selected,
@@ -798,7 +788,7 @@ private fun DangerZoneSection(onWipe: (List<String>) -> Unit) {
                                 },
                             )
                             Text(
-                                text = label,
+                                text = stringResource(labelRes),
                                 modifier = Modifier.padding(start = 8.dp),
                             )
                         }
@@ -812,10 +802,15 @@ private fun DangerZoneSection(onWipe: (List<String>) -> Unit) {
                         onWipe(selected.toList())
                     },
                     enabled = selected.isNotEmpty(),
-                ) { Text("Wipe selected", color = MaterialTheme.colorScheme.error) }
+                ) {
+                    Text(
+                        text = stringResource(R.string.settings_wipe_confirm),
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
             },
             dismissButton = {
-                TextButton(onClick = { confirmWipe = false }) { Text("Cancel") }
+                TextButton(onClick = { confirmWipe = false }) { Text(stringResource(R.string.action_cancel)) }
             },
         )
     }
@@ -840,7 +835,7 @@ private fun AboutSection(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                Text("App version", style = MaterialTheme.typography.bodyMedium)
+                Text(stringResource(R.string.settings_app_version), style = MaterialTheme.typography.bodyMedium)
                 Text(
                     text = com.megamaced.crate.BuildConfig.VERSION_NAME,
                     style = MaterialTheme.typography.bodyMedium,
@@ -851,9 +846,9 @@ private fun AboutSection(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                Text("Crate server version", style = MaterialTheme.typography.bodyMedium)
+                Text(stringResource(R.string.settings_server_version), style = MaterialTheme.typography.bodyMedium)
                 Text(
-                    text = state.profile?.crateVersion ?: "—",
+                    text = state.profile?.crateVersion ?: stringResource(R.string.settings_version_unknown),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -882,7 +877,7 @@ private fun UpdateCheckRow(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("Check for updates", style = MaterialTheme.typography.bodyMedium)
+            Text(stringResource(R.string.settings_check_updates), style = MaterialTheme.typography.bodyMedium)
             when (state) {
                 UpdateCheckState.Checking -> {
                     CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
@@ -890,19 +885,19 @@ private fun UpdateCheckRow(
 
                 is UpdateCheckState.Available -> {
                     TextButton(onClick = { onOpenRelease(state.htmlUrl) }) {
-                        Text("Open ${state.tag}")
+                        Text(stringResource(R.string.settings_open_release, state.tag))
                     }
                 }
 
                 else -> {
-                    TextButton(onClick = onCheck) { Text("Check") }
+                    TextButton(onClick = onCheck) { Text(stringResource(R.string.settings_check)) }
                 }
             }
         }
         when (state) {
             UpdateCheckState.UpToDate -> {
                 StatusLine(
-                    text = "You're on the latest version.",
+                    text = stringResource(R.string.settings_up_to_date),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     onDismiss = onDismiss,
                 )
@@ -910,7 +905,7 @@ private fun UpdateCheckRow(
 
             UpdateCheckState.Failed -> {
                 StatusLine(
-                    text = "Couldn't reach GitHub. Check your connection and try again.",
+                    text = stringResource(R.string.settings_update_check_failed),
                     color = MaterialTheme.colorScheme.error,
                     onDismiss = onDismiss,
                 )
@@ -918,7 +913,7 @@ private fun UpdateCheckRow(
 
             is UpdateCheckState.Available -> {
                 StatusLine(
-                    text = "${state.tag} is available on GitHub.",
+                    text = stringResource(R.string.settings_update_available, state.tag),
                     color = MaterialTheme.colorScheme.primary,
                     onDismiss = onDismiss,
                 )
@@ -943,6 +938,6 @@ private fun StatusLine(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(text, style = MaterialTheme.typography.bodySmall, color = color)
-        TextButton(onClick = onDismiss) { Text("Dismiss") }
+        TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_dismiss)) }
     }
 }

@@ -3,13 +3,16 @@ package com.megamaced.crate.ui.screen.scan
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.megamaced.crate.R
 import com.megamaced.crate.data.api.ApiResult
 import com.megamaced.crate.data.api.CrateApiService
 import com.megamaced.crate.data.api.apiCall
 import com.megamaced.crate.data.api.dto.DiscogsSearchResultDto
 import com.megamaced.crate.data.api.dto.OpenLibraryResultDto
+import com.megamaced.crate.data.api.toUiText
 import com.megamaced.crate.domain.model.Category
 import com.megamaced.crate.ui.screen.addedit.ExternalSearchResult
+import com.megamaced.crate.util.UiText
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -24,7 +27,7 @@ data class BarcodeScanUiState(
     val barcode: String? = null,
     val isLooking: Boolean = false,
     val candidates: List<ExternalSearchResult> = emptyList(),
-    val errorMessage: String? = null,
+    val errorMessage: UiText? = null,
     val sheetOpen: Boolean = false,
 )
 
@@ -96,16 +99,16 @@ class BarcodeScanViewModel
 
                 ApiResult.NetworkError -> {
                     _uiState.update {
-                        it.copy(isLooking = false, errorMessage = "Couldn't reach the server.")
+                        it.copy(isLooking = false, errorMessage = UiText.Res(R.string.error_network))
                     }
                 }
 
                 is ApiResult.HttpError -> {
                     val msg =
                         when (result.code) {
-                            400 -> "Provider token missing. Add it in Settings."
-                            404 -> "No matches for that barcode."
-                            else -> result.message ?: "Server error (${result.code})."
+                            400 -> UiText.Res(R.string.error_provider_token_missing)
+                            404 -> UiText.Res(R.string.scan_no_matches)
+                            else -> result.toUiText()
                         }
                     _uiState.update { it.copy(isLooking = false, errorMessage = msg) }
                 }

@@ -2,10 +2,13 @@ package com.megamaced.crate.ui.screen.share
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.megamaced.crate.R
 import com.megamaced.crate.data.api.ApiResult
+import com.megamaced.crate.data.api.toUiText
 import com.megamaced.crate.domain.model.Share
 import com.megamaced.crate.domain.model.UserSearchResult
 import com.megamaced.crate.domain.repository.ShareRepository
+import com.megamaced.crate.util.UiText
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -38,7 +41,7 @@ data class ShareSheetUiState(
     // Access level to grant when the user picks someone. Defaults to
     // read-only; the sheet exposes a toggle to switch to read/write.
     val grantCanWrite: Boolean = false,
-    val errorMessage: String? = null,
+    val errorMessage: UiText? = null,
 )
 
 @HiltViewModel
@@ -88,14 +91,14 @@ class ShareSheetViewModel
                     }
 
                     ApiResult.NetworkError -> {
-                        _state.update { it.copy(isLoadingShares = false, errorMessage = "Couldn't reach the server.") }
+                        _state.update { it.copy(isLoadingShares = false, errorMessage = UiText.Res(R.string.error_network)) }
                     }
 
                     is ApiResult.HttpError -> {
                         _state.update {
                             it.copy(
                                 isLoadingShares = false,
-                                errorMessage = result.message ?: "Server error (${result.code}).",
+                                errorMessage = result.toUiText(),
                             )
                         }
                     }
@@ -125,7 +128,7 @@ class ShareSheetViewModel
 
                         ApiResult.NetworkError -> {
                             _state.update {
-                                it.copy(isSearching = false, errorMessage = "Couldn't reach the server.")
+                                it.copy(isSearching = false, errorMessage = UiText.Res(R.string.error_network))
                             }
                         }
 
@@ -133,7 +136,7 @@ class ShareSheetViewModel
                             _state.update {
                                 it.copy(
                                     isSearching = false,
-                                    errorMessage = result.message ?: "Server error (${result.code}).",
+                                    errorMessage = result.toUiText(),
                                 )
                             }
                         }
@@ -178,14 +181,14 @@ class ShareSheetViewModel
                     }
 
                     ApiResult.NetworkError -> {
-                        _state.update { it.copy(isWorking = false, errorMessage = "Couldn't reach the server.") }
+                        _state.update { it.copy(isWorking = false, errorMessage = UiText.Res(R.string.error_network)) }
                     }
 
                     is ApiResult.HttpError -> {
                         _state.update {
                             it.copy(
                                 isWorking = false,
-                                errorMessage = result.message ?: "Server error (${result.code}).",
+                                errorMessage = result.toUiText(),
                             )
                         }
                     }
@@ -211,14 +214,14 @@ class ShareSheetViewModel
                     }
 
                     ApiResult.NetworkError -> {
-                        _state.update { it.copy(isWorking = false, errorMessage = "Couldn't reach the server.") }
+                        _state.update { it.copy(isWorking = false, errorMessage = UiText.Res(R.string.error_network)) }
                     }
 
                     is ApiResult.HttpError -> {
                         _state.update {
                             it.copy(
                                 isWorking = false,
-                                errorMessage = result.message ?: "Server error (${result.code}).",
+                                errorMessage = result.toUiText(),
                             )
                         }
                     }

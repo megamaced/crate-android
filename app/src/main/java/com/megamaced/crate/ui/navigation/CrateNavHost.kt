@@ -15,6 +15,7 @@ import com.megamaced.crate.ui.screen.addedit.AddEditItemScreen
 import com.megamaced.crate.ui.screen.addedit.ExternalSearchResult
 import com.megamaced.crate.ui.screen.addedit.SCAN_RESULT_KEY
 import com.megamaced.crate.ui.screen.collection.CollectionScreen
+import com.megamaced.crate.ui.screen.detail.DetailFilterAxis
 import com.megamaced.crate.ui.screen.detail.ItemDetailScreen
 import com.megamaced.crate.ui.screen.home.HomeScreen
 import com.megamaced.crate.ui.screen.login.LoginScreen
@@ -108,22 +109,35 @@ fun CrateNavHost(
                 onEdit = { id, categoryApiValue ->
                     navController.navigateOnce(Destination.AddEdit(itemId = id, category = categoryApiValue))
                 },
-                // A genre chip goes back to the list the item lives in — the
-                // shared-category page for a shared item, otherwise the
-                // collection — pre-filtered to that genre. popUpTo replaces the
-                // list we came from rather than stacking a second copy on top
-                // of the detail screen; when we arrived from Home or Search
-                // there is nothing to pop and it simply pushes.
-                onGenreClick = { categoryApiValue, genre, isShared ->
-                    if (isShared) {
+                // A tapped genre / format / year goes back to the list the
+                // item lives in — the shared-category page for a shared item,
+                // otherwise the collection — pre-filtered to that value.
+                // popUpTo replaces the list we came from rather than stacking a
+                // second copy on top of the detail screen; when we arrived from
+                // Home or Search there is nothing to pop and it simply pushes.
+                onFilterCollection = { target ->
+                    val genre = target.value.takeIf { target.axis == DetailFilterAxis.Genre }
+                    val format = target.value.takeIf { target.axis == DetailFilterAxis.Format }
+                    val decade = target.value.takeIf { target.axis == DetailFilterAxis.Decade }
+                    if (target.isShared) {
                         navController.navigateOnce(
-                            Destination.SharedCategory(category = categoryApiValue, genre = genre),
+                            Destination.SharedCategory(
+                                category = target.categoryApiValue,
+                                genre = genre,
+                                format = format,
+                                decade = decade,
+                            ),
                         ) {
                             popUpTo<Destination.SharedCategory> { inclusive = true }
                         }
                     } else {
                         navController.navigateOnce(
-                            Destination.Collection(category = categoryApiValue, genre = genre),
+                            Destination.Collection(
+                                category = target.categoryApiValue,
+                                genre = genre,
+                                format = format,
+                                decade = decade,
+                            ),
                         ) {
                             popUpTo<Destination.Collection> { inclusive = true }
                         }

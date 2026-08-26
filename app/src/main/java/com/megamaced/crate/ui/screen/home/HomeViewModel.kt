@@ -2,9 +2,12 @@ package com.megamaced.crate.ui.screen.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.megamaced.crate.R
 import com.megamaced.crate.data.api.ApiResult
+import com.megamaced.crate.data.api.toUiText
 import com.megamaced.crate.domain.model.HomeFeed
 import com.megamaced.crate.domain.repository.HomeRepository
+import com.megamaced.crate.util.UiText
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -17,7 +20,7 @@ data class HomeUiState(
     val feed: HomeFeed? = null,
     val isLoading: Boolean = false,
     val isRefreshing: Boolean = false,
-    val errorMessage: String? = null,
+    val errorMessage: UiText? = null,
 )
 
 @HiltViewModel
@@ -64,7 +67,7 @@ class HomeViewModel
                             it.copy(
                                 isLoading = false,
                                 isRefreshing = false,
-                                errorMessage = "Couldn't reach the server.",
+                                errorMessage = UiText.Res(R.string.error_network),
                             )
                         }
                     }
@@ -74,7 +77,7 @@ class HomeViewModel
                             it.copy(
                                 isLoading = false,
                                 isRefreshing = false,
-                                errorMessage = result.message ?: "Server error (${result.code}).",
+                                errorMessage = result.toUiText(),
                             )
                         }
                     }

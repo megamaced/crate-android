@@ -1,5 +1,6 @@
 package com.megamaced.crate.ui.screen.addedit
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -18,9 +19,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.SubcomposeAsyncImage
+import com.megamaced.crate.R
 import com.megamaced.crate.domain.model.Category
 
 /**
@@ -65,7 +68,7 @@ internal fun ExternalResultRow(
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
             Text(
-                text = result.title.ifBlank { "(untitled)" },
+                text = result.title.ifBlank { stringResource(R.string.external_result_untitled) },
                 style = MaterialTheme.typography.titleSmall,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
@@ -105,14 +108,15 @@ internal fun ExternalSearchResult.identityKey(): String =
  */
 internal fun ExternalSearchResult.listKey(index: Int): String = "$index-${identityKey()}"
 
-/** Display name of the provider backing [category]'s external search. */
-internal fun providerName(category: Category): String =
+/** Name of the provider backing [category]'s external search. */
+@StringRes
+internal fun providerNameRes(category: Category): Int =
     when (category) {
-        Category.Music -> "Discogs"
-        Category.Films -> "TMDB"
-        Category.Books -> "Open Library"
-        Category.Games -> "RAWG"
-        Category.Comics -> "ComicVine"
+        Category.Music -> R.string.provider_music
+        Category.Films -> R.string.provider_films
+        Category.Books -> R.string.provider_books
+        Category.Games -> R.string.provider_games
+        Category.Comics -> R.string.provider_comics
     }
 
 private fun buildSubtitle(result: ExternalSearchResult): String? =

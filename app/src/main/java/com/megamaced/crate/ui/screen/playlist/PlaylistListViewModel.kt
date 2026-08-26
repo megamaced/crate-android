@@ -2,9 +2,12 @@ package com.megamaced.crate.ui.screen.playlist
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.megamaced.crate.R
 import com.megamaced.crate.data.api.ApiResult
+import com.megamaced.crate.data.api.toUiText
 import com.megamaced.crate.domain.model.Playlist
 import com.megamaced.crate.domain.repository.PlaylistRepository
+import com.megamaced.crate.util.UiText
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -17,7 +20,7 @@ import javax.inject.Inject
 data class PlaylistListUiState(
     val playlists: List<Playlist> = emptyList(),
     val isRefreshing: Boolean = false,
-    val errorMessage: String? = null,
+    val errorMessage: UiText? = null,
 )
 
 @HiltViewModel
@@ -27,7 +30,7 @@ class PlaylistListViewModel
         private val playlistRepository: PlaylistRepository,
     ) : ViewModel() {
         private val isRefreshing = MutableStateFlow(false)
-        private val errorMessage = MutableStateFlow<String?>(null)
+        private val errorMessage = MutableStateFlow<UiText?>(null)
 
         // Guards create/rename/delete against double-submit from rapid taps.
         // Mutations launch on the main dispatcher, so a plain flag is enough.
@@ -108,11 +111,11 @@ class PlaylistListViewModel
                 }
 
                 ApiResult.NetworkError -> {
-                    errorMessage.value = "Couldn't reach the server."
+                    errorMessage.value = UiText.Res(R.string.error_network)
                 }
 
                 is ApiResult.HttpError -> {
-                    errorMessage.value = result.message ?: "Server error (${result.code})."
+                    errorMessage.value = result.toUiText()
                 }
 
                 ApiResult.Unauthorised -> { /* SessionManager handles */ }

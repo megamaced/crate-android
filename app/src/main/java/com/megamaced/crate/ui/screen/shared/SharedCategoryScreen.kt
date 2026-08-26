@@ -24,7 +24,9 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import com.megamaced.crate.R
 import com.megamaced.crate.data.prefs.CollectionViewMode
 import com.megamaced.crate.domain.model.SortField
 import com.megamaced.crate.ui.components.CollectionFilterBar
@@ -33,6 +35,7 @@ import com.megamaced.crate.ui.network.LocalIsOnline
 import com.megamaced.crate.ui.screen.collection.CollectionGrid
 import com.megamaced.crate.ui.screen.collection.CollectionList
 import com.megamaced.crate.ui.screen.collection.ViewModeToggle
+import com.megamaced.crate.util.resolve
 
 /**
  * A single shared category, rendered as close as possible to a primary
@@ -57,8 +60,9 @@ fun SharedCategoryScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val isOnline = LocalIsOnline.current
 
-    LaunchedEffect(uiState.error) {
-        uiState.error?.let { msg ->
+    val errorText = uiState.error?.resolve()
+    LaunchedEffect(errorText) {
+        errorText?.let { msg ->
             snackbarHostState.showSnackbar(msg)
             viewModel.dismissError()
         }
@@ -70,10 +74,10 @@ fun SharedCategoryScreen(
             TopAppBar(
                 title = {
                     Column {
-                        Text(uiState.label)
+                        Text(stringResource(uiState.labelRes))
                         uiState.ownerCaption?.let { caption ->
                             Text(
-                                text = caption,
+                                text = caption.resolve(),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -82,7 +86,10 @@ fun SharedCategoryScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.action_back),
+                        )
                     }
                 },
                 actions = {
@@ -103,7 +110,7 @@ fun SharedCategoryScreen(
             val owner = uiState.writeOwner
             if (isOnline && owner != null) {
                 FloatingActionButton(onClick = { onAddItem(owner, uiState.category.apiValue) }) {
-                    Icon(Icons.Filled.Add, contentDescription = "Add item")
+                    Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.action_add_item))
                 }
             }
         },

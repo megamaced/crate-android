@@ -9,7 +9,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.megamaced.crate.R
 import com.megamaced.crate.domain.model.Category
 
 @Composable
@@ -19,7 +21,7 @@ fun CategoryBadge(
 ) {
     val (container, content) = badgeColors(category)
     Text(
-        text = category.label,
+        text = stringResource(category.labelRes),
         style = MaterialTheme.typography.labelSmall,
         color = content,
         modifier = modifier

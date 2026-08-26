@@ -169,6 +169,55 @@ class CollectionViewModelTest {
         }
 
     @Test
+    fun `format nav arg pre-filters the list`() =
+        runTest {
+            val repo = FakeMediaRepository().apply {
+                seed(
+                    listOf(
+                        item(1, "OK Computer", format = "LP"),
+                        item(2, "Kid A", format = "CD"),
+                    ),
+                )
+            }
+            val args = SavedStateHandle(mapOf("category" to "music", "format" to "LP"))
+            val vm = CollectionViewModel(args, repo, FakeCollectionPrefs(), StubSettingsRepository(), dispatcher)
+
+            vm.uiState.test {
+                var current = awaitItem()
+                while (current.selectedFormats.isEmpty()) current = awaitItem()
+                assertEquals(setOf("LP"), current.selectedFormats)
+                assertEquals(listOf(1L), current.items.map { it.id })
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `decade nav arg filters by decade rather than by the exact year tapped`() =
+        runTest {
+            val repo = FakeMediaRepository().apply {
+                seed(
+                    listOf(
+                        item(1, "OK Computer", year = 1997),
+                        item(2, "Pablo Honey", year = 1993),
+                        item(3, "Kid A", year = 2000),
+                    ),
+                )
+            }
+            val args = SavedStateHandle(mapOf("category" to "music", "decade" to "1990s"))
+            val vm = CollectionViewModel(args, repo, FakeCollectionPrefs(), StubSettingsRepository(), dispatcher)
+
+            vm.uiState.test {
+                var current = awaitItem()
+                while (current.selectedDecade == null) current = awaitItem()
+                assertEquals("1990s", current.selectedDecade)
+                // Tapping 1997 brings back everything from that decade, not
+                // only the items released in 1997.
+                assertEquals(listOf(1L, 2L), current.items.map { it.id }.sorted())
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
     fun `changing category clears format filter and triggers refresh`() =
         runTest {
             val repo = FakeMediaRepository().apply {
