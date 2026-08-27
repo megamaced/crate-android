@@ -3,6 +3,7 @@ package com.megamaced.crate.ui.screen.collection
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -21,11 +22,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ViewList
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Bookmark
-import androidx.compose.material.icons.outlined.BookmarkBorder
-import androidx.compose.material.icons.outlined.Category
 import androidx.compose.material.icons.outlined.GridView
+import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.Share
+import androidx.compose.material.icons.outlined.ShoppingBasket
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -74,6 +74,7 @@ import com.megamaced.crate.ui.components.CollectionFilterBar
 import com.megamaced.crate.ui.components.EmptyState
 import com.megamaced.crate.ui.components.MediaCard
 import com.megamaced.crate.ui.components.SortMenuButton
+import com.megamaced.crate.ui.components.categoryIcon
 import com.megamaced.crate.ui.network.LocalIsOnline
 import com.megamaced.crate.ui.screen.share.ShareSheet
 import com.megamaced.crate.ui.screen.share.ShareTarget
@@ -116,9 +117,9 @@ fun CollectionScreen(
                         visible = uiState.visibleCategories,
                         onCategorySelected = viewModel::selectCategory,
                     )
-                    StatusMenu(
-                        selected = uiState.status,
-                        onStatusSelected = viewModel::selectStatus,
+                    StatusToggle(
+                        current = uiState.status,
+                        onSelected = viewModel::selectStatus,
                     )
                     ViewModeToggle(
                         current = uiState.viewMode,
@@ -220,39 +221,43 @@ private fun ShareCollectionMenu(
     onShareLibrary: () -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
-    IconButton(onClick = { expanded = true }) {
-        Icon(
-            imageVector = Icons.Outlined.Share,
-            contentDescription = stringResource(R.string.action_share),
-        )
-    }
-    DropdownMenu(
-        expanded = expanded,
-        onDismissRequest = { expanded = false },
-    ) {
-        DropdownMenuItem(
-            text = { Text(stringResource(R.string.collection_share_category, stringResource(category.labelRes))) },
-            onClick = {
-                expanded = false
-                onShareCategory()
-            },
-        )
-        DropdownMenuItem(
-            text = { Text(stringResource(R.string.collection_share_library)) },
-            onClick = {
-                expanded = false
-                onShareLibrary()
-            },
-        )
+    // See CategoryMenu: the Box is what the menu anchors to.
+    Box {
+        IconButton(onClick = { expanded = true }) {
+            Icon(
+                imageVector = Icons.Outlined.Share,
+                contentDescription = stringResource(R.string.action_share),
+            )
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+        ) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.collection_share_category, stringResource(category.labelRes))) },
+                onClick = {
+                    expanded = false
+                    onShareCategory()
+                },
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.collection_share_library)) },
+                onClick = {
+                    expanded = false
+                    onShareLibrary()
+                },
+            )
+        }
     }
 }
 
 /**
  * The category picker. It sits in the app bar rather than the body because a
- * phone has room for one row of controls above the grid, not several. The app
- * bar title names the current category, so the button is a control rather than
- * the sign of what is selected; only categories the user hasn't hidden in
- * settings are offered.
+ * phone has room for one row of controls above the grid, not several. The
+ * button wears the current category's own glyph — the same one its artwork
+ * placeholders use — so it says what the grid below is showing rather than
+ * standing for the abstract idea of a category. Only categories the user
+ * hasn't hidden in settings are offered.
  */
 @Composable
 private fun CategoryMenu(
@@ -263,86 +268,76 @@ private fun CategoryMenu(
     var expanded by remember { mutableStateOf(false) }
     if (visible.isEmpty()) return
 
-    IconButton(onClick = { expanded = true }) {
-        Icon(
-            imageVector = Icons.Outlined.Category,
-            contentDescription = stringResource(
-                R.string.collection_category_button,
-                stringResource(selected.labelRes),
-            ),
-        )
-    }
-    DropdownMenu(
-        expanded = expanded,
-        onDismissRequest = { expanded = false },
-    ) {
-        visible.forEach { category ->
-            val label = stringResource(category.labelRes)
-            DropdownMenuItem(
-                text = {
-                    Text(
-                        if (category == selected) {
-                            stringResource(R.string.category_option_selected, label)
-                        } else {
-                            label
-                        },
-                    )
-                },
-                onClick = {
-                    onCategorySelected(category)
-                    expanded = false
-                },
+    // Box, not a bare pair: a menu anchors to its parent layout node, so as a
+    // sibling of the button inside the app bar's actions Row it would take the
+    // whole row as its anchor and open away from the button that spawned it.
+    Box {
+        IconButton(onClick = { expanded = true }) {
+            Icon(
+                imageVector = categoryIcon(selected),
+                contentDescription = stringResource(
+                    R.string.collection_category_button,
+                    stringResource(selected.labelRes),
+                ),
             )
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+        ) {
+            visible.forEach { category ->
+                val label = stringResource(category.labelRes)
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            if (category == selected) {
+                                stringResource(R.string.category_option_selected, label)
+                            } else {
+                                label
+                            },
+                        )
+                    },
+                    leadingIcon = {
+                        Icon(imageVector = categoryIcon(category), contentDescription = null)
+                    },
+                    onClick = {
+                        onCategorySelected(category)
+                        expanded = false
+                    },
+                )
+            }
         }
     }
 }
 
 /**
- * Owned / wanted, the mode the list is in. Unlike the category, no other piece
- * of chrome names it, so the button carries the state itself: a filled bookmark
- * in the accent colour for the wanted list against an outline for the
- * collection, and a content description that reads the current mode out.
+ * Owned / wanted, the list the collection is showing. A toggle rather than a
+ * menu: two states, switched in place, the way the view-mode button beside it
+ * works. The glyph names the list you are on — a crate of what you own against
+ * a basket of what you're after — because nothing else in the chrome does, and
+ * the accent colour marks the wanted list on top of that: mistaking it for the
+ * collection reads as a collection that has emptied itself.
  */
 @Composable
-private fun StatusMenu(
-    selected: Status,
-    onStatusSelected: (Status) -> Unit,
+private fun StatusToggle(
+    current: Status,
+    onSelected: (Status) -> Unit,
 ) {
-    var expanded by remember { mutableStateOf(false) }
-    val wanted = selected == Status.Wanted
-
-    IconButton(onClick = { expanded = true }) {
+    val wanted = current == Status.Wanted
+    val target = if (wanted) Status.Owned else Status.Wanted
+    // Names the list first and the tap's effect second, so the button is never
+    // announced as the thing it is about to become.
+    val label = if (wanted) {
+        R.string.collection_status_wanted_a11y
+    } else {
+        R.string.collection_status_owned_a11y
+    }
+    IconButton(onClick = { onSelected(target) }) {
         Icon(
-            imageVector = if (wanted) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
-            contentDescription = stringResource(
-                R.string.collection_status_button,
-                stringResource(selected.labelRes),
-            ),
+            imageVector = if (wanted) Icons.Outlined.ShoppingBasket else Icons.Outlined.Inventory2,
+            contentDescription = stringResource(label),
             tint = if (wanted) MaterialTheme.colorScheme.primary else LocalContentColor.current,
         )
-    }
-    DropdownMenu(
-        expanded = expanded,
-        onDismissRequest = { expanded = false },
-    ) {
-        Status.entries.forEach { status ->
-            val label = stringResource(status.labelRes)
-            DropdownMenuItem(
-                text = {
-                    Text(
-                        if (status == selected) {
-                            stringResource(R.string.status_option_selected, label)
-                        } else {
-                            label
-                        },
-                    )
-                },
-                onClick = {
-                    onStatusSelected(status)
-                    expanded = false
-                },
-            )
-        }
     }
 }
 

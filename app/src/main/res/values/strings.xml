@@ -161,9 +161,9 @@
     <string name="collection_empty_filtered_wanted">No %1$s items in your wanted list.</string>
     <string name="collection_clear_filters">Clear filters</string>
     <string name="collection_category_button">Category: %1$s</string>
-    <string name="collection_status_button">Status: %1$s</string>
+    <string name="collection_status_owned_a11y">Showing owned items. Switch to the wanted list</string>
+    <string name="collection_status_wanted_a11y">Showing wanted items. Switch to the collection</string>
     <string name="category_option_selected">"%1$s  ✓"</string>
-    <string name="status_option_selected">"%1$s  ✓"</string>
     <string name="collection_share_category">Share %1$s…</string>
     <string name="collection_share_library">Share whole library…</string>
     <string name="collection_view_switch_to_list">Switch to list view</string>

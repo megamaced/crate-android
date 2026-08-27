@@ -1,0 +1,8 @@
+Toolbar fixes.
+
+- The category button now shows the icon of the category you are viewing.
+- Owned and wanted is a single button you tap to switch, like the view
+  button, rather than a menu.
+- New icons for both, and the wanted list stays highlighted.
+- Toolbar menus now open underneath the button you tapped instead of
+  off to one side.

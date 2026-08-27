@@ -168,42 +168,47 @@ fun ItemDetailScreen(
                     // Show the kebab whenever we can write (own item or a
                     // read/write share). Purely read-only shares get no menu.
                     if (item != null && uiState.canWrite) {
-                        IconButton(onClick = { menuExpanded = true }) {
-                            Icon(
-                                imageVector = Icons.Filled.MoreVert,
-                                contentDescription = stringResource(R.string.action_more),
+                        // Box, not a bare pair: a menu anchors to its parent
+                        // layout node, and as a sibling of the button inside
+                        // the actions Row that anchor is the whole row.
+                        Box {
+                            IconButton(onClick = { menuExpanded = true }) {
+                                Icon(
+                                    imageVector = Icons.Filled.MoreVert,
+                                    contentDescription = stringResource(R.string.action_more),
+                                )
+                            }
+                            DetailMenu(
+                                item = item,
+                                isOwner = uiState.isOwner,
+                                expanded = menuExpanded,
+                                onDismiss = { menuExpanded = false },
+                                onEdit = {
+                                    menuExpanded = false
+                                    onEdit(item.id, item.category.apiValue)
+                                },
+                                onShare = {
+                                    menuExpanded = false
+                                    shareOpen = true
+                                },
+                                onEnrich = {
+                                    menuExpanded = false
+                                    viewModel.enrich()
+                                },
+                                onStrip = {
+                                    menuExpanded = false
+                                    viewModel.stripEnrichment()
+                                },
+                                onFetchMarketValue = {
+                                    menuExpanded = false
+                                    viewModel.fetchMarketValue()
+                                },
+                                onDelete = {
+                                    menuExpanded = false
+                                    confirmDelete = true
+                                },
                             )
                         }
-                        DetailMenu(
-                            item = item,
-                            isOwner = uiState.isOwner,
-                            expanded = menuExpanded,
-                            onDismiss = { menuExpanded = false },
-                            onEdit = {
-                                menuExpanded = false
-                                onEdit(item.id, item.category.apiValue)
-                            },
-                            onShare = {
-                                menuExpanded = false
-                                shareOpen = true
-                            },
-                            onEnrich = {
-                                menuExpanded = false
-                                viewModel.enrich()
-                            },
-                            onStrip = {
-                                menuExpanded = false
-                                viewModel.stripEnrichment()
-                            },
-                            onFetchMarketValue = {
-                                menuExpanded = false
-                                viewModel.fetchMarketValue()
-                            },
-                            onDelete = {
-                                menuExpanded = false
-                                confirmDelete = true
-                            },
-                        )
                     }
                 },
             )

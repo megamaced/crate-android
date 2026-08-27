@@ -1,5 +1,6 @@
 package com.megamaced.crate.ui.components
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material3.DropdownMenu
@@ -27,38 +28,44 @@ fun SortMenuButton(
     var expanded by remember { mutableStateOf(false) }
     val options = remember(category) { sortOptionsFor(category) }
 
-    IconButton(onClick = { expanded = true }) {
-        Icon(
-            imageVector = Icons.AutoMirrored.Filled.Sort,
-            contentDescription = stringResource(R.string.action_sort),
-        )
-    }
-    DropdownMenu(
-        expanded = expanded,
-        onDismissRequest = { expanded = false },
-    ) {
-        options.forEach { option ->
-            // The noun ("Artist", "Album", …) is a resource of its own so the
-            // label can put it wherever the language wants it.
-            val label =
-                option.nounRes
-                    ?.let { stringResource(option.labelRes, stringResource(it)) }
-                    ?: stringResource(option.labelRes)
-            DropdownMenuItem(
-                text = {
-                    Text(
-                        if (option.sort == selected) {
-                            stringResource(R.string.sort_option_selected, label)
-                        } else {
-                            label
-                        },
-                    )
-                },
-                onClick = {
-                    onSelected(option.sort)
-                    expanded = false
-                },
+    // A menu anchors to its parent layout node. Left as a bare sibling of the
+    // button inside an app bar's actions Row, that parent is the whole row and
+    // the menu opens away from the button that spawned it; the Box makes the
+    // button its anchor.
+    Box {
+        IconButton(onClick = { expanded = true }) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.Sort,
+                contentDescription = stringResource(R.string.action_sort),
             )
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+        ) {
+            options.forEach { option ->
+                // The noun ("Artist", "Album", …) is a resource of its own so
+                // the label can put it wherever the language wants it.
+                val label =
+                    option.nounRes
+                        ?.let { stringResource(option.labelRes, stringResource(it)) }
+                        ?: stringResource(option.labelRes)
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            if (option.sort == selected) {
+                                stringResource(R.string.sort_option_selected, label)
+                            } else {
+                                label
+                            },
+                        )
+                    },
+                    onClick = {
+                        onSelected(option.sort)
+                        expanded = false
+                    },
+                )
+            }
         }
     }
 }
