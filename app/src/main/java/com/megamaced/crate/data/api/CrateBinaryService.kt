@@ -56,14 +56,4 @@ interface CrateBinaryService {
         @Path("itemId") itemId: Long,
         @Path("slot") slot: Int,
     )
-
-    @Streaming
-    @GET("apps/crate/export")
-    suspend fun export(
-        @Query("format") format: String = "csv",
-        @Query("scope") scope: String = "owned",
-        @Query("category") category: String = "all",
-        @Query("includeEnriched") includeEnriched: Int = 0,
-        @Query("includeMarket") includeMarket: Int = 0,
-    ): ResponseBody
 }

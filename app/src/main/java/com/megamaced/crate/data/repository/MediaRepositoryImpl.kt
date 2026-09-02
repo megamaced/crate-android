@@ -19,6 +19,7 @@ import com.megamaced.crate.domain.repository.MediaRepository
 import com.megamaced.crate.domain.repository.MediaRepository.RefreshResult
 import com.megamaced.crate.domain.repository.MediaRepository.SyncResult
 import com.megamaced.crate.util.ExifStrip
+import com.megamaced.crate.util.ExifStripFailedException
 import com.megamaced.crate.util.ServerTimestamps
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -123,12 +124,6 @@ class MediaRepositoryImpl
                 dao.delete(id)
             }
 
-        override suspend fun deleteAll(): ApiResult<Unit> =
-            apiCall {
-                api.deleteAllMedia()
-                dao.deleteAll()
-            }
-
         override suspend fun wipeCollection(scopes: List<String>): ApiResult<Unit> =
             apiCall {
                 api.deleteAllMedia(scopes = scopes.joinToString(","))
@@ -161,10 +156,13 @@ class MediaRepositoryImpl
                 // thread (apiCall's block runs in the caller's context until
                 // the first real suspension).
                 val sanitised = withContext(Dispatchers.Default) { ExifStrip.strip(bytes, mimeType) }
-                // ExifStrip logs why a strip fell back; this names the upload
-                // it happened on, which is what makes the warning actionable.
-                if (!sanitised.stripped) {
-                    Timber.w("Artwork for item %d is uploading with its original metadata", id)
+                // Fail closed. The app promises metadata is stripped before an
+                // image leaves the device, so an image the platform can't strip
+                // is refused rather than uploaded intact. ExifStrip logs why;
+                // this names the upload it happened on.
+                if (sanitised == null) {
+                    Timber.w("Artwork for item %d refused: its metadata could not be stripped", id)
+                    throw ExifStripFailedException()
                 }
                 // Label the part with the type the bytes actually are now —
                 // stripping re-encodes HEIC/WebP to JPEG.
@@ -199,8 +197,9 @@ class MediaRepositoryImpl
                 // carry GPS, timestamps, camera serials. Decode/re-encode is
                 // CPU-bound; keep it off the main thread.
                 val sanitised = withContext(Dispatchers.Default) { ExifStrip.strip(bytes, mimeType) }
-                if (!sanitised.stripped) {
-                    Timber.w("Photo %d for item %d is uploading with its original metadata", slot, id)
+                if (sanitised == null) {
+                    Timber.w("Photo %d for item %d refused: its metadata could not be stripped", slot, id)
+                    throw ExifStripFailedException()
                 }
                 val body = sanitised.bytes.toRequestBody(mediaTypeFor(sanitised.mimeType))
                 val part = MultipartBody.Part.createFormData(
@@ -227,6 +226,7 @@ class MediaRepositoryImpl
 
         override suspend fun syncDelta(
             updatedSince: String?,
+            cursorId: Long?,
             lastSeenWipedAt: String?,
         ): ApiResult<SyncResult> =
             apiCall {
@@ -278,52 +278,116 @@ class MediaRepositoryImpl
                     )
                 }
 
-                // Ask for one second before the stored cursor. Server stamps are
-                // second-resolution and the filter is strictly-greater, so an
-                // item updated in the same second as one we already fetched —
-                // but after that page's query ran — would never be returned
-                // again. The overlap re-delivers it; every write here is an
-                // upsert, so re-seeing a row costs nothing.
-                val effectiveSince =
-                    if (wiped || drifted) null else updatedSince?.let(ServerTimestamps::minusOneSecond)
+                val fullSweep = wiped || drifted || updatedSince == null
+                // What the caller handed us, and the floor the sweep may never
+                // fall below: a cursor is only ever replaced by a later one.
+                val stored = if (updatedSince == null) null else MediaCursor(updatedSince, cursorId)
+                // A delta resumes from the stored cursor. When only its
+                // timestamp is known — the first sync after upgrading, or a
+                // server too old to hand out the id half — ask from one second
+                // earlier: those servers filter strictly-greater against
+                // second-resolution stamps, so a row written in the same second
+                // as one already fetched, but after that page's query ran,
+                // would never be returned again. Re-seeing rows costs nothing,
+                // because every write below is an upsert.
+                var cursor =
+                    when {
+                        fullSweep -> {
+                            null
+                        }
+
+                        cursorId != null -> {
+                            stored
+                        }
+
+                        else -> {
+                            MediaCursor(ServerTimestamps.minusOneSecond(updatedSince), null)
+                        }
+                    }
 
                 var offset = 0
-                // Seeded with the *stored* cursor, not the rewound one, so the
-                // overlap never compounds into the cursor drifting backwards a
-                // second per sync.
-                var maxUpdatedAt: String? = if (wiped || drifted) null else updatedSince
+                // The last resume point the server handed back, and the highest
+                // stamp the sweep saw. The first is exact; the second is the
+                // fallback for a full sweep and for servers predating the
+                // keyset cursor.
+                var keyset: MediaCursor? = null
+                var maxSeen: String? = null
                 var reportedTotal = 0
                 // Offset pagination is only lossless while the server's sort is
-                // total. When it is not, pages overlap and rows go missing, and
-                // the cursor below still advances past them — so the gap becomes
-                // permanent. Track distinct ids so that failure is loud instead
-                // of showing up months later as a short collection count.
+                // total, and while nothing is edited mid-sweep: a row updated
+                // between two pages moves to the end of an updatedAt-ordered
+                // delta, pushing an unseen row back across the page boundary.
+                // Track distinct ids so that failure is loud instead of showing
+                // up months later as a short collection count.
                 val seenIds = mutableSetOf<Long>()
                 while (true) {
-                    val page = api.getMedia(updatedSince = effectiveSince, limit = SYNC_PAGE_SIZE, offset = offset)
+                    val page =
+                        api.getMedia(
+                            updatedSince = cursor?.updatedSince,
+                            updatedSinceId = cursor?.id,
+                            limit = SYNC_PAGE_SIZE,
+                            offset = offset,
+                        )
                     if (page.items.isEmpty()) break
                     reportedTotal = page.total
                     dao.upsertAll(page.items.map { it.toEntity(codec) })
                     page.items.forEach { dto ->
                         seenIds += dto.id
                         val candidate = dto.updatedAt
-                        val currentMax = maxUpdatedAt
-                        if (candidate != null && (currentMax == null || ServerTimestamps.isNewer(candidate, currentMax))) {
-                            maxUpdatedAt = candidate
+                        val current = maxSeen
+                        if (candidate != null && (current == null || ServerTimestamps.isNewer(candidate, current))) {
+                            maxSeen = candidate
                         }
                     }
-                    if (page.items.size < SYNC_PAGE_SIZE) break
-                    offset += SYNC_PAGE_SIZE
+                    val more = page.items.size >= SYNC_PAGE_SIZE
+                    // On a delta the server hands back the (updatedAt, id) of
+                    // this page's last row. Sending that pair as the next
+                    // page's cursor is an exact resume point: no offset to
+                    // drift under a concurrent edit, and no row lost to a
+                    // shared second.
+                    val next = page.nextCursor
+                    if (next != null) {
+                        keyset = MediaCursor(next.updatedSince, next.updatedSinceId)
+                        cursor = keyset
+                        offset = 0
+                    } else {
+                        offset += SYNC_PAGE_SIZE
+                    }
+                    if (!more) break
                 }
                 val sweptEverything = seenIds.size >= reportedTotal
                 if (!sweptEverything) {
                     Timber.w(
                         "Sync incomplete: server reported %d items, pagination yielded %d distinct. " +
-                            "Server sort is likely non-deterministic; upgrade the Crate server app.",
+                            "Holding the cursor so the next sync re-reads from the same point.",
                         reportedTotal,
                         seenIds.size,
                     )
                 }
+
+                // Committing a cursor past rows this sweep never saw makes the
+                // gap permanent: the next delta starts after them, and an edit
+                // changes no row count, so the drift check never escalates to a
+                // full sweep either. An incomplete sweep therefore keeps the
+                // cursor exactly where it was and tries again next time.
+                val committed =
+                    when {
+                        !sweptEverything -> {
+                            stored
+                        }
+
+                        keyset != null -> {
+                            keyset
+                        }
+
+                        maxSeen != null && (stored == null || ServerTimestamps.isNewer(maxSeen, stored.updatedSince)) -> {
+                            MediaCursor(maxSeen, null)
+                        }
+
+                        else -> {
+                            stored
+                        }
+                    }
 
                 // A full sweep enumerates everything the server holds for us, so
                 // anything local and absent from it has been deleted server-side.
@@ -337,7 +401,7 @@ class MediaRepositoryImpl
                 // whereas an empty page could equally be a sweep that failed to
                 // return anything.
                 val authoritative = sweptEverything && (seenIds.isNotEmpty() || probe.total == 0)
-                if (effectiveSince == null && ownerId != null && authoritative) {
+                if (fullSweep && ownerId != null && authoritative) {
                     val stale = dao.idsOwnedBy(ownerId).filterNot { it in seenIds }
                     if (stale.isNotEmpty()) {
                         // Chunked: one bound parameter per id would blow SQLite's
@@ -347,8 +411,22 @@ class MediaRepositoryImpl
                     }
                 }
 
-                SyncResult(cursor = maxUpdatedAt, wipedAt = serverWipedAt)
+                SyncResult(
+                    cursor = committed?.updatedSince,
+                    cursorId = committed?.id,
+                    wipedAt = serverWipedAt,
+                )
             }
+
+        /**
+         * A delta resume point: the `(updatedAt, id)` of the last row consumed.
+         * [id] is null against a server that predates the keyset cursor, where
+         * only the timestamp half exists.
+         */
+        private data class MediaCursor(
+            val updatedSince: String,
+            val id: Long?,
+        )
 
         companion object {
             private const val SYNC_PAGE_SIZE = 200

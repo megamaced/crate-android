@@ -3,7 +3,6 @@ package com.megamaced.crate.data.repository
 import com.megamaced.crate.data.api.ApiResult
 import com.megamaced.crate.data.api.CrateApiService
 import com.megamaced.crate.data.api.apiCall
-import com.megamaced.crate.data.api.dto.CurrencyRequest
 import com.megamaced.crate.data.api.dto.HiddenCategoriesRequest
 import com.megamaced.crate.data.api.dto.KeyRequest
 import com.megamaced.crate.data.api.dto.OnlineRecommendationsRequest
@@ -65,9 +64,6 @@ class SettingsRepositoryImpl
 
         override suspend fun setMarketSettings(settings: MarketSettings): ApiResult<Unit> =
             apiCall { api.setMarketSettings(settings.toDto()) }
-
-        override suspend fun setCurrency(currency: String): ApiResult<String> =
-            apiCall { api.setCurrency(CurrencyRequest(currency)).marketCurrency }
 
         override suspend fun getCurrencies(): ApiResult<List<String>> = apiCall { api.getCurrencies() }
 

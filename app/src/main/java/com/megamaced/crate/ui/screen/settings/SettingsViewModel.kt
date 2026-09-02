@@ -18,6 +18,7 @@ import com.megamaced.crate.util.UiText
 import com.megamaced.crate.util.UpdateChecker
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.async
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -298,14 +299,9 @@ class SettingsViewModel
                     }
                 val ids = refreshable.itemIds
                 refreshProgress.value = RefreshAllProgress(total = ids.size, done = 0)
-                ids.forEachIndexed { index, id ->
-                    ensureActive()
-                    // refresh-all reports the user's own currency; without it
-                    // every item in the sweep would be repriced in GBP.
-                    enrichmentRepository.fetchMarketValue(id, refreshable.currency)
-                    refreshProgress.value = RefreshAllProgress(total = ids.size, done = index + 1)
-                }
-                refreshProgress.value = null
+                // refresh-all reports the user's own currency; without it
+                // every item in the sweep would be repriced in GBP.
+                bulk(ids, refreshProgress) { id -> enrichmentRepository.fetchMarketValue(id, refreshable.currency) }
             }
         }
 
@@ -354,12 +350,43 @@ class SettingsViewModel
                     }
                 }
                 enrichProgress.value = RefreshAllProgress(total = ids.size, done = 0)
-                ids.forEachIndexed { index, id ->
-                    ensureActive()
-                    enrichmentRepository.enrich(id)
-                    enrichProgress.value = RefreshAllProgress(total = ids.size, done = index + 1)
+                bulk(ids, enrichProgress) { id -> enrichmentRepository.enrich(id) }
+            }
+        }
+
+        /**
+         * Drives a bulk run and reports what it came to. See [runBulk] for why
+         * the per-item results are counted rather than assumed.
+         */
+        private suspend fun bulk(
+            ids: List<Long>,
+            progress: MutableStateFlow<RefreshAllProgress?>,
+            operation: suspend (Long) -> ApiResult<*>,
+        ) {
+            val result =
+                runBulk(
+                    ids = ids,
+                    onProgress = { progress.value = RefreshAllProgress(total = ids.size, done = it) },
+                    operation = operation,
+                )
+            progress.value = null
+            when {
+                result.abandonedBy == BulkResult.Abandon.Network -> {
+                    reportError(UiText.Res(R.string.error_network))
                 }
-                enrichProgress.value = null
+
+                // Unauthorised is SessionManager's to act on — it signs the
+                // user out, and a second message on the way to the login
+                // screen explains nothing.
+                result.abandonedBy == BulkResult.Abandon.Unauthorised -> {
+                    Unit
+                }
+
+                result.untouched(ids.size) > 0 -> {
+                    reportError(
+                        UiText.Res(R.string.settings_bulk_partial_failure, listOf(result.untouched(ids.size), ids.size)),
+                    )
+                }
             }
         }
 

@@ -19,7 +19,8 @@ class PlaylistRepositoryImplTest {
     private val api = FakeCrateApiService()
     private val dao = FakePlaylistDao()
     private val mediaItemDao = FakeMediaItemDao()
-    private val repo = PlaylistRepositoryImpl(api, dao, mediaItemDao, codec)
+    private val accountPrefs = FakeAccountPrefs(OWNER)
+    private val repo = PlaylistRepositoryImpl(api, dao, mediaItemDao, accountPrefs, codec)
 
     @Test
     fun `refresh drops playlists that no longer exist on the server`() =
@@ -29,8 +30,8 @@ class PlaylistRepositoryImplTest {
             // there un-openable forever.
             dao.seedPlaylists(
                 listOf(
-                    PlaylistEntity(id = 1, name = "Kept"),
-                    PlaylistEntity(id = 2, name = "Deleted on the web"),
+                    PlaylistEntity(id = 1, name = "Kept", userId = OWNER),
+                    PlaylistEntity(id = 2, name = "Deleted on the web", userId = OWNER),
                 ),
             )
             api.nextPlaylists = listOf(playlistDto(1, "Kept"))
@@ -46,7 +47,7 @@ class PlaylistRepositoryImplTest {
         runTest {
             // Deleting on the web then deleting on the phone answers 404. Giving
             // up there left the row on the device with no way to remove it.
-            dao.seedPlaylists(listOf(PlaylistEntity(id = 1, name = "Already gone")))
+            dao.seedPlaylists(listOf(PlaylistEntity(id = 1, name = "Already gone", userId = OWNER)))
             api.deletePlaylistCode = 404
 
             val result = repo.delete(1)
@@ -58,7 +59,7 @@ class PlaylistRepositoryImplTest {
     @Test
     fun `a failure that isn't a 404 keeps the local row`() =
         runTest {
-            dao.seedPlaylists(listOf(PlaylistEntity(id = 1, name = "Still there")))
+            dao.seedPlaylists(listOf(PlaylistEntity(id = 1, name = "Still there", userId = OWNER)))
             api.deletePlaylistCode = 500
 
             val result = repo.delete(1)
@@ -99,11 +100,55 @@ class PlaylistRepositoryImplTest {
             }
         }
 
+    @Test
+    fun `a playlist shared with you stays out of My Playlists`() =
+        runTest {
+            // Opening a shared playlist caches the owner's row in the same
+            // table the owned list reads, where it looked like one of yours and
+            // stayed until a successful owned-list refresh removed it.
+            dao.seedPlaylists(
+                listOf(
+                    PlaylistEntity(id = 1, name = "Mine", userId = OWNER),
+                    PlaylistEntity(id = 2, name = "Pre-userId row"),
+                    PlaylistEntity(id = 9, name = "Shared with me", userId = "someone@else"),
+                ),
+            )
+
+            repo.observeAll().test {
+                assertEquals(listOf(1L, 2L), awaitItem().map { it.id }.sorted())
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `reconciling the owned list leaves a cached shared playlist alone`() =
+        runTest {
+            // The listing enumerates the user's own playlists, so it says
+            // nothing about one shared with them — pruning that row would drop
+            // the cache the shared views read.
+            dao.seedPlaylists(
+                listOf(
+                    PlaylistEntity(id = 1, name = "Mine", userId = OWNER),
+                    PlaylistEntity(id = 9, name = "Shared with me", userId = "someone@else"),
+                ),
+            )
+            api.nextPlaylists = listOf(playlistDto(1, "Mine"))
+
+            repo.refresh()
+
+            assertEquals(listOf(1L, 9L), dao.snapshot().map { it.id }.sorted())
+        }
+
     private fun playlistDto(
         id: Long,
         name: String,
         items: List<MediaItemDto>? = null,
-    ) = PlaylistDto(id = id, name = name, items = items)
+        userId: String? = OWNER,
+    ) = PlaylistDto(id = id, name = name, userId = userId, items = items)
+
+    private companion object {
+        const val OWNER = "david@macemail.co.uk"
+    }
 
     private fun mediaDto(
         id: Long,

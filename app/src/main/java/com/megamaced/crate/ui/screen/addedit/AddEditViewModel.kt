@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.megamaced.crate.R
 import com.megamaced.crate.data.api.ApiResult
 import com.megamaced.crate.data.api.CrateApiService
+import com.megamaced.crate.data.api.IMAGE_NOT_SANITISED_CODE
 import com.megamaced.crate.data.api.apiCall
 import com.megamaced.crate.data.api.toUiText
 import com.megamaced.crate.domain.model.Category
@@ -127,6 +128,10 @@ data class AddEditUiState(
      * the user believing the image was saved.
      */
     val imageTooLarge: Boolean = false,
+    /** True when the item saved but its artwork upload or removal didn't. */
+    val artworkUploadFailed: Boolean = false,
+    /** True when an image was refused because its metadata couldn't be stripped. */
+    val imageNotSanitised: Boolean = false,
 ) {
     val yearError: Boolean
         get() = year.isNotBlank() && (year.toIntOrNull()?.let { it !in MIN_YEAR..CURRENT_YEAR } ?: true)
@@ -253,7 +258,9 @@ class AddEditViewModel
                 errorMessage = null,
                 savedItemId = null,
                 photoUploadFailed = false,
+                artworkUploadFailed = false,
                 imageTooLarge = false,
+                imageNotSanitised = false,
             )
         }
 
@@ -561,7 +568,16 @@ class AddEditViewModel
             val state = _uiState.value
             if (!state.canSave) return
             viewModelScope.launch {
-                update { copy(isSaving = true, errorMessage = null, photoUploadFailed = false, imageTooLarge = false) }
+                update {
+                    copy(
+                        isSaving = true,
+                        errorMessage = null,
+                        photoUploadFailed = false,
+                        artworkUploadFailed = false,
+                        imageTooLarge = false,
+                        imageNotSanitised = false,
+                    )
+                }
                 val draft = state.toDraft()
                 val saveResult =
                     if (state.isEditing) {
@@ -587,36 +603,48 @@ class AddEditViewModel
             // Enrichment-supplied URLs are sent through MediaItemDraft.artworkPath
             // so the backend caches them server-side — no client upload needed.
             var tooLarge = false
-            when {
+            var sanitiseFailed = false
+            // The artwork is a second request, made after the item itself has
+            // saved. Its outcome used to be dropped on the floor, so losing
+            // connectivity between the two closed the editor as though the whole
+            // save had worked, with no artwork on the item and nothing said.
+            val artwork = when {
                 beforeState.pendingArtwork != null -> {
                     when (val read = imageReader.read(beforeState.pendingArtwork.uri)) {
                         is PickedImageReader.ReadResult.Success -> {
-                            mediaRepository.uploadArtwork(saved.id, read.bytes, beforeState.pendingArtwork.mimeType)
+                            classify(mediaRepository.uploadArtwork(saved.id, read.bytes, beforeState.pendingArtwork.mimeType))
                         }
 
                         // Over the cap once the bytes were counted. The item
                         // itself saved, so this is reported rather than fatal.
                         PickedImageReader.ReadResult.TooLarge -> {
                             tooLarge = true
+                            ImageOutcome.Ok
                         }
 
                         // Unreadable — a picker grant that didn't survive
                         // process death, or a file since deleted.
                         PickedImageReader.ReadResult.Unavailable -> {
-                            Unit
+                            ImageOutcome.Failed
                         }
                     }
                 }
 
                 beforeState.removeArtwork && beforeState.isEditing -> {
-                    mediaRepository.deleteArtwork(saved.id)
+                    classify(mediaRepository.deleteArtwork(saved.id))
+                }
+
+                else -> {
+                    ImageOutcome.Ok
                 }
             }
+            if (artwork == ImageOutcome.NotSanitised) sanitiseFailed = true
             // Same logic applied to each photo slot. Independent of artwork
             // (different endpoint, different appdata folder server-side).
             val photo1 = applyPhotoSlot(saved.id, slot = 1, beforeState.pendingPhoto1, beforeState.removePhoto1, beforeState.isEditing)
             val photo2 = applyPhotoSlot(saved.id, slot = 2, beforeState.pendingPhoto2, beforeState.removePhoto2, beforeState.isEditing)
-            if (photo1 == SlotOutcome.TooLarge || photo2 == SlotOutcome.TooLarge) tooLarge = true
+            if (photo1 == ImageOutcome.TooLarge || photo2 == ImageOutcome.TooLarge) tooLarge = true
+            if (photo1 == ImageOutcome.NotSanitised || photo2 == ImageOutcome.NotSanitised) sanitiseFailed = true
             if (beforeState.autoEnrich) {
                 enrichmentRepository.enrich(saved.id)
             }
@@ -626,15 +654,29 @@ class AddEditViewModel
             update {
                 copy(
                     isSaving = false,
-                    photoUploadFailed = photo1 == SlotOutcome.Failed || photo2 == SlotOutcome.Failed,
+                    photoUploadFailed = photo1 == ImageOutcome.Failed || photo2 == ImageOutcome.Failed,
+                    artworkUploadFailed = artwork == ImageOutcome.Failed,
                     imageTooLarge = tooLarge,
+                    imageNotSanitised = sanitiseFailed,
                     savedItemId = saved.id,
                 )
             }
         }
 
-        /** What a photo slot's pending work came to. [Ok] also covers "nothing to do". */
-        private enum class SlotOutcome { Ok, Failed, TooLarge }
+        /**
+         * What an image slot's pending work came to. [Ok] also covers "nothing
+         * to do". The three failures are kept apart because each needs the user
+         * to do something different: retry, pick a smaller image, or pick a
+         * different one this device can strip metadata from.
+         */
+        private enum class ImageOutcome { Ok, Failed, TooLarge, NotSanitised }
+
+        private fun classify(result: ApiResult<Unit>): ImageOutcome =
+            when {
+                result is ApiResult.Success -> ImageOutcome.Ok
+                result is ApiResult.HttpError && result.code == IMAGE_NOT_SANITISED_CODE -> ImageOutcome.NotSanitised
+                else -> ImageOutcome.Failed
+            }
 
         private suspend fun applyPhotoSlot(
             itemId: Long,
@@ -642,7 +684,7 @@ class AddEditViewModel
             pending: PendingImage?,
             remove: Boolean,
             isEditing: Boolean,
-        ): SlotOutcome {
+        ): ImageOutcome {
             val result = when {
                 pending != null -> {
                     when (val read = imageReader.read(pending.uri)) {
@@ -653,11 +695,11 @@ class AddEditViewModel
                         // Reported apart from a failed upload: one is worth
                         // retrying, the other needs a smaller image.
                         PickedImageReader.ReadResult.TooLarge -> {
-                            return SlotOutcome.TooLarge
+                            return ImageOutcome.TooLarge
                         }
 
                         PickedImageReader.ReadResult.Unavailable -> {
-                            return SlotOutcome.Failed
+                            return ImageOutcome.Failed
                         }
                     }
                 }
@@ -667,10 +709,10 @@ class AddEditViewModel
                 }
 
                 else -> {
-                    return SlotOutcome.Ok
+                    return ImageOutcome.Ok
                 }
             }
-            return if (result is ApiResult.Success) SlotOutcome.Ok else SlotOutcome.Failed
+            return classify(result)
         }
 
         private fun setError(message: UiText) {

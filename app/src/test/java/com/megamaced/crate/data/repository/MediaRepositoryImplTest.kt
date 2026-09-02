@@ -3,6 +3,8 @@ package com.megamaced.crate.data.repository
 import app.cash.turbine.test
 import com.megamaced.crate.data.api.ApiResult
 import com.megamaced.crate.data.api.CrateBinaryService
+import com.megamaced.crate.data.api.IMAGE_NOT_SANITISED_CODE
+import com.megamaced.crate.data.api.dto.MediaCursorDto
 import com.megamaced.crate.data.api.dto.MediaItemDto
 import com.megamaced.crate.data.api.dto.PaginatedMediaDto
 import com.megamaced.crate.data.db.entity.MediaItemEntity
@@ -112,7 +114,7 @@ class MediaRepositoryImplTest {
             api.pagesByOffset[pageSize] = page(offset = pageSize, ids = 201L..400L, total = 450)
             api.pagesByOffset[pageSize * 2] = page(offset = pageSize * 2, ids = 401L..450L, total = 450)
 
-            val result = repo.syncDelta(updatedSince = null, lastSeenWipedAt = null)
+            val result = repo.syncDelta(updatedSince = null, cursorId = null, lastSeenWipedAt = null)
 
             assertTrue(result is ApiResult.Success)
             assertEquals(450, dao.snapshot().size)
@@ -152,7 +154,7 @@ class MediaRepositoryImplTest {
                     offset = 0,
                 )
 
-            val result = repo.syncDelta(updatedSince = "2026-01-01 00:00:00", lastSeenWipedAt = null)
+            val result = repo.syncDelta(updatedSince = "2026-01-01 00:00:00", cursorId = null, lastSeenWipedAt = null)
 
             assertTrue(result is ApiResult.Success)
             assertEquals(listOf(1L, 2L), dao.snapshot().map { it.id }.sorted())
@@ -177,7 +179,7 @@ class MediaRepositoryImplTest {
                     offset = 0,
                 )
 
-            repo.syncDelta(updatedSince = null, lastSeenWipedAt = null)
+            repo.syncDelta(updatedSince = null, cursorId = null, lastSeenWipedAt = null)
 
             assertEquals(listOf(1L, 99L), dao.snapshot().map { it.id }.sorted())
         }
@@ -206,7 +208,7 @@ class MediaRepositoryImplTest {
                     offset = 0,
                 )
 
-            repo.syncDelta(updatedSince = null, lastSeenWipedAt = null)
+            repo.syncDelta(updatedSince = null, cursorId = null, lastSeenWipedAt = null)
 
             assertEquals(3, dao.snapshot().size)
         }
@@ -231,7 +233,7 @@ class MediaRepositoryImplTest {
                     offset = 0,
                 )
 
-            repo.syncDelta(updatedSince = "2026-01-01 00:00:00", lastSeenWipedAt = null)
+            repo.syncDelta(updatedSince = "2026-01-01 00:00:00", cursorId = null, lastSeenWipedAt = null)
 
             // Sweep ran with no updatedSince, and the stale row is gone.
             assertEquals(listOf(null, null), api.getMediaUpdatedSince)
@@ -317,7 +319,7 @@ class MediaRepositoryImplTest {
             dao.seed(listOf(entity(1, "The last one", category = "music", userId = OWNER)))
             api.nextPage = PaginatedMediaDto(items = emptyList(), total = 0, limit = 1, offset = 0)
 
-            val result = repo.syncDelta(updatedSince = null, lastSeenWipedAt = null)
+            val result = repo.syncDelta(updatedSince = null, cursorId = null, lastSeenWipedAt = null)
 
             assertTrue(result is ApiResult.Success)
             assertEquals(emptyList<Long>(), dao.snapshot().map { it.id })
@@ -339,13 +341,100 @@ class MediaRepositoryImplTest {
                     offset = 0,
                 )
 
-            val result = repo.syncDelta(updatedSince = "2026-01-01 12:00:00", lastSeenWipedAt = null)
+            val result = repo.syncDelta(updatedSince = "2026-01-01 12:00:00", cursorId = null, lastSeenWipedAt = null)
 
             // Probe is deliberately unfiltered; the sweep asks one second back.
             assertEquals(listOf(null, "2026-01-01 11:59:59"), api.getMediaUpdatedSince)
             // The cursor itself still moves forward — seeding it with the
             // rewound value would walk it backwards a second per sync.
             assertEquals("2026-01-01 12:00:05", (result as ApiResult.Success).value.cursor)
+        }
+
+    @Test
+    fun `a delta pages by the cursor the server hands back, not by offset`() =
+        runTest {
+            // Offsets drift under a concurrent edit: a row updated between two
+            // pages moves to the end of an updatedAt-ordered delta and pushes an
+            // unseen row back across the boundary. The server's (updatedAt, id)
+            // cursor has nothing to drift.
+            dao.seed(listOf(entity(1, "One", category = "music", userId = OWNER)))
+            api.pagesByOffset[0] =
+                PaginatedMediaDto(
+                    items = listOf(mediaDto(1, "One", category = "music", userId = OWNER, updatedAt = "2026-01-01 12:00:05")),
+                    total = 1,
+                    limit = 200,
+                    offset = 0,
+                    nextCursor = MediaCursorDto(updatedSince = "2026-01-01 12:00:05", updatedSinceId = 1),
+                )
+
+            val result = repo.syncDelta(updatedSince = "2026-01-01 12:00:00", cursorId = 7, lastSeenWipedAt = null)
+
+            // Probe unfiltered, then the delta resumes on the exact stored row.
+            assertEquals(listOf(null to null, "2026-01-01 12:00:00" to 7L), api.getMediaCursors)
+            // Both halves of the server's cursor are committed.
+            val sync = (result as ApiResult.Success).value
+            assertEquals("2026-01-01 12:00:05", sync.cursor)
+            assertEquals(1L, sync.cursorId)
+        }
+
+    @Test
+    fun `an incomplete sweep leaves the stored cursor exactly where it was`() =
+        runTest {
+            // The server says 500 items; pagination yields one page of 2. The
+            // 498 unseen rows are still unseen, so committing a cursor past
+            // them would make the gap permanent — an edit changes no row count,
+            // so the drift check never escalates to a full sweep either.
+            dao.seed(listOf(entity(1, "One", category = "music", userId = OWNER)))
+            api.pagesByOffset[0] =
+                PaginatedMediaDto(
+                    items = listOf(mediaDto(1, "One", category = "music", userId = OWNER, updatedAt = "2026-06-01 09:00:00")),
+                    total = 500,
+                    limit = 200,
+                    offset = 0,
+                )
+
+            val result = repo.syncDelta(updatedSince = "2026-01-01 12:00:00", cursorId = 7, lastSeenWipedAt = null)
+
+            val sync = (result as ApiResult.Success).value
+            assertEquals("2026-01-01 12:00:00", sync.cursor)
+            assertEquals(7L, sync.cursorId)
+        }
+
+    @Test
+    fun `a complete sweep still advances the cursor on a server with no keyset support`() =
+        runTest {
+            // Older servers return no nextCursor, so the highest stamp seen is
+            // the only cursor available — safe here because the sweep was
+            // complete, and paired with the one-second rewind on the next run.
+            dao.seed(listOf(entity(1, "One", category = "music", userId = OWNER)))
+            api.pagesByOffset[0] =
+                PaginatedMediaDto(
+                    items = listOf(mediaDto(1, "One", category = "music", userId = OWNER, updatedAt = "2026-06-01 09:00:00")),
+                    total = 1,
+                    limit = 200,
+                    offset = 0,
+                )
+
+            val result = repo.syncDelta(updatedSince = "2026-01-01 12:00:00", cursorId = null, lastSeenWipedAt = null)
+
+            val sync = (result as ApiResult.Success).value
+            assertEquals("2026-06-01 09:00:00", sync.cursor)
+            assertEquals(null, sync.cursorId)
+            // With no id half, the request rewinds a second to cover a server
+            // that filters strictly-greater on a second-resolution stamp.
+            assertEquals(listOf(null to null, "2026-01-01 11:59:59" to null), api.getMediaCursors)
+        }
+
+    @Test
+    fun `an unstrippable image is never uploaded`() =
+        runTest {
+            // ExifStrip can't decode anything on the JVM, which is the same
+            // outcome as a device codec that can't handle the image: the app
+            // promises metadata is stripped, so the bytes must not be sent.
+            val result = repo.uploadArtwork(1, byteArrayOf(1, 2, 3), "image/jpeg")
+
+            assertTrue(result is ApiResult.HttpError)
+            assertEquals(IMAGE_NOT_SANITISED_CODE, (result as ApiResult.HttpError).code)
         }
 
     private fun page(
@@ -424,13 +513,5 @@ private class NoopBinaryService : CrateBinaryService {
     override suspend fun deletePhoto(
         itemId: Long,
         slot: Int,
-    ) = error("not used")
-
-    override suspend fun export(
-        format: String,
-        scope: String,
-        category: String,
-        includeEnriched: Int,
-        includeMarket: Int,
     ) = error("not used")
 }

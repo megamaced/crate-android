@@ -76,6 +76,8 @@ interface AccountPrefs {
 data class UserPrefs(
     val currentUserId: String? = null,
     val lastSyncCursor: String? = null,
+    /** Id half of the delta cursor; null against a server that hands out none. */
+    val lastSyncCursorId: Long? = null,
     val lastSeenWipedAt: String? = null,
     val themeMode: ThemeMode = ThemeMode.System,
     val collectionViewMode: CollectionViewMode = CollectionViewMode.Card,
@@ -101,6 +103,7 @@ class UserPreferences
                 UserPrefs(
                     currentUserId = prefs[Keys.CURRENT_USER_ID],
                     lastSyncCursor = prefs[Keys.LAST_SYNC_CURSOR],
+                    lastSyncCursorId = prefs[Keys.LAST_SYNC_CURSOR_ID],
                     lastSeenWipedAt = prefs[Keys.LAST_SEEN_WIPED_AT],
                     themeMode = prefs[Keys.THEME_MODE]?.let(::parseThemeMode) ?: ThemeMode.System,
                     collectionViewMode =
@@ -136,8 +139,15 @@ class UserPreferences
             ds.edit { it[Keys.ONLINE_RECOMMENDATIONS] = enabled }
         }
 
-        suspend fun setLastSyncCursor(cursor: String?) {
-            ds.edit { it.write(Keys.LAST_SYNC_CURSOR, cursor) }
+        /** Written as one edit: half a cursor resumes from the wrong place. */
+        suspend fun setLastSyncCursor(
+            cursor: String?,
+            cursorId: Long? = null,
+        ) {
+            ds.edit {
+                it.write(Keys.LAST_SYNC_CURSOR, cursor)
+                it.write(Keys.LAST_SYNC_CURSOR_ID, cursorId)
+            }
         }
 
         suspend fun setLastSeenWipedAt(wipedAt: String?) {
@@ -174,6 +184,7 @@ class UserPreferences
             ds.edit { prefs ->
                 prefs.remove(Keys.CURRENT_USER_ID)
                 prefs.remove(Keys.LAST_SYNC_CURSOR)
+                prefs.remove(Keys.LAST_SYNC_CURSOR_ID)
                 prefs.remove(Keys.LAST_SEEN_WIPED_AT)
                 prefs.remove(Keys.HIDDEN_CATEGORIES)
                 prefs.remove(Keys.ONLINE_RECOMMENDATIONS)
@@ -215,6 +226,7 @@ class UserPreferences
                     repair = true
                     prefs[Keys.SYNC_REPAIR_VERSION] = CURRENT_SYNC_REPAIR_VERSION
                     prefs.remove(Keys.LAST_SYNC_CURSOR)
+                    prefs.remove(Keys.LAST_SYNC_CURSOR_ID)
                 }
             }
             return repair
@@ -235,6 +247,7 @@ class UserPreferences
         private object Keys {
             val CURRENT_USER_ID = stringPreferencesKey("current_user_id")
             val LAST_SYNC_CURSOR = stringPreferencesKey("last_sync_cursor")
+            val LAST_SYNC_CURSOR_ID = longPreferencesKey("last_sync_cursor_id")
             val LAST_SEEN_WIPED_AT = stringPreferencesKey("last_seen_wiped_at")
             val THEME_MODE = stringPreferencesKey("theme_mode")
             val COLLECTION_VIEW_MODE = stringPreferencesKey("collection_view_mode")

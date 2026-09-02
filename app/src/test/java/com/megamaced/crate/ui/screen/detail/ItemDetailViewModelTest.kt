@@ -140,8 +140,6 @@ private class FakeMediaRepository : MediaRepository {
         return ApiResult.Success(Unit)
     }
 
-    override suspend fun deleteAll(): ApiResult<Unit> = ApiResult.Success(Unit)
-
     override suspend fun uploadArtwork(
         id: Long,
         bytes: ByteArray,
@@ -164,9 +162,10 @@ private class FakeMediaRepository : MediaRepository {
 
     override suspend fun syncDelta(
         updatedSince: String?,
+        cursorId: Long?,
         lastSeenWipedAt: String?,
     ): ApiResult<MediaRepository.SyncResult> =
-        ApiResult.Success(MediaRepository.SyncResult(cursor = updatedSince, wipedAt = lastSeenWipedAt))
+        ApiResult.Success(MediaRepository.SyncResult(cursor = updatedSince, cursorId = cursorId, wipedAt = lastSeenWipedAt))
 
     override suspend fun wipeCollection(scopes: List<String>): ApiResult<Unit> = ApiResult.Success(Unit)
 }
@@ -268,8 +267,6 @@ private class FakeSettingsRepository : SettingsRepository {
     override suspend fun getMarketSettings() = ApiResult.Success(MarketSettings(false, "GBP"))
 
     override suspend fun setMarketSettings(settings: MarketSettings) = ApiResult.Success(Unit)
-
-    override suspend fun setCurrency(currency: String) = ApiResult.Success(currency)
 
     override suspend fun getCurrencies() = ApiResult.Success(listOf("GBP", "USD", "EUR"))
 

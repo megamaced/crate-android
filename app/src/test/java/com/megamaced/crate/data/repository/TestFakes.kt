@@ -56,7 +56,10 @@ class FakePlaylistDao : PlaylistDao {
 
     fun crossRefsFor(playlistId: Long): List<PlaylistItemCrossRef> = crossRefs.value.filter { it.playlistId == playlistId }
 
-    override fun observeAll(): Flow<List<PlaylistWithItems>> = playlists.map { rows -> rows.map { withItems(it) } }
+    override fun observeAll(ownerId: String?): Flow<List<PlaylistWithItems>> =
+        playlists.map { rows ->
+            rows.filter { ownerId == null || it.userId == null || it.userId == ownerId }.map { withItems(it) }
+        }
 
     override fun observeWithItems(id: Long): Flow<PlaylistWithItems?> =
         playlists.map { rows -> rows.firstOrNull { it.id == id }?.let(::withItems) }
@@ -80,6 +83,9 @@ class FakePlaylistDao : PlaylistDao {
     }
 
     override suspend fun allIds(): List<Long> = playlists.value.map { it.id }
+
+    override suspend fun idsOwnedBy(ownerId: String): List<Long> =
+        playlists.value.filter { it.userId == null || it.userId == ownerId }.map { it.id }
 
     override suspend fun deleteByIds(ids: List<Long>) {
         playlists.value = playlists.value.filterNot { it.id in ids }

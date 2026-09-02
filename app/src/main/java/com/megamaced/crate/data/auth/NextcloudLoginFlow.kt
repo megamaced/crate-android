@@ -64,16 +64,19 @@ class NextcloudLoginFlow
                 .build()
 
             return try {
-                val response = client.newCall(request).execute()
-                if (!response.isSuccessful) {
-                    return Result.failure(
-                        LoginFlowException(
-                            UiText.Res(R.string.login_error_server_returned, listOf(response.code)),
-                        ),
-                    )
-                }
-                val body = response.body?.string()
-                    ?: return Result.failure(LoginFlowException(UiText.Res(R.string.login_error_empty_response)))
+                // use{}: only a consumed body closes itself, so an unsuccessful
+                // response left unread holds its connection until the pool
+                // evicts it. The poll below repeats this up to 60 times.
+                val body = client.newCall(request).execute().use { response ->
+                    if (!response.isSuccessful) {
+                        return Result.failure(
+                            LoginFlowException(
+                                UiText.Res(R.string.login_error_server_returned, listOf(response.code)),
+                            ),
+                        )
+                    }
+                    response.body?.string()
+                } ?: return Result.failure(LoginFlowException(UiText.Res(R.string.login_error_empty_response)))
                 val initResponse = json.decodeFromString<LoginFlowInitResponse>(body)
                 // Both URLs come from the response body, so a hostile or
                 // compromised server could point them at an origin the user
@@ -128,33 +131,38 @@ class NextcloudLoginFlow
 
             repeat(MAX_POLL_ATTEMPTS) {
                 try {
-                    val response = client.newCall(request).execute()
-                    when (response.code) {
-                        200 -> {
-                            val responseBody = response.body?.string()
-                                ?: return LoginFlowStatus.Error(UiText.Res(R.string.login_error_empty_response))
-                            val result = json.decodeFromString<LoginFlowResult>(responseBody)
-                            // The app password is about to be bound to whatever
-                            // `server` says. Refuse an origin the user never
-                            // typed: otherwise a hostile server can point the
-                            // whole session — every later API call, with the
-                            // Basic header attached — somewhere else.
-                            if (!isSameOrigin(origin, result.server)) {
+                    // Every attempt is closed, including the 404 that means
+                    // "not authorised yet" — the normal case, and the one that
+                    // repeats. Leaking those exhausts connections and file
+                    // descriptors over a single login.
+                    client.newCall(request).execute().use { response ->
+                        when (response.code) {
+                            200 -> {
+                                val responseBody = response.body?.string()
+                                    ?: return LoginFlowStatus.Error(UiText.Res(R.string.login_error_empty_response))
+                                val result = json.decodeFromString<LoginFlowResult>(responseBody)
+                                // The app password is about to be bound to whatever
+                                // `server` says. Refuse an origin the user never
+                                // typed: otherwise a hostile server can point the
+                                // whole session — every later API call, with the
+                                // Basic header attached — somewhere else.
+                                if (!isSameOrigin(origin, result.server)) {
+                                    return LoginFlowStatus.Error(
+                                        UiText.Res(R.string.login_error_foreign_credentials),
+                                    )
+                                }
+                                return LoginFlowStatus.Success(result)
+                            }
+
+                            404 -> {
+                                // Not yet authorized, keep polling
+                            }
+
+                            else -> {
                                 return LoginFlowStatus.Error(
-                                    UiText.Res(R.string.login_error_foreign_credentials),
+                                    UiText.Res(R.string.login_error_server_returned, listOf(response.code)),
                                 )
                             }
-                            return LoginFlowStatus.Success(result)
-                        }
-
-                        404 -> {
-                            // Not yet authorized, keep polling
-                        }
-
-                        else -> {
-                            return LoginFlowStatus.Error(
-                                UiText.Res(R.string.login_error_server_returned, listOf(response.code)),
-                            )
                         }
                     }
                 } catch (e: Exception) {

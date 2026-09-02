@@ -482,8 +482,6 @@ private class RecordingMediaRepository : MediaRepository {
 
     override suspend fun delete(id: Long): ApiResult<Unit> = ApiResult.Success(Unit)
 
-    override suspend fun deleteAll(): ApiResult<Unit> = ApiResult.Success(Unit)
-
     override suspend fun wipeCollection(scopes: List<String>): ApiResult<Unit> = ApiResult.Success(Unit)
 
     override suspend fun uploadArtwork(
@@ -511,9 +509,10 @@ private class RecordingMediaRepository : MediaRepository {
 
     override suspend fun syncDelta(
         updatedSince: String?,
+        cursorId: Long?,
         lastSeenWipedAt: String?,
     ): ApiResult<MediaRepository.SyncResult> =
-        ApiResult.Success(MediaRepository.SyncResult(cursor = updatedSince, wipedAt = lastSeenWipedAt))
+        ApiResult.Success(MediaRepository.SyncResult(cursor = updatedSince, cursorId = cursorId, wipedAt = lastSeenWipedAt))
 }
 
 private class StubEnrichmentRepository : EnrichmentRepository {
@@ -572,8 +571,6 @@ private class StubSettingsRepository : SettingsRepository {
     override suspend fun getMarketSettings() = ApiResult.Success(MarketSettings(false, "GBP"))
 
     override suspend fun setMarketSettings(settings: MarketSettings) = error("not used")
-
-    override suspend fun setCurrency(currency: String) = error("not used")
 
     override suspend fun getCurrencies() = error("not used")
 

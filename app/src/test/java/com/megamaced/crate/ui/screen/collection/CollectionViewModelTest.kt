@@ -374,11 +374,6 @@ private class FakeMediaRepository : MediaRepository {
         return ApiResult.Success(Unit)
     }
 
-    override suspend fun deleteAll(): ApiResult<Unit> {
-        items.value = emptyList()
-        return ApiResult.Success(Unit)
-    }
-
     override suspend fun uploadArtwork(
         id: Long,
         bytes: ByteArray,
@@ -401,9 +396,10 @@ private class FakeMediaRepository : MediaRepository {
 
     override suspend fun syncDelta(
         updatedSince: String?,
+        cursorId: Long?,
         lastSeenWipedAt: String?,
     ): ApiResult<MediaRepository.SyncResult> =
-        ApiResult.Success(MediaRepository.SyncResult(cursor = updatedSince, wipedAt = lastSeenWipedAt))
+        ApiResult.Success(MediaRepository.SyncResult(cursor = updatedSince, cursorId = cursorId, wipedAt = lastSeenWipedAt))
 
     override suspend fun wipeCollection(scopes: List<String>): ApiResult<Unit> = ApiResult.Success(Unit)
 }
@@ -503,8 +499,6 @@ private class StubSettingsRepository : com.megamaced.crate.domain.repository.Set
     override suspend fun getMarketSettings() = error("not used")
 
     override suspend fun setMarketSettings(settings: com.megamaced.crate.domain.model.MarketSettings) = error("not used")
-
-    override suspend fun setCurrency(currency: String) = error("not used")
 
     override suspend fun getCurrencies() = error("not used")
 }

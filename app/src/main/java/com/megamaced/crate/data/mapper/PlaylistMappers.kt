@@ -44,14 +44,3 @@ fun PlaylistWithItems.toDomain(codec: MediaItemJsonCodec): Playlist {
         updatedAt = playlist.updatedAt,
     )
 }
-
-fun PlaylistEntity.toDomain(): Playlist =
-    Playlist(
-        id = id,
-        name = name,
-        userId = userId,
-        items = emptyList(),
-        itemCount = itemCount,
-        createdAt = createdAt,
-        updatedAt = updatedAt,
-    )

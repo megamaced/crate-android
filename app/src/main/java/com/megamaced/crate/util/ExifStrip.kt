@@ -30,12 +30,14 @@ import java.io.ByteArrayOutputStream
  * Decoding is downsampled to [MAX_DIMENSION] on the longest edge so a large
  * camera image (12MP+ → ~48 MB as ARGB_8888) can't OOM the process.
  *
- * On any failure the original bytes are returned: we'd rather upload an intact
- * image with metadata than fail the upload outright. That trade-off is
- * reported rather than silent — the fallback is logged, and [Stripped.stripped]
- * is false so a caller can tell an upload that still carries GPS from one that
- * doesn't.
+ * Stripping fails closed. When the platform can't decode or re-encode the
+ * image there is no way to remove its metadata, and the app tells users —
+ * in the README and in the store listing — that EXIF/GPS is stripped before
+ * anything leaves the device. Returning the original bytes would quietly break
+ * that promise on exactly the images most likely to carry GPS, so [strip]
+ * returns null instead and the caller refuses the upload.
  */
+
 object ExifStrip {
     /**
      * Result of a strip. [mimeType] is the type of [bytes] as they now stand,
@@ -46,28 +48,18 @@ object ExifStrip {
     data class Stripped(
         val bytes: ByteArray,
         val mimeType: String,
-        /**
-         * True when [bytes] are a fresh re-encode and therefore carry no
-         * EXIF/IPTC/XMP. False when the platform couldn't decode the image and
-         * these are the untouched original bytes — whatever GPS, timestamps and
-         * camera serials the source held are still in them.
-         */
-        val stripped: Boolean = true,
     ) {
         // ByteArray uses identity equals/hashCode, so the generated data-class
         // implementations would be misleading. Compare contents instead.
         override fun equals(other: Any?): Boolean {
             if (this === other) return true
             if (other !is Stripped) return false
-            return mimeType == other.mimeType &&
-                stripped == other.stripped &&
-                bytes.contentEquals(other.bytes)
+            return mimeType == other.mimeType && bytes.contentEquals(other.bytes)
         }
 
         override fun hashCode(): Int {
-            var result = bytes.contentHashCode()
-            result = 31 * result + mimeType.hashCode()
-            return 31 * result + stripped.hashCode()
+            val result = bytes.contentHashCode()
+            return 31 * result + mimeType.hashCode()
         }
     }
 
@@ -77,10 +69,14 @@ object ExifStrip {
      */
     private const val MAX_DIMENSION = 2048
 
+    /**
+     * Re-encoded, metadata-free bytes — or null when the platform could not
+     * strip this image, in which case it must not be uploaded.
+     */
     fun strip(
         bytes: ByteArray,
         mimeType: String,
-    ): Stripped {
+    ): Stripped? {
         // PNG stays PNG (lossless, may carry transparency); everything else —
         // JPEG, HEIC/HEIF, WebP, and unknown/`image/*` — is normalised to JPEG.
         val isPng = mimeType == "image/png"
@@ -93,9 +89,9 @@ object ExifStrip {
             val boundsOpts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
             BitmapFactory.decodeByteArray(bytes, 0, bytes.size, boundsOpts)
             if (boundsOpts.outWidth <= 0 || boundsOpts.outHeight <= 0) {
-                // Not a decodable raster (or an unsupported codec). Fall back
-                // to the original bytes rather than fail the upload.
-                return unstripped(bytes, mimeType, "no decodable image bounds")
+                // Not a decodable raster, or a codec this device lacks. Nothing
+                // can be stripped from bytes that can't be decoded.
+                return failed(mimeType, "no decodable image bounds")
             }
 
             val decodeOpts =
@@ -103,7 +99,7 @@ object ExifStrip {
                     inSampleSize = sampleSize(boundsOpts.outWidth, boundsOpts.outHeight, MAX_DIMENSION)
                 }
             val decoded = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, decodeOpts)
-                ?: return unstripped(bytes, mimeType, "the platform decoder returned no bitmap")
+                ?: return failed(mimeType, "the platform decoder returned no bitmap")
 
             // 2. Bake in the source orientation (the tag is lost on re-encode).
             val oriented = applyOrientation(decoded, readOrientation(bytes))
@@ -116,33 +112,24 @@ object ExifStrip {
             if (ok) {
                 Stripped(out.toByteArray(), outMime)
             } else {
-                unstripped(bytes, mimeType, "re-encoding to $outMime failed")
+                failed(mimeType, "re-encoding to $outMime failed")
             }
         } catch (t: Throwable) {
-            unstripped(bytes, mimeType, "the strip threw", t)
+            failed(mimeType, "the strip threw", t)
         }
     }
 
     /**
-     * The original bytes, returned as they arrived and still carrying their
-     * metadata. Logged at warn because the user is told uploads are stripped:
-     * a silent fallback leaves them believing their location was removed when
-     * it wasn't.
+     * No usable output. Logged at warn with the reason, because the upload the
+     * caller is about to refuse looks to the user like an unexplained failure.
      */
-    private fun unstripped(
-        bytes: ByteArray,
+    private fun failed(
         mimeType: String,
         reason: String,
         cause: Throwable? = null,
-    ): Stripped {
-        Timber.w(
-            cause,
-            "EXIF NOT stripped from %s (%s) — uploading the original %d bytes, GPS and timestamps intact",
-            mimeType,
-            reason,
-            bytes.size,
-        )
-        return Stripped(bytes, mimeType, stripped = false)
+    ): Stripped? {
+        Timber.w(cause, "Refusing to upload %s: EXIF could not be stripped (%s)", mimeType, reason)
+        return null
     }
 
     /** Power-of-two subsample so the longest edge lands at or below [maxDim]. */
@@ -217,3 +204,10 @@ object ExifStrip {
         return Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
     }
 }
+
+/**
+ * Raised by an upload path when [ExifStrip.strip] could not sanitise the image.
+ * Carried as a distinct failure so the user is told the upload was refused to
+ * protect their location data, rather than shown a generic server error.
+ */
+class ExifStripFailedException : Exception("Image metadata could not be stripped")

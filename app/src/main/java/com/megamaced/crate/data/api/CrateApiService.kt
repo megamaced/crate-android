@@ -141,6 +141,10 @@ interface CrateApiService {
         @Query("status") status: String? = null,
         @Query("category") category: String? = null,
         @Query("updatedSince") updatedSince: String? = null,
+        // Only meaningful alongside updatedSince, and only as the id of a row
+        // already seen: together they are the keyset cursor. Servers that
+        // predate it ignore the parameter and fall back to timestamp filtering.
+        @Query("updatedSinceId") updatedSinceId: Long? = null,
         @Query("limit") limit: Int = 50,
         @Query("offset") offset: Int = 0,
         @Query("paginated") paginated: Boolean = true,

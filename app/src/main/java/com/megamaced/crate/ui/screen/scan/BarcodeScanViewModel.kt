@@ -12,6 +12,8 @@ import com.megamaced.crate.data.api.dto.OpenLibraryResultDto
 import com.megamaced.crate.data.api.toUiText
 import com.megamaced.crate.domain.model.Category
 import com.megamaced.crate.ui.screen.addedit.ExternalSearchResult
+import com.megamaced.crate.ui.screen.addedit.toResult
+import com.megamaced.crate.ui.screen.addedit.toResultOrNull
 import com.megamaced.crate.util.UiText
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
@@ -85,7 +87,7 @@ class BarcodeScanViewModel
             val result =
                 apiCall {
                     when (category) {
-                        Category.Books -> listOfNotNull(api.openLibraryIsbn(barcode).toResult())
+                        Category.Books -> listOfNotNull(api.openLibraryIsbn(barcode).toResultOrNull())
                         Category.Music, null -> api.discogsBarcode(barcode).map(DiscogsSearchResultDto::toResult)
                         else -> api.discogsBarcode(barcode).map(DiscogsSearchResultDto::toResult)
                     }
@@ -118,31 +120,4 @@ class BarcodeScanViewModel
                 }
             }
         }
-    }
-
-private fun DiscogsSearchResultDto.toResult(): ExternalSearchResult =
-    ExternalSearchResult(
-        title = title.orEmpty(),
-        artist = artist,
-        format = format,
-        year = year,
-        barcode = barcode,
-        label = label,
-        country = country,
-        discogsId = discogsId,
-        coverUrl = thumb,
-    )
-
-private fun OpenLibraryResultDto.toResult(): ExternalSearchResult? =
-    if (title.isBlank()) {
-        null
-    } else {
-        ExternalSearchResult(
-            title = title,
-            artist = artist,
-            year = year,
-            barcode = barcode,
-            label = label,
-            coverUrl = artworkUrl ?: thumb,
-        )
     }

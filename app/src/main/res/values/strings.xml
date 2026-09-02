@@ -8,6 +8,7 @@
     <string name="error_server">Server error (%1$d).</string>
     <string name="error_unexpected_response">Unexpected response from server.</string>
     <string name="error_provider_token_missing">Provider token missing. Add it in Settings.</string>
+    <string name="error_image_not_sanitised">That image wasn\'t uploaded: its location data couldn\'t be removed on this device.</string>
 
     <!-- Actions and icon labels reused across screens -->
     <string name="action_add_item">Add item</string>
@@ -222,6 +223,7 @@
     <string name="additional_photos_section">Additional photos</string>
     <string name="photo_slot_label">Slot %1$d</string>
     <string name="photo_upload_failed">Couldn’t upload photo</string>
+    <string name="artwork_upload_failed">Couldn’t upload artwork</string>
 
     <!-- Add / edit form -->
     <string name="add_edit_title_add">Add %1$s</string>
@@ -246,6 +248,7 @@
     <string name="add_edit_format_select">Select…</string>
     <string name="add_edit_image_too_large">That image is too large — pick one under 25 MB.</string>
     <string name="add_edit_isbn_not_found">ISBN not found in Open Library</string>
+    <string name="settings_bulk_partial_failure">Finished with %1$d of %2$d not updated.</string>
     <string name="format_unrecognised">Not a standard %1$s — pick one from the list.</string>
 
     <!-- Headings in the format picker. The format values under them are what the

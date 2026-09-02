@@ -40,8 +40,6 @@ interface SettingsRepository {
 
     suspend fun setMarketSettings(settings: MarketSettings): ApiResult<Unit>
 
-    suspend fun setCurrency(currency: String): ApiResult<String>
-
     suspend fun getCurrencies(): ApiResult<List<String>>
 
     /** Locally-cached hidden categories — observed by navigation, home, and search. */

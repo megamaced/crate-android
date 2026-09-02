@@ -36,8 +36,6 @@ interface MediaRepository {
 
     suspend fun delete(id: Long): ApiResult<Unit>
 
-    suspend fun deleteAll(): ApiResult<Unit>
-
     suspend fun wipeCollection(scopes: List<String>): ApiResult<Unit>
 
     suspend fun uploadArtwork(
@@ -67,7 +65,8 @@ interface MediaRepository {
 
     /**
      * Pages through `GET /api/v1/media?updatedSince={cursor}` writing every
-     * row into Room.
+     * row into Room. [cursorId] is the id half of the stored cursor, if the
+     * last sweep was given one; together the pair is an exact resume point.
      *
      * If the server reports a `wipedAt` newer than [lastSeenWipedAt], the
      * local DB is wiped before paging so deletions that delta sync can't
@@ -77,6 +76,7 @@ interface MediaRepository {
      */
     suspend fun syncDelta(
         updatedSince: String?,
+        cursorId: Long?,
         lastSeenWipedAt: String?,
     ): ApiResult<SyncResult>
 
@@ -97,6 +97,12 @@ interface MediaRepository {
 
     data class SyncResult(
         val cursor: String?,
+        /**
+         * The id half of the delta cursor, when the server supplied one. Stored
+         * beside [cursor] and sent back with it so the next delta resumes on the
+         * exact row this sweep stopped at rather than on a second boundary.
+         */
+        val cursorId: Long?,
         val wipedAt: String?,
     )
 }

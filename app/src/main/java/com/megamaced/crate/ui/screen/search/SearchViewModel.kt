@@ -17,6 +17,7 @@ import com.megamaced.crate.domain.model.MediaItem
 import com.megamaced.crate.domain.repository.MediaRepository
 import com.megamaced.crate.domain.repository.SettingsRepository
 import com.megamaced.crate.ui.screen.addedit.ExternalSearchResult
+import com.megamaced.crate.ui.screen.addedit.toResult
 import com.megamaced.crate.util.UiText
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -210,45 +211,3 @@ private fun MediaItem.matches(query: String): Boolean {
         label.orEmpty().lowercase().contains(q) ||
         notes.orEmpty().lowercase().contains(q)
 }
-
-private fun DiscogsSearchResultDto.toResult(): ExternalSearchResult =
-    ExternalSearchResult(
-        title = title.orEmpty(),
-        artist = artist,
-        format = format,
-        year = year,
-        barcode = barcode,
-        label = label,
-        country = country,
-        discogsId = discogsId,
-    )
-
-private fun TmdbSearchResultDto.toResult(): ExternalSearchResult =
-    ExternalSearchResult(
-        title = title,
-        year = year,
-    )
-
-private fun OpenLibraryResultDto.toResult(): ExternalSearchResult =
-    ExternalSearchResult(
-        title = title,
-        artist = artist,
-        year = year,
-        barcode = barcode,
-        label = label,
-    )
-
-private fun RawgSearchResultDto.toResult(): ExternalSearchResult =
-    ExternalSearchResult(
-        title = title,
-        year = year,
-        subtitle = genres,
-    )
-
-private fun ComicVineSearchResultDto.toResult(): ExternalSearchResult =
-    ExternalSearchResult(
-        title = title,
-        year = year,
-        label = label,
-        subtitle = genres,
-    )

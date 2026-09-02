@@ -13,9 +13,19 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface PlaylistDao {
+    // "My Playlists" is the signed-in user's own list. Opening a playlist
+    // shared with you caches the owner's row in this same table, so without the
+    // predicate it joins your own list and stays there offline. Same fail-open
+    // null case as MediaItemDao: an unknown current user filters nothing.
     @Transaction
-    @Query("SELECT * FROM playlists ORDER BY updatedAt DESC")
-    fun observeAll(): Flow<List<PlaylistWithItems>>
+    @Query(
+        """
+        SELECT * FROM playlists
+        WHERE (:ownerId IS NULL OR userId IS NULL OR userId = :ownerId)
+        ORDER BY updatedAt DESC
+        """,
+    )
+    fun observeAll(ownerId: String?): Flow<List<PlaylistWithItems>>
 
     @Transaction
     @Query("SELECT * FROM playlists WHERE id = :id")
@@ -38,6 +48,9 @@ interface PlaylistDao {
     @Query("DELETE FROM playlists")
     suspend fun deleteAll()
 
+    @Query("SELECT id FROM playlists WHERE userId IS NULL OR userId = :ownerId")
+    suspend fun idsOwnedBy(ownerId: String): List<Long>
+
     @Query("SELECT id FROM playlists")
     suspend fun allIds(): List<Long>
 
@@ -51,12 +64,22 @@ interface PlaylistDao {
      * web simply stops being listed — so it would linger on the phone forever,
      * un-openable and un-deletable. One transaction so a list refresh is never
      * observed half-applied.
+     *
+     * [ownerId] scopes what may be deleted. The listing enumerates the user's
+     * own playlists, so it says nothing about a playlist shared with them —
+     * pruning those would drop the cache the shared views read. A null owner
+     * (no `/me` yet) means nothing can be classified, so nothing is pruned.
      */
     @Transaction
-    suspend fun replaceAll(playlists: List<PlaylistEntity>) {
-        val serverIds = playlists.mapTo(mutableSetOf()) { it.id }
-        val stale = allIds().filterNot { it in serverIds }
-        if (stale.isNotEmpty()) deleteByIds(stale)
+    suspend fun replaceAll(
+        playlists: List<PlaylistEntity>,
+        ownerId: String?,
+    ) {
+        if (ownerId != null) {
+            val serverIds = playlists.mapTo(mutableSetOf()) { it.id }
+            val stale = idsOwnedBy(ownerId).filterNot { it in serverIds }
+            if (stale.isNotEmpty()) deleteByIds(stale)
+        }
         upsertAll(playlists)
     }
 

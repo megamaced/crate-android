@@ -11,9 +11,12 @@ import com.megamaced.crate.data.db.dao.PlaylistDao
 import com.megamaced.crate.data.mapper.MediaItemJsonCodec
 import com.megamaced.crate.data.mapper.toDomain
 import com.megamaced.crate.data.mapper.toEntity
+import com.megamaced.crate.data.prefs.AccountPrefs
 import com.megamaced.crate.domain.model.Playlist
 import com.megamaced.crate.domain.repository.PlaylistRepository
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -25,9 +28,16 @@ class PlaylistRepositoryImpl
         private val api: CrateApiService,
         private val dao: PlaylistDao,
         private val mediaItemDao: MediaItemDao,
+        private val accountPrefs: AccountPrefs,
         private val codec: MediaItemJsonCodec,
     ) : PlaylistRepository {
-        override fun observeAll(): Flow<List<Playlist>> = dao.observeAll().map { rows -> rows.map { it.toDomain(codec) } }
+        // Scoped to the signed-in user: opening a shared playlist caches the
+        // owner's row in the same table, and that row is not one of yours.
+        @OptIn(ExperimentalCoroutinesApi::class)
+        override fun observeAll(): Flow<List<Playlist>> =
+            accountPrefs.currentUserIdFlow.flatMapLatest { ownerId ->
+                dao.observeAll(ownerId).map { rows -> rows.map { it.toDomain(codec) } }
+            }
 
         override fun observe(id: Long): Flow<Playlist?> = dao.observeWithItems(id).map { row -> row?.toDomain(codec) }
 
@@ -37,7 +47,7 @@ class PlaylistRepositoryImpl
                 // Reconcile rather than upsert: this response is the whole
                 // truth about which playlists exist, so anything local and
                 // absent from it was deleted elsewhere.
-                dao.replaceAll(playlists.map { it.toEntity() })
+                dao.replaceAll(playlists.map { it.toEntity() }, accountPrefs.currentUserId())
                 playlists.forEach { playlist ->
                     playlist.items?.let { items ->
                         mediaItemDao.upsertAll(items.map { it.toEntity(codec) })

@@ -1,6 +1,7 @@
 package com.megamaced.crate.data.api
 
 import com.megamaced.crate.R
+import com.megamaced.crate.util.ExifStripFailedException
 import com.megamaced.crate.util.UiText
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.SerializationException
@@ -27,6 +28,13 @@ const val PARSE_FAILURE_CODE = -1
  * anonymous failure.
  */
 const val MALFORMED_RESPONSE_CODE = -2
+
+/**
+ * [ApiResult.HttpError.code] for an image the device could not strip metadata
+ * from, which is therefore never sent. Unlike the codes above this is a
+ * deliberate refusal, not a failure, so it is worded as one and never retried.
+ */
+const val IMAGE_NOT_SANITISED_CODE = -3
 
 /** Every [ApiResult.HttpError.code] that never reached the HTTP layer. */
 val NON_HTTP_FAILURE_CODES = setOf(PARSE_FAILURE_CODE, MALFORMED_RESPONSE_CODE)
@@ -69,6 +77,7 @@ fun ApiResult.HttpError.toUiText(): UiText =
     when {
         message != null -> UiText.Raw(message)
         code == MALFORMED_RESPONSE_CODE -> UiText.Res(R.string.error_unexpected_response)
+        code == IMAGE_NOT_SANITISED_CODE -> UiText.Res(R.string.error_image_not_sanitised)
         else -> UiText.Res(R.string.error_server, listOf(code))
     }
 
@@ -104,6 +113,12 @@ suspend inline fun <T> apiCall(crossinline block: suspend () -> T): ApiResult<T>
     } catch (e: IOException) {
         Timber.w(e, "Network error")
         ApiResult.NetworkError
+    } catch (e: ExifStripFailedException) {
+        // The image never left the device: stripping its metadata failed, and
+        // uploading it anyway would break the guarantee the app makes about
+        // location data.
+        Timber.w(e, "Upload refused: image could not be sanitised")
+        ApiResult.HttpError(IMAGE_NOT_SANITISED_CODE, null)
     } catch (e: CancellationException) {
         // Never swallow structured-concurrency cancellation: let it propagate
         // so a cancelled viewModelScope job actually stops instead of falling

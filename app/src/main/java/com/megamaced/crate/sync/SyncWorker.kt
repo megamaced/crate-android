@@ -48,19 +48,32 @@ class SyncWorker
             // re-reads the whole collection and back-fills rows an earlier,
             // lossy pagination pass never delivered.
             val cursor = if (repair) null else prefs.lastSyncCursor
+            val cursorId = if (repair) null else prefs.lastSyncCursorId
             if (repair) Timber.i("Sync repair: forcing full resync to back-fill missing rows")
             val seenWipedAt = prefs.lastSeenWipedAt
-            return when (val result = mediaRepository.syncDelta(cursor, seenWipedAt)) {
+            return when (val result = mediaRepository.syncDelta(cursor, cursorId, seenWipedAt)) {
                 is ApiResult.Success -> {
                     val newCursor = result.value.cursor
+                    val newCursorId = result.value.cursorId
                     val newWipedAt = result.value.wipedAt
-                    if (newCursor != null && newCursor != cursor) {
-                        userPreferences.setLastSyncCursor(newCursor)
+                    // Both halves move together, and an unchanged cursor — which
+                    // is what an incomplete sweep deliberately returns — writes
+                    // nothing.
+                    if (newCursor != null && (newCursor != cursor || newCursorId != cursorId)) {
+                        userPreferences.setLastSyncCursor(newCursor, newCursorId)
                     }
                     if (newWipedAt != seenWipedAt) {
                         userPreferences.setLastSeenWipedAt(newWipedAt)
                     }
-                    Timber.d("Sync ok (cursor %s -> %s, wipedAt %s -> %s)", cursor, newCursor, seenWipedAt, newWipedAt)
+                    Timber.d(
+                        "Sync ok (cursor %s/%s -> %s/%s, wipedAt %s -> %s)",
+                        cursor,
+                        cursorId,
+                        newCursor,
+                        newCursorId,
+                        seenWipedAt,
+                        newWipedAt,
+                    )
                     Result.success()
                 }
 

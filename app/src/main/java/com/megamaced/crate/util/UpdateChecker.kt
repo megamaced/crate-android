@@ -62,24 +62,32 @@ class UpdateChecker
 
             val tag = release.tagName
             val state = userPreferences.getUpdateState()
-            if (tag != state.lastNotifiedVersion) {
-                postNotification(tag, release.htmlUrl)
+            // Only a notification that actually reached the shade counts as
+            // notified. On Android 13+ posting is a no-op without the runtime
+            // permission — which this app never asks for — so recording it
+            // regardless meant that if the user later granted notifications,
+            // this release would never be announced.
+            if (tag != state.lastNotifiedVersion && postNotification(tag, release.htmlUrl)) {
                 userPreferences.setUpdateLastNotifiedVersion(tag)
             }
             return Result.UpdateAvailable(tag, release.htmlUrl)
         }
 
+        /** True when the notification was posted; false when it could not be. */
         private fun postNotification(
             tag: String,
             htmlUrl: String,
-        ) {
+        ): Boolean {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 val granted =
                     ContextCompat.checkSelfPermission(
                         context,
                         Manifest.permission.POST_NOTIFICATIONS,
                     ) == PackageManager.PERMISSION_GRANTED
-                if (!granted) return
+                if (!granted) {
+                    Timber.tag(TAG).d("Update notification skipped: no POST_NOTIFICATIONS permission")
+                    return false
+                }
             }
 
             val manager = NotificationManagerCompat.from(context)
@@ -112,7 +120,11 @@ class UpdateChecker
                     .setPriority(NotificationCompat.PRIORITY_DEFAULT)
                     .build()
 
-            manager.notify(NOTIFICATION_ID, notification)
+            // The permission can be revoked between the check above and here,
+            // and some OEM builds throw regardless; either way it wasn't posted.
+            return runCatching { manager.notify(NOTIFICATION_ID, notification) }
+                .onFailure { Timber.tag(TAG).w(it, "Update notification could not be posted") }
+                .isSuccess
         }
 
         private fun ensureChannel() {

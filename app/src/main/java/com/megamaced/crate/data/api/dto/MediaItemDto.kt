@@ -125,6 +125,23 @@ data class PaginatedMediaDto(
     val limit: Int,
     val offset: Int,
     val wipedAt: String? = null,
+    /**
+     * Resume point for the next delta page: the `(updated_at, id)` of this
+     * page's last row. Sent back verbatim, it resumes exactly where this page
+     * stopped, which neither an offset nor a timestamp derived from the rows
+     * can do — `updated_at` is second-resolution, so a timestamp alone cannot
+     * separate two rows edited in the same second, and an offset shifts under
+     * any concurrent edit. Absent on a full sweep, on an empty delta page, and
+     * from servers older than the keyset cursor.
+     */
+    val nextCursor: MediaCursorDto? = null,
+)
+
+/** The `(updatedSince, updatedSinceId)` pair the server hands back and takes. */
+@Serializable
+data class MediaCursorDto(
+    val updatedSince: String,
+    val updatedSinceId: Long,
 )
 
 @Serializable
