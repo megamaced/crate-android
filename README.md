@@ -36,7 +36,7 @@ There's a manual **Check for updates** button under *Settings → About* that po
 - **Barcode scanning** — scan barcodes with the camera (ZXing, no Google Play Services)
 - **External metadata search** — Discogs (music), TMDB (films), Open Library (books), RAWG (games), ComicVine (comics)
 - **Artwork** — pick artwork from your device or pull it from external search results
-- **User photo slots** — two extra photos per item alongside the artwork (receipts, sleevenotes, disc shots). EXIF/GPS metadata is stripped client-side before upload
+- **User photo slots** — two extra photos per item alongside the artwork (receipts, sleevenotes, disc shots). EXIF/GPS metadata is stripped client-side before upload; an image this device cannot strip is refused rather than sent
 - **Original price tracking** — record what you originally paid and see gain/loss against the current market value on each item
 - **Playlists** — create, edit, and delete playlists; add/remove items
 - **Search** — search your own collection or external sources

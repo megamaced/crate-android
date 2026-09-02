@@ -1,0 +1,11 @@
+Reliability and privacy fixes from two audit passes.
+
+- Items shared with you no longer appear in your own
+  collection, search or home feed.
+- Wiping one category no longer empties the whole app until
+  the next sync, and playlists keep the server's order.
+- Sync no longer skips an item edited in the same second as
+  another, or strands rows behind a partial sweep.
+- A photo whose location data cannot be stripped is refused
+  rather than uploaded.
+- Failed artwork uploads are reported, not silent.
