@@ -1,5 +1,6 @@
 package com.megamaced.crate.di
 
+import com.megamaced.crate.data.prefs.AccountPrefs
 import com.megamaced.crate.data.prefs.CollectionPrefs
 import com.megamaced.crate.data.prefs.UserPreferences
 import dagger.Binds
@@ -14,4 +15,8 @@ abstract class PrefsModule {
     @Binds
     @Singleton
     abstract fun bindCollectionPrefs(impl: UserPreferences): CollectionPrefs
+
+    @Binds
+    @Singleton
+    abstract fun bindAccountPrefs(impl: UserPreferences): AccountPrefs
 }

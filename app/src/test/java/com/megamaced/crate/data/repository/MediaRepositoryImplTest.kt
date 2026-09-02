@@ -5,15 +5,13 @@ import com.megamaced.crate.data.api.ApiResult
 import com.megamaced.crate.data.api.CrateBinaryService
 import com.megamaced.crate.data.api.dto.MediaItemDto
 import com.megamaced.crate.data.api.dto.PaginatedMediaDto
-import com.megamaced.crate.data.db.dao.MediaItemDao
 import com.megamaced.crate.data.db.entity.MediaItemEntity
+import com.megamaced.crate.data.db.entity.PlaylistEntity
 import com.megamaced.crate.data.mapper.MediaItemJsonCodec
 import com.megamaced.crate.domain.model.Category
 import com.megamaced.crate.domain.model.MediaItemDraft
 import com.megamaced.crate.domain.model.Status
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.map
+import com.megamaced.crate.domain.repository.MediaRepository
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
@@ -25,7 +23,15 @@ class MediaRepositoryImplTest {
     private val dao = FakeMediaItemDao()
     private val api = FakeCrateApiService()
     private val binary = NoopBinaryService()
-    private val repo = MediaRepositoryImpl(api, binary, dao, codec)
+    private val playlistDao = FakePlaylistDao()
+    private val accountPrefs = FakeAccountPrefs()
+    private val repo = MediaRepositoryImpl(api, binary, dao, playlistDao, accountPrefs, codec)
+
+    init {
+        // Every sync asks the server who it is talking to; the fake would
+        // otherwise throw the way any unstubbed endpoint does.
+        api.nextMe = meDto(OWNER)
+    }
 
     @Test
     fun `refresh writes API page into DAO and surfaces total`() =
@@ -232,6 +238,116 @@ class MediaRepositoryImplTest {
             assertEquals(listOf(1L), dao.snapshot().map { it.id })
         }
 
+    @Test
+    fun `the collection leaves out items owned by someone else`() =
+        runTest {
+            // Opening a shared item caches the owner's row in the same table.
+            // It is not part of this user's collection and must not show up in
+            // Collection, Search or the offline Home feed.
+            accountPrefs.setCurrentUserId(OWNER)
+            dao.seed(
+                listOf(
+                    entity(1, "Mine", category = "music", userId = OWNER),
+                    entity(2, "Pre-userId row", category = "music"),
+                    entity(99, "Shared with me", category = "music", userId = "someone@else"),
+                ),
+            )
+
+            repo.observeAll().test {
+                assertEquals(listOf(1L, 2L), awaitItem().map { it.id }.sorted())
+                cancelAndIgnoreRemainingEvents()
+            }
+            repo.observeByCategory(Category.Music).test {
+                assertEquals(listOf(1L, 2L), awaitItem().map { it.id }.sorted())
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `an unknown current user leaves the collection unfiltered`() =
+        runTest {
+            // Before /me has ever been read, filtering on an unknown id would
+            // hide the entire collection — so the predicate has to fail open.
+            dao.seed(listOf(entity(1, "Mine", category = "music", userId = OWNER)))
+
+            repo.observeAll().test {
+                assertEquals(1, awaitItem().size)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `a scoped wipe clears only the selected categories`() =
+        runTest {
+            dao.seed(
+                listOf(
+                    entity(1, "A game", category = "game", userId = OWNER),
+                    entity(2, "An album", category = "music", userId = OWNER),
+                    entity(3, "A film", category = "film", userId = OWNER),
+                ),
+            )
+
+            val result = repo.wipeCollection(listOf("game"))
+
+            assertTrue(result is ApiResult.Success)
+            assertEquals(listOf("game"), api.wipeScopes)
+            // The server deleted only the games, so the phone must match it —
+            // clearing everything left the collection empty until the next sync.
+            assertEquals(listOf(2L, 3L), dao.snapshot().map { it.id }.sorted())
+        }
+
+    @Test
+    fun `wiping the playlists scope clears playlists but keeps the items`() =
+        runTest {
+            dao.seed(listOf(entity(1, "An album", category = "music", userId = OWNER)))
+            playlistDao.seedPlaylists(listOf(PlaylistEntity(id = 5, name = "Sunday")))
+
+            repo.wipeCollection(listOf(MediaRepository.PLAYLISTS_SCOPE))
+
+            assertEquals(emptyList<Long>(), playlistDao.snapshot().map { it.id })
+            assertEquals(listOf(1L), dao.snapshot().map { it.id })
+        }
+
+    @Test
+    fun `deleting the last server item prunes the local row`() =
+        runTest {
+            // total = 0 means the probe returns no row to infer an owner from,
+            // which used to skip the count check and both pruning guards — so
+            // the last item deleted on the web lingered on the phone for good.
+            dao.seed(listOf(entity(1, "The last one", category = "music", userId = OWNER)))
+            api.nextPage = PaginatedMediaDto(items = emptyList(), total = 0, limit = 1, offset = 0)
+
+            val result = repo.syncDelta(updatedSince = null, lastSeenWipedAt = null)
+
+            assertTrue(result is ApiResult.Success)
+            assertEquals(emptyList<Long>(), dao.snapshot().map { it.id })
+        }
+
+    @Test
+    fun `a delta re-requests the second before the cursor without rewinding it`() =
+        runTest {
+            // Server stamps are second-resolution and the filter is strictly
+            // greater, so an item written in the same second as one already
+            // fetched — but after that page's query ran — is never returned
+            // again. The one-second overlap re-delivers it.
+            dao.seed(listOf(entity(1, "One", category = "music", userId = OWNER)))
+            api.nextPage =
+                PaginatedMediaDto(
+                    items = listOf(mediaDto(1, "One", category = "music", userId = OWNER, updatedAt = "2026-01-01 12:00:05")),
+                    total = 1,
+                    limit = 200,
+                    offset = 0,
+                )
+
+            val result = repo.syncDelta(updatedSince = "2026-01-01 12:00:00", lastSeenWipedAt = null)
+
+            // Probe is deliberately unfiltered; the sweep asks one second back.
+            assertEquals(listOf(null, "2026-01-01 11:59:59"), api.getMediaUpdatedSince)
+            // The cursor itself still moves forward — seeding it with the
+            // rewound value would walk it backwards a second per sync.
+            assertEquals("2026-01-01 12:00:05", (result as ApiResult.Success).value.cursor)
+        }
+
     private fun page(
         offset: Int,
         ids: LongRange,
@@ -248,6 +364,7 @@ class MediaRepositoryImplTest {
         title: String,
         category: String,
         userId: String? = null,
+        updatedAt: String? = null,
     ) = MediaItemDto(
         id = id,
         userId = userId,
@@ -256,6 +373,7 @@ class MediaRepositoryImplTest {
         format = "LP",
         status = Status.Owned.apiValue,
         category = category,
+        updatedAt = updatedAt,
     )
 
     private fun entity(
@@ -276,58 +394,6 @@ class MediaRepositoryImplTest {
     private companion object {
         const val OWNER = "david@macemail.co.uk"
     }
-}
-
-private class FakeMediaItemDao : MediaItemDao {
-    private val rows = MutableStateFlow<List<MediaItemEntity>>(emptyList())
-
-    fun seed(items: List<MediaItemEntity>) {
-        rows.value = items
-    }
-
-    fun snapshot(): List<MediaItemEntity> = rows.value
-
-    override fun observeAll(): Flow<List<MediaItemEntity>> = rows
-
-    override fun observeByCategory(
-        category: String,
-        status: String?,
-    ): Flow<List<MediaItemEntity>> =
-        rows.map { list ->
-            list.filter { it.category == category && (status == null || it.status == status) }
-        }
-
-    override fun observe(id: Long): Flow<MediaItemEntity?> = rows.map { it.firstOrNull { row -> row.id == id } }
-
-    override suspend fun get(id: Long): MediaItemEntity? = rows.value.firstOrNull { it.id == id }
-
-    override suspend fun maxUpdatedAt(): String? = rows.value.maxOfOrNull { it.updatedAt.orEmpty() }
-
-    override suspend fun upsert(item: MediaItemEntity) {
-        rows.value = rows.value.filterNot { it.id == item.id } + item
-    }
-
-    override suspend fun upsertAll(items: List<MediaItemEntity>) {
-        items.forEach { upsert(it) }
-    }
-
-    override suspend fun delete(id: Long) {
-        rows.value = rows.value.filterNot { it.id == id }
-    }
-
-    override suspend fun deleteAll() {
-        rows.value = emptyList()
-    }
-
-    override suspend fun countOwnedBy(ownerId: String): Int = ownedBy(ownerId).size
-
-    override suspend fun idsOwnedBy(ownerId: String): List<Long> = ownedBy(ownerId).map { it.id }
-
-    override suspend fun deleteByIds(ids: List<Long>) {
-        rows.value = rows.value.filterNot { it.id in ids }
-    }
-
-    private fun ownedBy(ownerId: String) = rows.value.filter { it.userId == null || it.userId == ownerId }
 }
 
 private class NoopBinaryService : CrateBinaryService {

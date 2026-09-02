@@ -65,6 +65,7 @@ import com.megamaced.crate.R
 import com.megamaced.crate.data.prefs.ThemeMode
 import com.megamaced.crate.domain.model.Category
 import com.megamaced.crate.domain.model.UserProfile
+import com.megamaced.crate.domain.repository.MediaRepository
 import com.megamaced.crate.util.resolve
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -740,7 +741,7 @@ private fun DangerZoneSection(onWipe: (List<String>) -> Unit) {
     // rest of the app — the api values are what the endpoint expects, and the
     // labels are the app's own plurals ("Films", not "Film").
     val scopes = remember {
-        Category.entries.map { it.apiValue to it.labelRes } + (PLAYLISTS_SCOPE to R.string.nav_playlists)
+        Category.entries.map { it.apiValue to it.labelRes } + (MediaRepository.PLAYLISTS_SCOPE to R.string.nav_playlists)
     }
     // Nothing pre-selected: this deletes from the server irreversibly, so every
     // scope is an explicit opt-in and the confirm button starts disabled.
@@ -817,7 +818,6 @@ private fun DangerZoneSection(onWipe: (List<String>) -> Unit) {
 }
 
 /** Scope key the wipe endpoint uses for playlists; the rest are category api values. */
-private const val PLAYLISTS_SCOPE = "playlists"
 
 @Composable
 private fun AboutSection(

@@ -5,10 +5,12 @@ import com.megamaced.crate.data.api.CrateApiService
 import com.megamaced.crate.data.api.CrateBinaryService
 import com.megamaced.crate.data.api.apiCall
 import com.megamaced.crate.data.db.dao.MediaItemDao
+import com.megamaced.crate.data.db.dao.PlaylistDao
 import com.megamaced.crate.data.mapper.MediaItemJsonCodec
 import com.megamaced.crate.data.mapper.toDomain
 import com.megamaced.crate.data.mapper.toEntity
 import com.megamaced.crate.data.mapper.toRequest
+import com.megamaced.crate.data.prefs.AccountPrefs
 import com.megamaced.crate.domain.model.Category
 import com.megamaced.crate.domain.model.MediaItem
 import com.megamaced.crate.domain.model.MediaItemDraft
@@ -18,8 +20,11 @@ import com.megamaced.crate.domain.repository.MediaRepository.RefreshResult
 import com.megamaced.crate.domain.repository.MediaRepository.SyncResult
 import com.megamaced.crate.util.ExifStrip
 import com.megamaced.crate.util.ServerTimestamps
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType
@@ -38,17 +43,30 @@ class MediaRepositoryImpl
         private val api: CrateApiService,
         private val binary: CrateBinaryService,
         private val dao: MediaItemDao,
+        private val playlistDao: PlaylistDao,
+        private val accountPrefs: AccountPrefs,
         private val codec: MediaItemJsonCodec,
     ) : MediaRepository {
-        override fun observeAll(): Flow<List<MediaItem>> = dao.observeAll().map { rows -> rows.map { it.toDomain(codec) } }
+        // Both collection reads are scoped to the signed-in user. Rows belonging
+        // to someone else land in the same table whenever a shared item or a
+        // shared playlist is opened, and they are not part of your collection —
+        // see the predicate and its fail-open null case in MediaItemDao.
+        @OptIn(ExperimentalCoroutinesApi::class)
+        override fun observeAll(): Flow<List<MediaItem>> =
+            accountPrefs.currentUserIdFlow.flatMapLatest { ownerId ->
+                dao.observeAll(ownerId).map { rows -> rows.map { it.toDomain(codec) } }
+            }
 
+        @OptIn(ExperimentalCoroutinesApi::class)
         override fun observeByCategory(
             category: Category,
             status: Status?,
         ): Flow<List<MediaItem>> =
-            dao
-                .observeByCategory(category.apiValue, status?.apiValue)
-                .map { rows -> rows.map { it.toDomain(codec) } }
+            accountPrefs.currentUserIdFlow.flatMapLatest { ownerId ->
+                dao
+                    .observeByCategory(category.apiValue, status?.apiValue, ownerId)
+                    .map { rows -> rows.map { it.toDomain(codec) } }
+            }
 
         override fun observe(id: Long): Flow<MediaItem?> = dao.observe(id).map { it?.toDomain(codec) }
 
@@ -114,7 +132,20 @@ class MediaRepositoryImpl
         override suspend fun wipeCollection(scopes: List<String>): ApiResult<Unit> =
             apiCall {
                 api.deleteAllMedia(scopes = scopes.joinToString(","))
-                dao.deleteAll()
+                // The server deletes only the scopes it was sent, so the local
+                // DB must match it exactly. Clearing everything used to empty
+                // the phone for a wipe of one category, and nothing put the
+                // other categories back until the next sync — up to six hours,
+                // and never while offline.
+                val categories = scopes.mapNotNull { Category.fromApi(it) }.map { it.apiValue }
+                if (categories.isNotEmpty()) {
+                    dao.deleteByCategories(categories, accountPrefs.currentUserId())
+                }
+                // Playlists are their own scope; the cross-refs go with them
+                // through the FK cascade.
+                if (MediaRepository.PLAYLISTS_SCOPE in scopes) {
+                    playlistDao.deleteAll()
+                }
             }
 
         override suspend fun uploadArtwork(
@@ -204,9 +235,24 @@ class MediaRepositoryImpl
                 // its authoritative item count, and the id of the owning user.
                 val probe = api.getMedia(limit = 1, offset = 0)
                 val serverWipedAt = probe.wipedAt
-                // Every row a sweep of our own collection returns belongs to us, so
-                // the probe row identifies the owner without a second request.
-                val ownerId = probe.items.firstOrNull()?.userId
+                // Ask the server who we are rather than inferring it from the
+                // probe row: an empty collection returns no row, and that is
+                // exactly the case where pruning matters (the last item was
+                // deleted on the web). Cache it — the collection queries are
+                // scoped by it.
+                val ownerId = (
+                    try {
+                        api.getMe().userId.takeIf { it.isNotBlank() }
+                    } catch (e: CancellationException) {
+                        // Never swallow cancellation: it has to reach the caller
+                        // for the sweep to actually stop.
+                        throw e
+                    } catch (e: Exception) {
+                        Timber.w(e, "Sync couldn't read /me; falling back to the probe row for the owner id")
+                        null
+                    }
+                ) ?: probe.items.firstOrNull()?.userId
+                if (ownerId != null) accountPrefs.setCurrentUserId(ownerId)
 
                 // If the server has been wiped since our last sync, our local
                 // rows are stale (re-import generates new IDs, so delta sync
@@ -232,10 +278,20 @@ class MediaRepositoryImpl
                     )
                 }
 
-                val effectiveSince = if (wiped || drifted) null else updatedSince
+                // Ask for one second before the stored cursor. Server stamps are
+                // second-resolution and the filter is strictly-greater, so an
+                // item updated in the same second as one we already fetched —
+                // but after that page's query ran — would never be returned
+                // again. The overlap re-delivers it; every write here is an
+                // upsert, so re-seeing a row costs nothing.
+                val effectiveSince =
+                    if (wiped || drifted) null else updatedSince?.let(ServerTimestamps::minusOneSecond)
 
                 var offset = 0
-                var maxUpdatedAt: String? = effectiveSince
+                // Seeded with the *stored* cursor, not the rewound one, so the
+                // overlap never compounds into the cursor drifting backwards a
+                // second per sync.
+                var maxUpdatedAt: String? = if (wiped || drifted) null else updatedSince
                 var reportedTotal = 0
                 // Offset pagination is only lossless while the server's sort is
                 // total. When it is not, pages overlap and rows go missing, and
@@ -275,8 +331,13 @@ class MediaRepositoryImpl
                 // only a full sweep is authoritative (a delta says nothing about
                 // rows it filtered out); an incomplete sweep would prune rows that
                 // pagination merely skipped; and an empty response must not empty
-                // the database — a genuine wipe arrives via wipedAt instead.
-                if (effectiveSince == null && ownerId != null && sweptEverything && seenIds.isNotEmpty()) {
+                // the database unless the server said the collection is empty.
+                // The empty case is authoritative only when the server itself
+                // reported an empty collection: probe.total is that statement,
+                // whereas an empty page could equally be a sweep that failed to
+                // return anything.
+                val authoritative = sweptEverything && (seenIds.isNotEmpty() || probe.total == 0)
+                if (effectiveSince == null && ownerId != null && authoritative) {
                     val stale = dao.idsOwnedBy(ownerId).filterNot { it in seenIds }
                     if (stale.isNotEmpty()) {
                         // Chunked: one bound parameter per id would blow SQLite's

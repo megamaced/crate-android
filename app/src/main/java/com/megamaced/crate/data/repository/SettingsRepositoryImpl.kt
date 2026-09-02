@@ -31,6 +31,9 @@ class SettingsRepositoryImpl
             // Mirror server-side hidden_categories into the local DataStore cache
             // so navigation / home / search can read it synchronously next launch.
             if (result is ApiResult.Success) {
+                // The user id is what every "my collection" query is scoped by,
+                // so this is the one authoritative place it gets cached.
+                userPreferences.setCurrentUserId(result.value.userId)
                 userPreferences.setHiddenCategories(result.value.hiddenCategories)
                 userPreferences.setOnlineRecommendations(result.value.onlineRecommendations)
             }

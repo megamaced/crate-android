@@ -30,6 +30,15 @@ object ServerTimestamps {
         return if (da != null && db != null) da.compareTo(db) else a.compareTo(b)
     }
 
+    /**
+     * [value] one second earlier, for re-requesting a delta with a one-second
+     * overlap. Server stamps are second-resolution, so two rows written in the
+     * same second can straddle a page boundary and the later one is then never
+     * returned by a strictly-greater filter. Returns [value] unchanged when it
+     * doesn't parse — an overlap is an optimisation, not something to guess at.
+     */
+    fun minusOneSecond(value: String): String = parse(value)?.minusSeconds(1)?.format(FORMATTER) ?: value
+
     private fun parse(value: String): LocalDateTime? =
         try {
             LocalDateTime.parse(value.trim(), FORMATTER)

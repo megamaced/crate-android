@@ -46,17 +46,32 @@ data class PlaylistItemCrossRef(
     val position: Int = 0,
 )
 
+/**
+ * A cross-ref row together with the media item it points at.
+ *
+ * The obvious shape — a `@Relation`/`@Junction` straight from playlist to
+ * media item — throws [PlaylistItemCrossRef.position] away: Room's generated
+ * junction query selects neither the position column nor an ORDER BY, so rows
+ * come back in the junction index's order (by media-item id) and the app
+ * disagrees with the server and the web client for any playlist not already in
+ * id order. Relating through the cross-ref keeps the position, and the mapper
+ * sorts on it.
+ *
+ * [item] is nullable only because Room models a one-to-one relation that way;
+ * the FK cascade means a cross-ref can never outlive its media item.
+ */
+data class PlaylistItemWithMedia(
+    @androidx.room.Embedded val ref: PlaylistItemCrossRef,
+    @Relation(parentColumn = "mediaItemId", entityColumn = "id")
+    val item: MediaItemEntity?,
+)
+
 data class PlaylistWithItems(
     @androidx.room.Embedded val playlist: PlaylistEntity,
     @Relation(
+        entity = PlaylistItemCrossRef::class,
         parentColumn = "id",
-        entityColumn = "id",
-        associateBy =
-            androidx.room.Junction(
-                value = PlaylistItemCrossRef::class,
-                parentColumn = "playlistId",
-                entityColumn = "mediaItemId",
-            ),
+        entityColumn = "playlistId",
     )
-    val items: List<MediaItemEntity>,
+    val itemRefs: List<PlaylistItemWithMedia>,
 )

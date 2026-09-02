@@ -104,8 +104,10 @@ fun AddEditItemScreen(
     // warning can be shown to completion before the screen pops — two separate
     // effects would race and navigation would win, hiding the warning.
     val photoFailedMessage = stringResource(R.string.photo_upload_failed)
+    val imageTooLargeMessage = stringResource(R.string.add_edit_image_too_large)
     LaunchedEffect(state.savedItemId) {
         if (state.savedItemId != null) {
+            if (state.imageTooLarge) snackbarHostState.showSnackbar(imageTooLargeMessage)
             if (state.photoUploadFailed) snackbarHostState.showSnackbar(photoFailedMessage)
             onBack()
         }

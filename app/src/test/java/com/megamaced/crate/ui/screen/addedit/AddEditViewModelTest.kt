@@ -319,6 +319,32 @@ class AddEditViewModelTest {
         }
 
     @Test
+    fun `an image the provider declared no length for is caught when it is read`() =
+        runTest {
+            // Cloud and document providers routinely report no length, so the
+            // check at pick time passes and the cap has to hold at upload time.
+            val reader =
+                FakePickedImageReader(
+                    length = null,
+                    result = PickedImageReader.ReadResult.TooLarge,
+                )
+            val media = RecordingMediaRepository()
+            val vm = newViewModel(media = media, imageReader = reader)
+            fillRequiredFields(vm)
+            vm.onArtworkPicked("content://media/1")
+            advanceUntilIdle()
+
+            vm.save()
+            advanceUntilIdle()
+
+            val state = vm.uiState.value
+            assertNotNull(state.savedItemId)
+            assertTrue(state.imageTooLarge)
+            // Nothing was uploaded: the bytes never got past the cap.
+            assertTrue(media.artworkUploads.isEmpty())
+        }
+
+    @Test
     fun `a successful save reports no photo failure`() =
         runTest {
             val media = RecordingMediaRepository()
@@ -331,6 +357,7 @@ class AddEditViewModelTest {
             advanceUntilIdle()
 
             assertFalse(vm.uiState.value.photoUploadFailed)
+            assertFalse(vm.uiState.value.imageTooLarge)
         }
 
     // -- SavedStateHandle survival -------------------------------------------
@@ -401,7 +428,7 @@ class AddEditViewModelTest {
 
 private class FakePickedImageReader(
     private val length: Long? = 1_024,
-    private val bytes: ByteArray? = ByteArray(4) { 1 },
+    private val result: PickedImageReader.ReadResult = PickedImageReader.ReadResult.Success(ByteArray(4) { 1 }),
 ) : PickedImageReader {
     val readUris = mutableListOf<String>()
 
@@ -409,9 +436,9 @@ private class FakePickedImageReader(
 
     override suspend fun length(uri: String): Long? = length
 
-    override suspend fun read(uri: String): ByteArray? {
+    override suspend fun read(uri: String): PickedImageReader.ReadResult {
         readUris += uri
-        return bytes
+        return result
     }
 }
 

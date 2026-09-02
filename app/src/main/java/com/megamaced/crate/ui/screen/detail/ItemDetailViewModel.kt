@@ -14,6 +14,7 @@ import com.megamaced.crate.di.DefaultDispatcher
 import com.megamaced.crate.domain.LocalSimilarity
 import com.megamaced.crate.domain.model.Category
 import com.megamaced.crate.domain.model.MediaItem
+import com.megamaced.crate.domain.model.UserProfile
 import com.megamaced.crate.domain.repository.EnrichmentRepository
 import com.megamaced.crate.domain.repository.MediaRepository
 import com.megamaced.crate.domain.repository.SettingsRepository
@@ -194,6 +195,9 @@ class ItemDetailViewModel
          * screen that is otherwise complete.
          */
         private suspend fun loadOnlineSuggestions() {
+            // Reads the mirrored opt-in, which the caller has just refreshed
+            // from /me — it is a per-user server setting, and the local mirror
+            // can still hold the previous account's answer until it lands.
             if (!settingsRepository.onlineRecommendationsFlow.first()) return
             val result = apiCall { api.getRecommendations(itemId) }
             if (result is ApiResult.Success) {
@@ -204,21 +208,25 @@ class ItemDetailViewModel
 
         init {
             viewModelScope.launch {
-                loadOnlineSuggestions()
-            }
-            viewModelScope.launch {
+                // The profile comes first: it carries the market currency, and
+                // it is what refreshes the locally mirrored per-user settings
+                // the two calls below read.
+                val me = (settingsRepository.getMe() as? ApiResult.Success)?.value
+                me?.marketCurrency?.takeIf { it.isNotBlank() }?.let { marketCurrency.value = it }
+                launch { loadOnlineSuggestions() }
                 val refreshed = mediaRepository.refreshSingle(itemId)
                 // Capture the per-item write permission from the network fetch;
                 // it isn't carried through Room, so this is our only source.
                 val networkCanWrite = (refreshed as? ApiResult.Success)?.value?.canWrite == true
                 sharedCanWrite.value = networkCanWrite
-                runAutoBackgroundFetches(networkCanWrite)
+                if (me != null) runAutoBackgroundFetches(me, networkCanWrite)
             }
         }
 
-        private suspend fun runAutoBackgroundFetches(networkCanWrite: Boolean) {
-            val me = (settingsRepository.getMe() as? ApiResult.Success)?.value ?: return
-            me.marketCurrency?.takeIf { it.isNotBlank() }?.let { marketCurrency.value = it }
+        private suspend fun runAutoBackgroundFetches(
+            me: UserProfile,
+            networkCanWrite: Boolean,
+        ) {
             var item = mediaRepository.observe(itemId).firstOrNull() ?: return
 
             // Auto enrich/market are writes. Skip them only for read-only

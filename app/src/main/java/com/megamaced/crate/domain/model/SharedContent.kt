@@ -58,6 +58,13 @@ fun SharedWithMe.itemsByCategory(): Map<Category, List<MediaItem>> {
     return byCat.mapValues { (_, map) -> map.values.toList() }
 }
 
+/**
+ * Every distinct item reaching the viewer through any share, in one flat list.
+ * This is the authoritative "what is still shared with me" set, so it is also
+ * what a revoked share has to be reconciled against.
+ */
+fun SharedWithMe.allItems(): List<MediaItem> = itemsByCategory().values.flatten()
+
 /** Owners who granted write access covering [category]. Mirrors writeOwnersForCategory. */
 fun SharedWithMe.writeOwnersForCategory(category: Category): List<String> {
     val owners = LinkedHashSet<String>()

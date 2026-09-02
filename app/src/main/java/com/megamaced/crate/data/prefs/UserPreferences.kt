@@ -15,6 +15,7 @@ import com.megamaced.crate.R
 import com.megamaced.crate.domain.model.Category
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
@@ -55,7 +56,25 @@ interface CollectionPrefs {
     suspend fun setLastCategory(category: Category)
 }
 
+/**
+ * The signed-in user's server-side id, cached from `/me`.
+ *
+ * Room caches other users' rows in the same tables (opening a shared item, or a
+ * shared playlist's members), so every "my collection" query needs to know who
+ * we are. Exposed as its own interface, like [CollectionPrefs], so repositories
+ * can be unit-tested without a DataStore-backed Context.
+ */
+interface AccountPrefs {
+    /** Emits null until `/me` has been read at least once for this account. */
+    val currentUserIdFlow: Flow<String?>
+
+    suspend fun currentUserId(): String?
+
+    suspend fun setCurrentUserId(userId: String?)
+}
+
 data class UserPrefs(
+    val currentUserId: String? = null,
     val lastSyncCursor: String? = null,
     val lastSeenWipedAt: String? = null,
     val themeMode: ThemeMode = ThemeMode.System,
@@ -73,12 +92,14 @@ class UserPreferences
     @Inject
     constructor(
         @ApplicationContext private val context: Context,
-    ) : CollectionPrefs {
+    ) : CollectionPrefs,
+        AccountPrefs {
         private val ds get() = context.dataStore
 
         val flow: Flow<UserPrefs> =
             ds.data.map { prefs ->
                 UserPrefs(
+                    currentUserId = prefs[Keys.CURRENT_USER_ID],
                     lastSyncCursor = prefs[Keys.LAST_SYNC_CURSOR],
                     lastSeenWipedAt = prefs[Keys.LAST_SEEN_WIPED_AT],
                     themeMode = prefs[Keys.THEME_MODE]?.let(::parseThemeMode) ?: ThemeMode.System,
@@ -94,6 +115,14 @@ class UserPreferences
                     onlineRecommendations = prefs[Keys.ONLINE_RECOMMENDATIONS] ?: false,
                 )
             }
+
+        override val currentUserIdFlow: Flow<String?> = flow.map { it.currentUserId }.distinctUntilChanged()
+
+        override suspend fun currentUserId(): String? = ds.data.first()[Keys.CURRENT_USER_ID]
+
+        override suspend fun setCurrentUserId(userId: String?) {
+            ds.edit { it.write(Keys.CURRENT_USER_ID, userId) }
+        }
 
         val hiddenCategoriesFlow: Flow<Set<Category>> = flow.map { it.hiddenCategories }
 
@@ -130,6 +159,26 @@ class UserPreferences
 
         override suspend fun setLastCategory(category: Category) {
             ds.edit { it[Keys.LAST_CATEGORY] = category.apiValue }
+        }
+
+        /**
+         * Forgets everything that belongs to the account being signed out of.
+         *
+         * The sync cursor and wipe marker are per-account bookkeeping, and
+         * hidden categories, the online-recommendations opt-in and the last
+         * category are the server-side profile mirrored locally — carrying any
+         * of them into the next account shows one user another's choices.
+         * Theme and collection view mode are device-wide UX and stay.
+         */
+        suspend fun clearAccountScoped() {
+            ds.edit { prefs ->
+                prefs.remove(Keys.CURRENT_USER_ID)
+                prefs.remove(Keys.LAST_SYNC_CURSOR)
+                prefs.remove(Keys.LAST_SEEN_WIPED_AT)
+                prefs.remove(Keys.HIDDEN_CATEGORIES)
+                prefs.remove(Keys.ONLINE_RECOMMENDATIONS)
+                prefs.remove(Keys.LAST_CATEGORY)
+            }
         }
 
         suspend fun getUpdateState(): UpdateCheckState {
@@ -184,6 +233,7 @@ class UserPreferences
         }
 
         private object Keys {
+            val CURRENT_USER_ID = stringPreferencesKey("current_user_id")
             val LAST_SYNC_CURSOR = stringPreferencesKey("last_sync_cursor")
             val LAST_SEEN_WIPED_AT = stringPreferencesKey("last_seen_wiped_at")
             val THEME_MODE = stringPreferencesKey("theme_mode")

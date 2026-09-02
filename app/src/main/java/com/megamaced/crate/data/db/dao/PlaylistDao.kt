@@ -38,6 +38,28 @@ interface PlaylistDao {
     @Query("DELETE FROM playlists")
     suspend fun deleteAll()
 
+    @Query("SELECT id FROM playlists")
+    suspend fun allIds(): List<Long>
+
+    @Query("DELETE FROM playlists WHERE id IN (:ids)")
+    suspend fun deleteByIds(ids: List<Long>)
+
+    /**
+     * Reconciles the local table against an authoritative server list.
+     *
+     * Upserting alone can never notice a deletion — a playlist deleted on the
+     * web simply stops being listed — so it would linger on the phone forever,
+     * un-openable and un-deletable. One transaction so a list refresh is never
+     * observed half-applied.
+     */
+    @Transaction
+    suspend fun replaceAll(playlists: List<PlaylistEntity>) {
+        val serverIds = playlists.mapTo(mutableSetOf()) { it.id }
+        val stale = allIds().filterNot { it in serverIds }
+        if (stale.isNotEmpty()) deleteByIds(stale)
+        upsertAll(playlists)
+    }
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertCrossRefs(refs: List<PlaylistItemCrossRef>)
 

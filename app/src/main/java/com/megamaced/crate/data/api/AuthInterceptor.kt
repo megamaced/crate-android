@@ -29,6 +29,10 @@ class AuthInterceptor
         override fun intercept(chain: Interceptor.Chain): Response {
             val original = chain.request()
             val credentials = tokenStore.getCredentials()
+            // Captured before the call goes out: a 401 can arrive long after
+            // the user has signed out and back in, and acting on it then would
+            // sign the *next* account out and wipe its database.
+            val requestEpoch = sessionManager.currentEpoch()
             // Match the full origin (scheme + host + port), not just the
             // hostname — the credential is bound to a specific origin, so the
             // header should never ride along to the same host on a different
@@ -74,7 +78,7 @@ class AuthInterceptor
                 response.code == 401 &&
                 original.url.encodedPath.contains(CrateApiService.API_BASE)
             ) {
-                sessionManager.onUnauthorised()
+                sessionManager.onUnauthorised(requestEpoch)
             }
 
             return response

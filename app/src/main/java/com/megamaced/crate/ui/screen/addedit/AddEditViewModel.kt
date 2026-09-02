@@ -120,6 +120,13 @@ data class AddEditUiState(
      * uploaded when it didn't.
      */
     val photoUploadFailed: Boolean = false,
+    /**
+     * True when a picked image turned out to be over the size cap only once its
+     * bytes were read. Providers often declare no length, so the check at pick
+     * time can't catch every case, and a silently dropped upload would leave
+     * the user believing the image was saved.
+     */
+    val imageTooLarge: Boolean = false,
 ) {
     val yearError: Boolean
         get() = year.isNotBlank() && (year.toIntOrNull()?.let { it !in MIN_YEAR..CURRENT_YEAR } ?: true)
@@ -246,6 +253,7 @@ class AddEditViewModel
                 errorMessage = null,
                 savedItemId = null,
                 photoUploadFailed = false,
+                imageTooLarge = false,
             )
         }
 
@@ -553,7 +561,7 @@ class AddEditViewModel
             val state = _uiState.value
             if (!state.canSave) return
             viewModelScope.launch {
-                update { copy(isSaving = true, errorMessage = null, photoUploadFailed = false) }
+                update { copy(isSaving = true, errorMessage = null, photoUploadFailed = false, imageTooLarge = false) }
                 val draft = state.toDraft()
                 val saveResult =
                     if (state.isEditing) {
@@ -578,11 +586,25 @@ class AddEditViewModel
             // and the row already existed on the server, wipe the cached image.
             // Enrichment-supplied URLs are sent through MediaItemDraft.artworkPath
             // so the backend caches them server-side — no client upload needed.
+            var tooLarge = false
             when {
                 beforeState.pendingArtwork != null -> {
-                    val bytes = imageReader.read(beforeState.pendingArtwork.uri)
-                    if (bytes != null) {
-                        mediaRepository.uploadArtwork(saved.id, bytes, beforeState.pendingArtwork.mimeType)
+                    when (val read = imageReader.read(beforeState.pendingArtwork.uri)) {
+                        is PickedImageReader.ReadResult.Success -> {
+                            mediaRepository.uploadArtwork(saved.id, read.bytes, beforeState.pendingArtwork.mimeType)
+                        }
+
+                        // Over the cap once the bytes were counted. The item
+                        // itself saved, so this is reported rather than fatal.
+                        PickedImageReader.ReadResult.TooLarge -> {
+                            tooLarge = true
+                        }
+
+                        // Unreadable — a picker grant that didn't survive
+                        // process death, or a file since deleted.
+                        PickedImageReader.ReadResult.Unavailable -> {
+                            Unit
+                        }
                     }
                 }
 
@@ -592,8 +614,9 @@ class AddEditViewModel
             }
             // Same logic applied to each photo slot. Independent of artwork
             // (different endpoint, different appdata folder server-side).
-            val photo1Ok = applyPhotoSlot(saved.id, slot = 1, beforeState.pendingPhoto1, beforeState.removePhoto1, beforeState.isEditing)
-            val photo2Ok = applyPhotoSlot(saved.id, slot = 2, beforeState.pendingPhoto2, beforeState.removePhoto2, beforeState.isEditing)
+            val photo1 = applyPhotoSlot(saved.id, slot = 1, beforeState.pendingPhoto1, beforeState.removePhoto1, beforeState.isEditing)
+            val photo2 = applyPhotoSlot(saved.id, slot = 2, beforeState.pendingPhoto2, beforeState.removePhoto2, beforeState.isEditing)
+            if (photo1 == SlotOutcome.TooLarge || photo2 == SlotOutcome.TooLarge) tooLarge = true
             if (beforeState.autoEnrich) {
                 enrichmentRepository.enrich(saved.id)
             }
@@ -603,24 +626,40 @@ class AddEditViewModel
             update {
                 copy(
                     isSaving = false,
-                    photoUploadFailed = !photo1Ok || !photo2Ok,
+                    photoUploadFailed = photo1 == SlotOutcome.Failed || photo2 == SlotOutcome.Failed,
+                    imageTooLarge = tooLarge,
                     savedItemId = saved.id,
                 )
             }
         }
 
-        /** False when the slot had work to do and it failed. */
+        /** What a photo slot's pending work came to. [Ok] also covers "nothing to do". */
+        private enum class SlotOutcome { Ok, Failed, TooLarge }
+
         private suspend fun applyPhotoSlot(
             itemId: Long,
             slot: Int,
             pending: PendingImage?,
             remove: Boolean,
             isEditing: Boolean,
-        ): Boolean {
+        ): SlotOutcome {
             val result = when {
                 pending != null -> {
-                    val bytes = imageReader.read(pending.uri) ?: return false
-                    mediaRepository.uploadPhoto(itemId, slot, bytes, pending.mimeType)
+                    when (val read = imageReader.read(pending.uri)) {
+                        is PickedImageReader.ReadResult.Success -> {
+                            mediaRepository.uploadPhoto(itemId, slot, read.bytes, pending.mimeType)
+                        }
+
+                        // Reported apart from a failed upload: one is worth
+                        // retrying, the other needs a smaller image.
+                        PickedImageReader.ReadResult.TooLarge -> {
+                            return SlotOutcome.TooLarge
+                        }
+
+                        PickedImageReader.ReadResult.Unavailable -> {
+                            return SlotOutcome.Failed
+                        }
+                    }
                 }
 
                 remove && isEditing -> {
@@ -628,10 +667,10 @@ class AddEditViewModel
                 }
 
                 else -> {
-                    return true
+                    return SlotOutcome.Ok
                 }
             }
-            return result is ApiResult.Success
+            return if (result is ApiResult.Success) SlotOutcome.Ok else SlotOutcome.Failed
         }
 
         private fun setError(message: UiText) {

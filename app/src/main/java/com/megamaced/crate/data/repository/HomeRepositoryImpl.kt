@@ -7,6 +7,7 @@ import com.megamaced.crate.data.api.apiCall
 import com.megamaced.crate.data.db.dao.HomeFeedDao
 import com.megamaced.crate.data.mapper.MediaItemJsonCodec
 import com.megamaced.crate.data.mapper.toDomain
+import com.megamaced.crate.data.prefs.AccountPrefs
 import com.megamaced.crate.domain.model.Category
 import com.megamaced.crate.domain.model.CategoryFeed
 import com.megamaced.crate.domain.model.HomeFeed
@@ -21,6 +22,7 @@ class HomeRepositoryImpl
     constructor(
         private val api: CrateApiService,
         private val dao: HomeFeedDao,
+        private val accountPrefs: AccountPrefs,
         private val codec: MediaItemJsonCodec,
     ) : HomeRepository {
         override suspend fun fetch(): ApiResult<HomeFeed> {
@@ -37,11 +39,14 @@ class HomeRepositoryImpl
         }
 
         private suspend fun buildOfflineFeed(): HomeFeed {
-            val categories = dao.getOwnedCategories().mapNotNull { Category.fromApi(it) }
+            // The offline feed is a view of the user's own collection, and the
+            // same table also caches items reached through a share.
+            val ownerId = accountPrefs.currentUserId()
+            val categories = dao.getOwnedCategories(ownerId).mapNotNull { Category.fromApi(it) }
             val seed = LocalDate.now().toEpochDay().toInt()
             val categoryFeeds = categories.map { category ->
-                val items = dao.getRecentByCategory(category.apiValue)
-                val count = dao.countByCategory(category.apiValue)
+                val items = dao.getRecentByCategory(category.apiValue, ownerId)
+                val count = dao.countByCategory(category.apiValue, ownerId)
                 val itemOfDay = if (items.isNotEmpty()) items[seed % items.size] else null
                 CategoryFeed(
                     category = category,
@@ -50,8 +55,8 @@ class HomeRepositoryImpl
                     recentItems = items.map { it.toDomain(codec) },
                 )
             }
-            val recentlyAdded = dao.getRecentOwned().map { it.toDomain(codec) }
-            val mostValuable = dao.getMostValuable().map { it.toDomain(codec) }
+            val recentlyAdded = dao.getRecentOwned(ownerId).map { it.toDomain(codec) }
+            val mostValuable = dao.getMostValuable(ownerId).map { it.toDomain(codec) }
             return HomeFeed(
                 categoryFeeds = categoryFeeds,
                 recentlyAdded = recentlyAdded,

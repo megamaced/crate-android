@@ -2,37 +2,53 @@ package com.megamaced.crate.data.db.dao
 
 import androidx.room.Dao
 import androidx.room.Query
-import androidx.room.Transaction
 import androidx.room.Upsert
 import com.megamaced.crate.data.db.entity.MediaItemEntity
 import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface MediaItemDao {
-    @Query("SELECT * FROM media_items ORDER BY updatedAt DESC")
-    fun observeAll(): Flow<List<MediaItemEntity>>
+    // -- Collection reads -----------------------------------------------------
+    //
+    // Every list the user thinks of as "my collection" is scoped to the signed-in
+    // user. Opening a shared item (or a shared playlist) caches the owner's row
+    // in this same table, and without the predicate those rows show up in
+    // Collection, Search and the offline Home feed as if they were the user's
+    // own. A null userId predates the column being carried through the mapper
+    // and is treated as own; a null :ownerId means we don't yet know who we are,
+    // and filtering then would hide the whole collection — so it fails open.
+
+    @Query(
+        """
+        SELECT * FROM media_items
+        WHERE (:ownerId IS NULL OR userId IS NULL OR userId = :ownerId)
+        ORDER BY updatedAt DESC
+        """,
+    )
+    fun observeAll(ownerId: String?): Flow<List<MediaItemEntity>>
 
     @Query(
         """
         SELECT * FROM media_items
         WHERE category = :category
           AND (:status IS NULL OR status = :status)
+          AND (:ownerId IS NULL OR userId IS NULL OR userId = :ownerId)
         ORDER BY updatedAt DESC
         """,
     )
     fun observeByCategory(
         category: String,
         status: String? = null,
+        ownerId: String? = null,
     ): Flow<List<MediaItemEntity>>
 
+    // Unscoped by design: the detail screen opens shared items too, and it is
+    // the one place another user's row is meant to be readable.
     @Query("SELECT * FROM media_items WHERE id = :id")
     fun observe(id: Long): Flow<MediaItemEntity?>
 
     @Query("SELECT * FROM media_items WHERE id = :id")
     suspend fun get(id: Long): MediaItemEntity?
-
-    @Query("SELECT MAX(updatedAt) FROM media_items")
-    suspend fun maxUpdatedAt(): String?
 
     // @Upsert (INSERT-or-UPDATE), NOT @Insert(REPLACE): with REPLACE, Room
     // emits INSERT OR REPLACE, which deletes-then-inserts a conflicting row and
@@ -66,12 +82,27 @@ interface MediaItemDao {
     @Query("DELETE FROM media_items WHERE id IN (:ids)")
     suspend fun deleteByIds(ids: List<Long>)
 
+    /** Ids of cached rows belonging to *other* users — i.e. reached via a share. */
+    @Query("SELECT id FROM media_items WHERE userId IS NOT NULL AND userId != :ownerId")
+    suspend fun foreignIds(ownerId: String): List<Long>
+
+    /**
+     * Drops the local rows for the selected categories only — see
+     * `wipeCollection`. Scoped to the signed-in user for the same reason the
+     * sweep is: a wipe of your collection deletes nothing of someone else's.
+     */
+    @Query(
+        """
+        DELETE FROM media_items
+        WHERE category IN (:categories)
+          AND (:ownerId IS NULL OR userId IS NULL OR userId = :ownerId)
+        """,
+    )
+    suspend fun deleteByCategories(
+        categories: List<String>,
+        ownerId: String?,
+    )
+
     @Query("DELETE FROM media_items")
     suspend fun deleteAll()
-
-    @Transaction
-    suspend fun replaceAll(items: List<MediaItemEntity>) {
-        deleteAll()
-        upsertAll(items)
-    }
 }

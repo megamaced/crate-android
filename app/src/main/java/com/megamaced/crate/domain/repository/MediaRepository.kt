@@ -80,6 +80,14 @@ interface MediaRepository {
         lastSeenWipedAt: String?,
     ): ApiResult<SyncResult>
 
+    companion object {
+        /**
+         * The one wipe scope that isn't a [Category] — kept beside the
+         * repository so the Settings UI and the local clean-up can't drift.
+         */
+        const val PLAYLISTS_SCOPE = "playlists"
+    }
+
     data class RefreshResult(
         val total: Int,
         val limit: Int,

@@ -31,6 +31,10 @@ import com.megamaced.crate.data.api.dto.SharedWithMeDto
 import com.megamaced.crate.data.api.dto.TmdbSearchResultDto
 import com.megamaced.crate.data.api.dto.TokenRequest
 import com.megamaced.crate.data.api.dto.UserSearchResultDto
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.ResponseBody.Companion.toResponseBody
+import retrofit2.HttpException
+import retrofit2.Response
 
 /**
  * Test double — every method that a test doesn't override throws, so unused
@@ -42,7 +46,20 @@ class FakeCrateApiService : CrateApiService {
     var nextCreated: MediaItemDto? = null
     var nextUpdated: MediaItemDto? = null
     var nextItem: MediaItemDto? = null
+
+    /** Profile returned by [getMe] — the sync sweep asks who it is talking to. */
+    var nextMe: MeDto? = null
     val deletedIds = mutableListOf<Long>()
+
+    /** The `scopes` argument of each deleteAllMedia call, in call order. */
+    val wipeScopes = mutableListOf<String?>()
+
+    /** Playlists [listPlaylists] answers with. */
+    var nextPlaylists: List<PlaylistDto> = emptyList()
+
+    /** Ids passed to [deletePlaylist], and the HTTP code it should fail with. */
+    val deletedPlaylistIds = mutableListOf<Long>()
+    var deletePlaylistCode: Int? = null
 
     /**
      * Offset-keyed pages, for exercising the multi-page sync sweep. Takes
@@ -89,11 +106,20 @@ class FakeCrateApiService : CrateApiService {
         deletedIds += id
     }
 
-    override suspend fun deleteAllMedia(scopes: String?) = unsupported()
+    override suspend fun deleteAllMedia(scopes: String?) {
+        wipeScopes += scopes
+    }
+
+    override suspend fun getMe(): MeDto = requireNotNull(nextMe) { "FakeCrateApiService.nextMe was not set" }
+
+    override suspend fun listPlaylists(): List<PlaylistDto> = nextPlaylists
+
+    override suspend fun deletePlaylist(id: Long) {
+        deletedPlaylistIds += id
+        deletePlaylistCode?.let { throw httpException(it) }
+    }
 
     // -- Everything else: not exercised by current tests ----------------------
-
-    override suspend fun getMe(): MeDto = unsupported()
 
     override suspend fun getDiscogsToken(): HasTokenDto = unsupported()
 
@@ -150,8 +176,6 @@ class FakeCrateApiService : CrateApiService {
 
     override suspend fun comicVineSearch(query: String): List<ComicVineSearchResultDto> = unsupported()
 
-    override suspend fun listPlaylists(): List<PlaylistDto> = unsupported()
-
     override suspend fun createPlaylist(body: CreatePlaylistRequest): PlaylistDto = unsupported()
 
     override suspend fun getPlaylist(id: Long): PlaylistDto = unsupported()
@@ -160,8 +184,6 @@ class FakeCrateApiService : CrateApiService {
         id: Long,
         body: CreatePlaylistRequest,
     ): PlaylistDto = unsupported()
-
-    override suspend fun deletePlaylist(id: Long) = unsupported()
 
     override suspend fun addPlaylistItem(
         id: Long,
@@ -214,4 +236,10 @@ class FakeCrateApiService : CrateApiService {
     override suspend fun removeShare(id: Long) = unsupported()
 
     private fun unsupported(): Nothing = error("FakeCrateApiService method not stubbed for this test")
+
+    /** A Retrofit [HttpException] with [code], as the real service would raise. */
+    private fun httpException(code: Int): HttpException =
+        HttpException(
+            Response.error<Unit>(code, "".toResponseBody("application/json".toMediaType())),
+        )
 }
