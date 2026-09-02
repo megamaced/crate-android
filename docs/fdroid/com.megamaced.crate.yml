@@ -14,9 +14,9 @@ Repo: https://github.com/megamaced/crate-android.git
 Binaries: https://github.com/megamaced/crate-android/releases/download/v%v/app-release.apk
 
 Builds:
-  - versionName: 1.17.1
-    versionCode: 29
-    commit: 6d24dca7e27d624b95fb7e5738a494d5de4a2c07
+  - versionName: 1.18.0
+    versionCode: 30
+    commit: fd1922a057c5c798e3f31bc67b3f8d68eacce490
     subdir: app
     gradle:
       - yes
@@ -25,5 +25,5 @@ AllowedAPKSigningKeys: 699f63584a83a9aeace27b19044cf009dc7cecbf482fd6be8de747ffc
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags ^v[0-9.]+$
-CurrentVersion: 1.17.1
-CurrentVersionCode: 29
+CurrentVersion: 1.18.0
+CurrentVersionCode: 30
