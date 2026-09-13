@@ -1,0 +1,8 @@
+Maintenance release. Nothing changes in how the app behaves.
+
+- Rebuilt against Android 17 (SDK 37) on the current build
+  toolchain.
+- Networking, image loading, database and interface libraries
+  updated to their current releases.
+- Reproducible-build checks re-verified against the new
+  toolchain.
