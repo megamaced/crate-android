@@ -1,6 +1,5 @@
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
@@ -25,7 +24,7 @@ val hasReleaseSigningConfig =
 
 android {
     namespace = "com.megamaced.crate"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.megamaced.crate"
@@ -102,7 +101,7 @@ android {
     // Expose the exported Room schemas to the instrumented test suite so
     // MigrationTestHelper can resolve them at runtime.
     sourceSets {
-        getByName("androidTest").assets.srcDirs("$projectDir/schemas")
+        getByName("androidTest").assets.directories.add("$projectDir/schemas")
     }
 }
 
