@@ -15,7 +15,7 @@ androidxHilt = "1.4.0"
 browser = "1.10.0"
 workManager = "2.11.2"
 dataStore = "1.2.1"
-room = "2.8.4"
+room = "2.8.5"
 securityCrypto = "1.1.0"
 # security-crypto 1.1.0 is the terminal release of a deprecated library and
 # pins Tink at 1.8.0. Declared directly so the credential store at rest gets
