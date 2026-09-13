@@ -1,0 +1,7 @@
+Restores F-Droid's reproducible build, which v1.19.0 broke.
+
+Nothing changes in how the app behaves. F-Droid rebuilds this app
+from source and checks the result byte-for-byte against the
+published release; the new build toolchain made two parts of the
+APK depend on the machine that built it, so that check failed and
+F-Droid would have stopped shipping updates.

@@ -30,8 +30,8 @@ android {
         applicationId = "com.megamaced.crate"
         minSdk = 29
         targetSdk = 36
-        versionCode = 31
-        versionName = "1.19.0"
+        versionCode = 32
+        versionName = "1.19.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
@@ -80,6 +80,18 @@ android {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
+        // AGP 9 strips prebuilt .so files from dependencies whenever an NDK is
+        // resolvable, and packages them unstripped when one is not. That makes
+        // the APK's bytes depend on the build machine, which breaks F-Droid's
+        // reproducible-build comparison (v1.19.0 failed on four copies of
+        // libdatastore_shared_counter.so). Keeping the symbols is
+        // environment-independent by construction; pinning ndkVersion is not,
+        // because a different NDK's llvm-strip need not emit identical bytes.
+        // These are prebuilt dependency libraries, so none of our symbols are
+        // involved and the cost is a few KB per ABI.
+        jniLibs {
+            keepDebugSymbols += "**/*.so"
+        }
     }
 
     // AGP 8.x embeds an extra APK signing block ("Dependency metadata",
@@ -107,6 +119,21 @@ android {
 
 ksp {
     arg("room.schemaLocation", "$projectDir/schemas")
+}
+
+// F-Droid rebuilds this app from source and byte-compares against the APK
+// published on the GitHub release. The ART baseline profile breaks that: AGP
+// merges profiles out of dependency AARs (this app declares none of its own)
+// and the resulting assets/dexopt/baseline.prof is not stable across build
+// environments, which also perturbs classes.dex because the embedded profile
+// drives dex layout. v1.19.0 failed to reproduce on exactly those two files.
+//
+// Matched by task name rather than by CompileArtProfileTask, which is AGP
+// internal API and moves between versions.
+tasks.configureEach {
+    if (name.contains("ArtProfile")) {
+        enabled = false
+    }
 }
 
 dependencies {
