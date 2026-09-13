@@ -7,17 +7,17 @@ Native Android companion for [Crate](https://github.com/megamaced/crate), a pers
 ## Screenshots
 
 <p align="center">
-  <img src="screenshots/home.png" width="200" alt="Home screen" />
-  <img src="screenshots/collection-music.png" width="200" alt="Music collection" />
-  <img src="screenshots/collection-games.png" width="200" alt="Games collection" />
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/01-home.png" width="200" alt="Home screen with Item of the Day cards for music, films and books" />
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/02-home-recent.png" width="200" alt="Home screen recent-additions rails per collection type" />
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/03-collection-music.png" width="200" alt="Music collection grid with year, genre and format filters" />
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/04-collection-films.png" width="200" alt="Films collection grid grouped by director with format filters" />
 </p>
 <p align="center">
-  <img src="screenshots/add-item.png" width="200" alt="Add item" />
-  <img src="screenshots/playlists.png" width="200" alt="Playlists" />
-  <img src="screenshots/search.png" width="200" alt="Search" />
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/05-item-detail.png" width="200" alt="Item detail view showing artwork, platform, year, owned status and genres" />
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/06-playlists.png" width="200" alt="Playlists with per-playlist edit and delete actions" />
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/07-search.png" width="200" alt="Search across the local collection with an External toggle for Discogs lookups" />
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/08-add-item.png" width="200" alt="Add item form with Discogs search, barcode scanning and Owned/Wanted status" />
 </p>
-
-> Screenshots above were captured on the previous copper-themed build (v1.2 and earlier). The current build (v1.4.0+) uses Nextcloud's brand blue throughout to sit alongside the official Nextcloud client suite.
 
 <!-- When bumping the app version, update the Status line below to match app/build.gradle.kts versionName. -->
 
@@ -52,11 +52,19 @@ There's a manual **Check for updates** button under *Settings → About* that po
 
 ## Installation
 
-Download the latest signed APK from the [Releases page](https://github.com/megamaced/crate-android/releases/latest) and install it. You will need to allow "install from unknown sources" for your browser the first time.
+### F-Droid (recommended)
+
+[<img src="https://fdroid.gitlab.io/artwork/badge/get-it-on.png" alt="Get it on F-Droid" height="80" />](https://f-droid.org/packages/com.megamaced.crate/)
+
+The app is published on F-Droid as `com.megamaced.crate`. This is the route most people want: the F-Droid client notices new releases and updates the app for you. Install the [F-Droid client](https://f-droid.org), search for **Crate**, and install from there.
+
+The listing is a **reproducible build**. F-Droid rebuilds the app from this repository at the release tag, verifies the result matches the APK signed with the developer's key, and distributes that same signed APK. Both channels therefore carry the same signature, so you can move between the F-Droid build and a GitHub-release APK in either direction **without uninstalling**.
+
+### APK from GitHub Releases
+
+Download the latest signed `app-release.apk` from the [Releases page](https://github.com/megamaced/crate-android/releases/latest) and install it. You will need to allow "install from unknown sources" for your browser the first time.
 
 Subsequent updates install in place over the existing app. Use *Settings → About → Check for updates* when you want to see if a newer version is published.
-
-F-Droid submission is in progress; once it lands you'll be able to install and update via F-Droid as well.
 
 ## Tech stack
 
