@@ -32,7 +32,7 @@ okhttp = "5.5.0"
 kotlinxSerialization = "1.11.0"
 
 # Image loading
-coil = "3.6.2"
+coil = "3.6.3"
 
 # Barcode
 zxingEmbedded = "4.3.0"
