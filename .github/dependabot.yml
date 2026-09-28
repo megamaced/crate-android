@@ -4,6 +4,12 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    # New releases wait a week before Dependabot proposes them: minor and patch
+    # PRs merge themselves once CI is green, so this is the window for a
+    # hijacked release to be caught and yanked upstream first. Security
+    # updates skip the wait.
+    cooldown:
+      default-days: 7
     groups:
       androidx:
         patterns: ['androidx.*']
@@ -24,3 +30,5 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
