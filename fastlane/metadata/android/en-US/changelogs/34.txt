@@ -1,0 +1,9 @@
+Servers with a self-signed certificate or a private certificate
+authority can now be used.
+
+- Crate now trusts certificates you install on the device as a CA
+  certificate, so a self-signed or private-CA server can be reached
+  once its certificate is installed.
+- Login explains certificate problems in plain words instead of
+  showing a raw error.
+- LaserDisc and CDV are no longer offered as music formats.

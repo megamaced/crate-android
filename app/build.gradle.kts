@@ -30,8 +30,8 @@ android {
         applicationId = "com.megamaced.crate"
         minSdk = 29
         targetSdk = 36
-        versionCode = 33
-        versionName = "1.20.0"
+        versionCode = 34
+        versionName = "1.20.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
