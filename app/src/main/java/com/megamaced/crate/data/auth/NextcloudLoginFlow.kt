@@ -11,8 +11,11 @@ import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import timber.log.Timber
+import java.security.cert.CertificateException
 import javax.inject.Inject
 import javax.inject.Singleton
+import javax.net.ssl.SSLHandshakeException
+import javax.net.ssl.SSLPeerUnverifiedException
 
 @Serializable
 data class LoginFlowInitResponse(
@@ -93,12 +96,7 @@ class NextcloudLoginFlow
                 Result.success(initResponse)
             } catch (e: Exception) {
                 Timber.e(e, "Login flow initiation failed")
-                Result.failure(
-                    LoginFlowException(
-                        UiText.Res(R.string.login_error_connect_failed, listOf(e.message.toString())),
-                        e,
-                    ),
-                )
+                Result.failure(LoginFlowException(connectFailureReason(e), e))
             }
         }
 
@@ -192,6 +190,34 @@ class NextcloudLoginFlow
             private const val USER_AGENT = "Crate Android"
             private const val POLL_INTERVAL_MS = 5_000L
             private const val MAX_POLL_ATTEMPTS = 60 // 5 minutes total
+        }
+    }
+
+/**
+ * What the login screen says when the server can't be reached. Certificate
+ * failures get their own wording: the raw exception text ("Trust anchor for
+ * certification path not found") doesn't tell a self-hosted user that the
+ * fix is their certificate, or installing it on the device.
+ *
+ * An untrusted chain surfaces as an [SSLHandshakeException] caused by a
+ * [CertificateException]; other handshake failures (no shared protocol or
+ * cipher) keep the generic message. A trusted certificate that doesn't name
+ * the host is OkHttp's [SSLPeerUnverifiedException], which a self-signed
+ * certificate for an IP address hits when the IP is only in its CN.
+ */
+internal fun connectFailureReason(e: Exception): UiText =
+    when {
+        e is SSLPeerUnverifiedException -> {
+            UiText.Res(R.string.login_error_certificate_hostname)
+        }
+
+        e is SSLHandshakeException &&
+            generateSequence<Throwable>(e) { it.cause }.any { it is CertificateException } -> {
+            UiText.Res(R.string.login_error_untrusted_certificate)
+        }
+
+        else -> {
+            UiText.Res(R.string.login_error_connect_failed, listOf(e.message.toString()))
         }
     }
 

@@ -10,6 +10,10 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import java.security.cert.CertPathValidatorException
+import java.security.cert.CertificateException
+import javax.net.ssl.SSLHandshakeException
+import javax.net.ssl.SSLPeerUnverifiedException
 
 class NextcloudLoginFlowTest {
     private lateinit var server: MockWebServer
@@ -202,6 +206,34 @@ class NextcloudLoginFlowTest {
                 (status as LoginFlowStatus.Error).reason,
             )
         }
+
+    @Test
+    fun `an untrusted certificate chain gets the certificate message`() {
+        // The shape Conscrypt throws for a self-signed or private-CA server.
+        val validator = CertPathValidatorException("Trust anchor for certification path not found.")
+        val e = SSLHandshakeException(validator.toString()).apply {
+            initCause(CertificateException(validator))
+        }
+
+        assertEquals(UiText.Res(R.string.login_error_untrusted_certificate), connectFailureReason(e))
+    }
+
+    @Test
+    fun `a certificate that doesn't name the host gets the hostname message`() {
+        val e = SSLPeerUnverifiedException("Hostname 192.168.1.10 not verified")
+
+        assertEquals(UiText.Res(R.string.login_error_certificate_hostname), connectFailureReason(e))
+    }
+
+    @Test
+    fun `a handshake failure unrelated to the certificate keeps the generic message`() {
+        val e = SSLHandshakeException("Connection closed by peer")
+
+        assertEquals(
+            UiText.Res(R.string.login_error_connect_failed, listOf("Connection closed by peer")),
+            connectFailureReason(e),
+        )
+    }
 
     @Test
     fun `poll refuses an endpoint on a different origin without making a request`() =

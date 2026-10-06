@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config xmlns:tools="http://schemas.android.com/tools">
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+            <!-- Self-hosted servers often use a self-signed certificate or a
+                 private CA. Installing that certificate on the device is the
+                 only way to reach them, and an app targeting API 24+ ignores
+                 user-installed CAs unless it opts in here. -->
+            <certificates
+                src="user"
+                tools:ignore="AcceptsUserCertificates" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

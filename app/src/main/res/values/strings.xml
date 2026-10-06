@@ -360,6 +360,8 @@
     <string name="login_error_foreign_login_url">Server returned a login URL for a different host</string>
     <string name="login_error_foreign_credentials">Server returned credentials for a different host</string>
     <string name="login_error_connect_failed">Failed to connect: %1$s</string>
+    <string name="login_error_untrusted_certificate">This device doesn\'t trust the server\'s certificate. If your server uses a self-signed certificate or a private certificate authority, install that certificate on this device as a CA certificate.</string>
+    <string name="login_error_certificate_hostname">The server\'s certificate isn\'t valid for this address. To connect by IP address, the certificate must list that IP as a subject alternative name.</string>
     <string name="login_error_connection_failed">Connection failed</string>
     <string name="login_error_timed_out">Login timed out</string>
     <string name="login_error_unusable_address">The server returned an address Crate can\'t use.</string>

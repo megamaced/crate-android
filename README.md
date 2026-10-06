@@ -49,6 +49,7 @@ There's a manual **Check for updates** button under *Settings → About* that po
 
 - Android 10 (API 29) or newer
 - A Nextcloud instance running the [Crate server app](https://github.com/megamaced/crate)
+- HTTPS. A self-signed certificate or private CA works once that certificate is installed on the device as a CA certificate (Android's security settings, usually under *Encryption & credentials*). To connect by IP address, the certificate must list that IP as a subject alternative name.
 
 ## Installation
 

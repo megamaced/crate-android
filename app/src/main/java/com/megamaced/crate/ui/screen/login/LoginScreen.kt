@@ -19,6 +19,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -67,7 +68,8 @@ fun LoginScreen(
     val errorText = uiState.error?.resolve()
     LaunchedEffect(errorText) {
         errorText?.let { error ->
-            snackbarHostState.showSnackbar(error)
+            // Long: the certificate errors are instructions, not a status blip.
+            snackbarHostState.showSnackbar(error, duration = SnackbarDuration.Long)
             viewModel.dismissError()
         }
     }
