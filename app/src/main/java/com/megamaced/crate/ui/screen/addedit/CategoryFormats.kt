@@ -28,7 +28,7 @@ object CategoryFormats {
         ),
         Group(
             R.string.format_group_disc,
-            listOf("CD", "SACD", "CD-R", "SHM-CD", "HDCD", "CDV", "Blu-ray Audio", "DVD-Audio", "LaserDisc", "MiniDisc"),
+            listOf("CD", "SACD", "CD-R", "SHM-CD", "HDCD", "Blu-ray Audio", "DVD-Audio", "MiniDisc"),
         ),
     )
 
