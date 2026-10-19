@@ -81,8 +81,6 @@ class BarcodeScanViewModel
             }
         }
 
-        fun manualOverride(): ExternalSearchResult? = _uiState.value.barcode?.let { ExternalSearchResult(title = "", barcode = it) }
-
         private suspend fun lookup(
             barcode: String,
             category: Category?,

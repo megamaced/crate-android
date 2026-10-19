@@ -131,8 +131,6 @@ class LoginViewModel
                             it.copy(isPolling = false, error = status.reason)
                         }
                     }
-
-                    LoginFlowStatus.Polling -> { /* unreachable from poll() return */ }
                 }
             }
         }

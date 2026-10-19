@@ -5,8 +5,6 @@ import com.megamaced.crate.data.api.dto.AddPlaylistItemRequest
 import com.megamaced.crate.data.api.dto.ComicVineSearchResultDto
 import com.megamaced.crate.data.api.dto.CreateMediaItemRequest
 import com.megamaced.crate.data.api.dto.CreatePlaylistRequest
-import com.megamaced.crate.data.api.dto.CurrencyRequest
-import com.megamaced.crate.data.api.dto.CurrencyResponseDto
 import com.megamaced.crate.data.api.dto.DiscogsSearchResultDto
 import com.megamaced.crate.data.api.dto.HasKeyDto
 import com.megamaced.crate.data.api.dto.HasTokenDto
@@ -167,8 +165,6 @@ class FakeCrateApiService : CrateApiService {
     override suspend fun getMarketSettings(): MarketSettingsDto = unsupported()
 
     override suspend fun setMarketSettings(body: MarketSettingsDto) = unsupported()
-
-    override suspend fun setCurrency(body: CurrencyRequest): CurrencyResponseDto = unsupported()
 
     override suspend fun getCurrencies(): List<String> = unsupported()
 

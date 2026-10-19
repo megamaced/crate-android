@@ -39,8 +39,6 @@ data class LoginFlowResult(
 )
 
 sealed interface LoginFlowStatus {
-    data object Polling : LoginFlowStatus
-
     data class Success(
         val result: LoginFlowResult,
     ) : LoginFlowStatus

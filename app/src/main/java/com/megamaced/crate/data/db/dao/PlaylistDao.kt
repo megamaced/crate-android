@@ -51,9 +51,6 @@ interface PlaylistDao {
     @Query("SELECT id FROM playlists WHERE userId IS NULL OR userId = :ownerId")
     suspend fun idsOwnedBy(ownerId: String): List<Long>
 
-    @Query("SELECT id FROM playlists")
-    suspend fun allIds(): List<Long>
-
     @Query("DELETE FROM playlists WHERE id IN (:ids)")
     suspend fun deleteByIds(ids: List<Long>)
 

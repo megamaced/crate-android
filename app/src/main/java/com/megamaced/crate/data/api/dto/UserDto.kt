@@ -64,13 +64,3 @@ data class MarketSettingsDto(
     val autoEnrichOnClick: Boolean = true,
     val autoEnrichOnImport: Boolean = true,
 )
-
-@Serializable
-data class CurrencyRequest(
-    val currency: String,
-)
-
-@Serializable
-data class CurrencyResponseDto(
-    val marketCurrency: String,
-)

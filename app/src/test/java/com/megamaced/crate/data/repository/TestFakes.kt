@@ -94,8 +94,6 @@ class FakePlaylistDao : PlaylistDao {
         crossRefs.value = emptyList()
     }
 
-    override suspend fun allIds(): List<Long> = playlists.value.map { it.id }
-
     override suspend fun idsOwnedBy(ownerId: String): List<Long> =
         playlists.value.filter { it.userId == null || it.userId == ownerId }.map { it.id }
 

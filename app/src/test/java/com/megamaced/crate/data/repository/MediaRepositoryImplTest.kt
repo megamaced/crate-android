@@ -759,23 +759,12 @@ class MediaRepositoryImplTest {
 }
 
 private class NoopBinaryService : CrateBinaryService {
-    override suspend fun getArtwork(
-        itemId: Long,
-        size: String?,
-    ) = error("not used")
-
     override suspend fun uploadArtwork(
         itemId: Long,
         file: okhttp3.MultipartBody.Part,
     ) = error("not used")
 
     override suspend fun deleteArtwork(itemId: Long) = error("not used")
-
-    override suspend fun getPhoto(
-        itemId: Long,
-        slot: Int,
-        size: String?,
-    ) = error("not used")
 
     override suspend fun uploadPhoto(
         itemId: Long,

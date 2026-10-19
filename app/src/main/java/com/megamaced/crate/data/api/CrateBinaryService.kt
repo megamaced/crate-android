@@ -3,26 +3,17 @@ package com.megamaced.crate.data.api
 import okhttp3.MultipartBody
 import okhttp3.ResponseBody
 import retrofit2.http.DELETE
-import retrofit2.http.GET
 import retrofit2.http.Multipart
 import retrofit2.http.POST
 import retrofit2.http.Part
 import retrofit2.http.Path
-import retrofit2.http.Query
-import retrofit2.http.Streaming
 
 /**
- * Non-OCS endpoints that return raw binary (artwork images, export files)
- * or accept multipart uploads. These bypass the OCS envelope converter.
+ * Non-OCS endpoints that accept multipart uploads or deletions of an item's
+ * images. These bypass the OCS envelope converter. Reading the images is
+ * Coil's job, through the same authenticated client.
  */
 interface CrateBinaryService {
-    @Streaming
-    @GET("apps/crate/artwork/{itemId}")
-    suspend fun getArtwork(
-        @Path("itemId") itemId: Long,
-        @Query("size") size: String? = null,
-    ): ResponseBody
-
     @Multipart
     @POST("apps/crate/artwork/{itemId}")
     suspend fun uploadArtwork(
@@ -34,14 +25,6 @@ interface CrateBinaryService {
     suspend fun deleteArtwork(
         @Path("itemId") itemId: Long,
     )
-
-    @Streaming
-    @GET("apps/crate/photo/{itemId}/{slot}")
-    suspend fun getPhoto(
-        @Path("itemId") itemId: Long,
-        @Path("slot") slot: Int,
-        @Query("size") size: String? = null,
-    ): ResponseBody
 
     @Multipart
     @POST("apps/crate/photo/{itemId}/{slot}")

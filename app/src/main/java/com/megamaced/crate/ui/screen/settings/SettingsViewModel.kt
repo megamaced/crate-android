@@ -324,11 +324,6 @@ class SettingsViewModel
             updateMarket(current.copy(autoEnrichOnClick = enabled))
         }
 
-        fun setAutoEnrichOnImport(enabled: Boolean) {
-            val current = market.value.settings ?: return
-            updateMarket(current.copy(autoEnrichOnImport = enabled))
-        }
-
         fun setOnlineRecommendations(enabled: Boolean) {
             viewModelScope.launch {
                 if (settingsRepository.setOnlineRecommendations(enabled) !is ApiResult.Success) {

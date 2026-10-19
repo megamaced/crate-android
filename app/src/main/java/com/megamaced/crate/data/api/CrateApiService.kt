@@ -4,8 +4,6 @@ import com.megamaced.crate.data.api.dto.AddPlaylistItemRequest
 import com.megamaced.crate.data.api.dto.ComicVineSearchResultDto
 import com.megamaced.crate.data.api.dto.CreateMediaItemRequest
 import com.megamaced.crate.data.api.dto.CreatePlaylistRequest
-import com.megamaced.crate.data.api.dto.CurrencyRequest
-import com.megamaced.crate.data.api.dto.CurrencyResponseDto
 import com.megamaced.crate.data.api.dto.DiscogsSearchResultDto
 import com.megamaced.crate.data.api.dto.HasKeyDto
 import com.megamaced.crate.data.api.dto.HasTokenDto
@@ -110,12 +108,6 @@ interface CrateApiService {
     suspend fun setMarketSettings(
         @Body body: MarketSettingsDto,
     )
-
-    @OcsResponse
-    @PUT(API_BASE + "settings/currency")
-    suspend fun setCurrency(
-        @Body body: CurrencyRequest,
-    ): CurrencyResponseDto
 
     @OcsResponse
     @GET(API_BASE + "settings/currencies")
