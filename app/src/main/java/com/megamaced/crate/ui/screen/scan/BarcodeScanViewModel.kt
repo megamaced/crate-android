@@ -52,7 +52,10 @@ class BarcodeScanViewModel
 
         fun onBarcodeDetected(raw: String) {
             val current = _uiState.value
-            if (current.isLooking || current.barcode == raw) return
+            // While a candidate sheet is open, its barcode is the one the user
+            // is choosing for: a later scan must not replace it underneath
+            // them, however the camera came to be running.
+            if (current.sheetOpen || current.isLooking || current.barcode == raw) return
             _uiState.update {
                 it.copy(barcode = raw, isLooking = true, sheetOpen = true, errorMessage = null)
             }

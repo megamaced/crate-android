@@ -169,26 +169,14 @@ private fun CameraPreview(
     // The camera follows the host lifecycle, not just composition: releasing it
     // only on removal leaves the device held (and the privacy indicator lit)
     // while the app is in the background, and other camera apps can't acquire
-    // it. This effect owns the initial resume too.
-    LifecycleResumeEffect(barcodeView) {
-        barcodeView.resume()
+    // it. It also stays paused while the candidate sheet is up, and both have
+    // to agree: keyed on [paused], this one effect pauses when either the host
+    // pauses or the sheet opens, and resumes only when the host is resumed
+    // with no sheet open — so coming back from the background with a sheet up
+    // leaves the camera off.
+    LifecycleResumeEffect(barcodeView, paused) {
+        if (!paused) barcodeView.resume()
         onPauseOrDispose { barcodeView.pause() }
-    }
-
-    // The candidate sheet pauses the preview while it is up. Skipped on the
-    // first pass so it can't double-resume over the lifecycle effect above.
-    var sheetHasOpened by remember { mutableStateOf(false) }
-    LaunchedEffect(paused) {
-        when {
-            paused -> {
-                sheetHasOpened = true
-                barcodeView.pause()
-            }
-
-            sheetHasOpened -> {
-                barcodeView.resume()
-            }
-        }
     }
 
     AndroidView(
