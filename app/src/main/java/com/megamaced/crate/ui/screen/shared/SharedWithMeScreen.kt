@@ -177,7 +177,9 @@ private fun CategoryTile(
                 text = stringResource(summary.labelRes),
                 style = MaterialTheme.typography.titleMedium,
             )
-            val owners = summary.owners
+            // An empty category shared read/write has no items to name an owner
+            // by, but it is still somebody's collection.
+            val owners = summary.owners.ifEmpty { summary.writeOwners }
             // A named owner reads better than "1 person", so the plural only
             // covers the case where the category spans several of them.
             val ownerText =

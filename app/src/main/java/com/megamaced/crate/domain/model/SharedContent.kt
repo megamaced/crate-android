@@ -74,16 +74,32 @@ fun SharedWithMe.writeOwnersForCategory(category: Category): List<String> {
 }
 
 /**
- * Categories with at least one shared item, in the app's standard order, each
- * with its label, count, items and owner metadata. Drives the landing tiles and
- * the per-category subpages. Mirrors sharedCategories.
+ * Categories the viewer may add to: the category of each read/write category
+ * share, and every category of a read/write whole-library share. The grant is
+ * what gives the viewer somewhere to add, so it counts before the owner has a
+ * single item there. Mirrors writableCategories.
+ */
+fun SharedWithMe.writableCategories(): Set<Category> {
+    val writable = LinkedHashSet<Category>()
+    if (libraries.any { it.canWrite }) writable.addAll(CATEGORY_ORDER)
+    categories.forEach { share -> if (share.canWrite) share.category?.let(writable::add) }
+    return writable
+}
+
+/**
+ * Categories with at least one shared item, or that the viewer may add to, in
+ * the app's standard order, each with its label, count, items and owner
+ * metadata. Drives the landing tiles and the per-category subpages — so an
+ * empty collection shared read/write still has a tile, and through it an Add.
+ * Mirrors sharedCategories.
  */
 fun SharedWithMe.sharedCategories(): List<SharedCategorySummary> {
     val map = itemsByCategory()
+    val writable = writableCategories()
     return CATEGORY_ORDER
-        .filter { (map[it]?.size ?: 0) > 0 }
+        .filter { (map[it]?.size ?: 0) > 0 || it in writable }
         .map { category ->
-            val items = map.getValue(category)
+            val items = map[category].orEmpty()
             SharedCategorySummary(
                 category = category,
                 labelRes = category.labelRes,
