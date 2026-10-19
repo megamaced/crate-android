@@ -144,10 +144,14 @@ class SearchViewModel
         fun selectCategory(value: Category) {
             if (externalCategory.value != value) {
                 externalSearchJob?.cancel()
+                searchGeneration++
                 externalCategory.value = value
                 externalResults.value = emptyList()
                 externalHasSearched.value = false
                 externalError.value = null
+                // The cancelled search never reaches its own reset (apiCall
+                // rethrows cancellation), and the new provider has none running.
+                isExternalLoading.value = false
             }
         }
 
@@ -155,46 +159,59 @@ class SearchViewModel
         // can't overwrite newer results.
         private var externalSearchJob: Job? = null
 
+        // Bumped by every search and every provider change. A search touches
+        // the shared state only while it is still the latest, so a cancelled
+        // one cannot clear the spinner of the search that replaced it.
+        private var searchGeneration = 0
+
         fun runExternalSearch() {
             val q = query.value.trim()
             if (q.isBlank()) return
             val category = externalCategory.value
             externalSearchJob?.cancel()
+            val generation = ++searchGeneration
             externalSearchJob = viewModelScope.launch {
                 isExternalLoading.value = true
                 externalError.value = null
-                val result =
-                    apiCall {
-                        when (category) {
-                            Category.Music -> api.discogsSearch(q).map(DiscogsSearchResultDto::toResult)
-                            Category.Films -> api.tmdbSearch(q).map(TmdbSearchResultDto::toResult)
-                            Category.Books -> api.openLibrarySearch(q).map(OpenLibraryResultDto::toResult)
-                            Category.Games -> api.rawgSearch(q).map(RawgSearchResultDto::toResult)
-                            Category.Comics -> api.comicVineSearch(q).map(ComicVineSearchResultDto::toResult)
-                        }
-                    }
-                when (result) {
-                    is ApiResult.Success -> {
-                        externalResults.value = result.value
-                    }
-
-                    ApiResult.NetworkError -> {
-                        externalError.value = UiText.Res(R.string.error_network)
-                    }
-
-                    is ApiResult.HttpError -> {
-                        externalError.value =
-                            when (result.code) {
-                                400 -> UiText.Res(R.string.error_provider_token_missing)
-                                else -> result.toUiText()
+                try {
+                    val result =
+                        apiCall {
+                            when (category) {
+                                Category.Music -> api.discogsSearch(q).map(DiscogsSearchResultDto::toResult)
+                                Category.Films -> api.tmdbSearch(q).map(TmdbSearchResultDto::toResult)
+                                Category.Books -> api.openLibrarySearch(q).map(OpenLibraryResultDto::toResult)
+                                Category.Games -> api.rawgSearch(q).map(RawgSearchResultDto::toResult)
+                                Category.Comics -> api.comicVineSearch(q).map(ComicVineSearchResultDto::toResult)
                             }
-                    }
-
-                    ApiResult.Unauthorised -> { /* SessionManager handles */ }
+                        }
+                    if (generation == searchGeneration) showExternalResult(result)
+                } finally {
+                    if (generation == searchGeneration) isExternalLoading.value = false
                 }
-                isExternalLoading.value = false
-                externalHasSearched.value = true
             }
+        }
+
+        private fun showExternalResult(result: ApiResult<List<ExternalSearchResult>>) {
+            when (result) {
+                is ApiResult.Success -> {
+                    externalResults.value = result.value
+                }
+
+                ApiResult.NetworkError -> {
+                    externalError.value = UiText.Res(R.string.error_network)
+                }
+
+                is ApiResult.HttpError -> {
+                    externalError.value =
+                        when (result.code) {
+                            400 -> UiText.Res(R.string.error_provider_token_missing)
+                            else -> result.toUiText()
+                        }
+                }
+
+                ApiResult.Unauthorised -> { /* SessionManager handles */ }
+            }
+            externalHasSearched.value = true
         }
 
         fun dismissExternalError() {
