@@ -247,4 +247,76 @@ class NextcloudLoginFlowTest {
             assertTrue(status is LoginFlowStatus.Error)
             assertEquals(0, server.requestCount)
         }
+
+    @Test
+    fun `poll refuses a 307 to another origin before the token goes there`() = assertForeignPollRedirectRefused(307)
+
+    @Test
+    fun `poll refuses a 308 to another origin before the token goes there`() = assertForeignPollRedirectRefused(308)
+
+    private fun assertForeignPollRedirectRefused(code: Int) =
+        runTest {
+            val elsewhere = MockWebServer()
+            elsewhere.start()
+            try {
+                server.enqueue(MockResponse().setResponseCode(code).setHeader("Location", elsewhere.url("/steal").toString()))
+                elsewhere.enqueue(MockResponse().setResponseCode(403))
+
+                val status = loginFlow.poll(
+                    endpoint = server.url("/login/v2/poll").toString(),
+                    token = "review-only-token",
+                    expectedOrigin = origin(),
+                )
+
+                assertEquals(LoginFlowStatus.Error(UiText.Res(R.string.login_error_foreign_login_url)), status)
+                assertEquals(1, server.requestCount)
+                assertEquals(0, elsewhere.requestCount)
+            } finally {
+                elsewhere.shutdown()
+            }
+        }
+
+    @Test
+    fun `poll follows a 307 within its own origin with the token`() =
+        runTest {
+            server.enqueue(MockResponse().setResponseCode(307).setHeader("Location", "/index.php/login/v2/poll"))
+            server.enqueue(
+                MockResponse().setResponseCode(200).setBody(
+                    """{"server": "${origin().trimEnd('/')}", "loginName": "testuser", "appPassword": "pw"}""",
+                ),
+            )
+
+            val status = loginFlow.poll(
+                endpoint = server.url("/login/v2/poll").toString(),
+                token = "test-token",
+                expectedOrigin = origin(),
+            )
+
+            assertTrue(status is LoginFlowStatus.Success)
+            server.takeRequest()
+            val followed = server.takeRequest()
+            assertEquals("POST", followed.method)
+            assertEquals("/index.php/login/v2/poll", followed.path)
+            assertEquals("token=test-token", followed.body.readUtf8())
+        }
+
+    @Test
+    fun `initiate refuses a redirect to another origin`() {
+        val elsewhere = MockWebServer()
+        elsewhere.start()
+        try {
+            server.enqueue(MockResponse().setResponseCode(308).setHeader("Location", elsewhere.url("/login/v2").toString()))
+
+            val result = loginFlow.initiate(origin())
+
+            assertTrue(result.isFailure)
+            assertEquals(
+                UiText.Res(R.string.login_error_foreign_login_url),
+                (result.exceptionOrNull() as LoginFlowException).reason,
+            )
+            assertEquals(0, elsewhere.requestCount)
+        } finally {
+            elsewhere.shutdown()
+        }
+    }
 }

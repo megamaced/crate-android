@@ -10,7 +10,9 @@ import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.Response
 import timber.log.Timber
+import java.io.IOException
 import java.security.cert.CertificateException
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -52,7 +54,15 @@ sealed interface LoginFlowStatus {
 class NextcloudLoginFlow
     @Inject
     constructor() {
-        private val client = OkHttpClient()
+        // Redirects are followed by hand (executeWithinOrigin), never by
+        // OkHttp: a 307 or 308 re-sends the POST body, and the poll's body is
+        // the flow token, which can be exchanged once for an app password.
+        private val client =
+            OkHttpClient
+                .Builder()
+                .followRedirects(false)
+                .followSslRedirects(false)
+                .build()
         private val json = Json { ignoreUnknownKeys = true }
 
         fun initiate(host: String): Result<LoginFlowInitResponse> {
@@ -70,7 +80,7 @@ class NextcloudLoginFlow
                 // use{}: only a consumed body closes itself, so an unsuccessful
                 // response left unread holds its connection until the pool
                 // evicts it. The poll below repeats this up to 60 times.
-                val body = client.newCall(request).execute().use { response ->
+                val body = executeWithinOrigin(request, origin).use { response ->
                     if (!response.isSuccessful) {
                         return Result.failure(
                             LoginFlowException(
@@ -94,6 +104,9 @@ class NextcloudLoginFlow
                     )
                 }
                 Result.success(initResponse)
+            } catch (e: ForeignRedirectException) {
+                Timber.w(e, "Login flow initiation redirected off its origin")
+                Result.failure(LoginFlowException(UiText.Res(R.string.login_error_foreign_login_url), e))
             } catch (e: Exception) {
                 Timber.e(e, "Login flow initiation failed")
                 Result.failure(LoginFlowException(connectFailureReason(e), e))
@@ -133,7 +146,7 @@ class NextcloudLoginFlow
                     // "not authorised yet" — the normal case, and the one that
                     // repeats. Leaking those exhausts connections and file
                     // descriptors over a single login.
-                    client.newCall(request).execute().use { response ->
+                    executeWithinOrigin(request, origin).use { response ->
                         when (response.code) {
                             200 -> {
                                 val responseBody = response.body?.string()
@@ -163,12 +176,55 @@ class NextcloudLoginFlow
                             }
                         }
                     }
+                } catch (e: ForeignRedirectException) {
+                    // Refused before anything was sent there; asking again
+                    // would only be redirected again.
+                    Timber.w(e, "Poll redirected off its origin")
+                    return LoginFlowStatus.Error(UiText.Res(R.string.login_error_foreign_login_url))
                 } catch (e: Exception) {
                     Timber.w(e, "Poll attempt failed")
                 }
                 delay(POLL_INTERVAL_MS)
             }
             return LoginFlowStatus.Error(UiText.Res(R.string.login_error_timed_out))
+        }
+
+        /**
+         * Executes [request], following a redirect only while it stays on
+         * [origin]: same scheme, host and port, checked before the next request
+         * is made. A 307 or 308 keeps the method and body — the poll's body is
+         * the flow token — so a redirect elsewhere is refused rather than
+         * followed; a 301, 302 or 303 continues as a GET without a body, as
+         * OkHttp itself would.
+         *
+         * @throws ForeignRedirectException when a redirect leaves [origin]
+         */
+        private fun executeWithinOrigin(
+            request: Request,
+            origin: HttpUrl,
+        ): Response {
+            var current = request
+            repeat(MAX_REDIRECTS + 1) {
+                val response = client.newCall(current).execute()
+                if (!response.isRedirect) return response
+                val target = response.header("Location")?.let { current.url.resolve(it) }
+                val code = response.code
+                response.close()
+                if (target == null || !isSameOrigin(origin, target.toString())) {
+                    throw ForeignRedirectException(current.url.redact(), target?.redact())
+                }
+                current =
+                    if (code == HTTP_TEMPORARY_REDIRECT || code == HTTP_PERMANENT_REDIRECT) {
+                        current.newBuilder().url(target).build()
+                    } else {
+                        current
+                            .newBuilder()
+                            .url(target)
+                            .get()
+                            .build()
+                    }
+            }
+            throw IOException("Too many redirects from ${request.url.redact()}")
         }
 
         /**
@@ -190,8 +246,17 @@ class NextcloudLoginFlow
             private const val USER_AGENT = "Crate Android"
             private const val POLL_INTERVAL_MS = 5_000L
             private const val MAX_POLL_ATTEMPTS = 60 // 5 minutes total
+            private const val MAX_REDIRECTS = 5
+            private const val HTTP_TEMPORARY_REDIRECT = 307
+            private const val HTTP_PERMANENT_REDIRECT = 308
         }
     }
+
+/** A login request redirected off the origin the user typed; nothing was sent there. */
+class ForeignRedirectException(
+    from: String,
+    to: String?,
+) : IOException("Redirect from $from to ${to ?: "an unreadable location"} leaves the login origin")
 
 /**
  * What the login screen says when the server can't be reached. Certificate
