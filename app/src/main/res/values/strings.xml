@@ -187,6 +187,7 @@
 
     <!-- Item detail -->
     <string name="detail_not_found">Item not found</string>
+    <string name="action_retry">Retry</string>
     <string name="detail_delete_title">Delete this item?</string>
     <string name="detail_delete_message">This removes it from your collection on the server. This cannot be undone.</string>
     <string name="detail_menu_enrich">Enrich</string>

@@ -222,13 +222,22 @@ fun ItemDetailScreen(
             }
 
             item == null -> {
-                Box(
+                Column(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(innerPadding),
-                    contentAlignment = Alignment.Center,
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    Text(stringResource(R.string.detail_not_found), style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        uiState.loadError?.resolve() ?: stringResource(R.string.detail_not_found),
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                    if (uiState.loadError != null) {
+                        TextButton(onClick = viewModel::retry) {
+                            Text(stringResource(R.string.action_retry))
+                        }
+                    }
                 }
             }
 

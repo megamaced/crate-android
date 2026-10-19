@@ -2,6 +2,7 @@ package com.megamaced.crate.ui.screen.detail
 
 import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
+import com.megamaced.crate.R
 import com.megamaced.crate.data.api.ApiResult
 import com.megamaced.crate.data.repository.FakeCrateApiService
 import com.megamaced.crate.domain.model.Category
@@ -17,6 +18,7 @@ import com.megamaced.crate.domain.repository.EnrichmentRepository
 import com.megamaced.crate.domain.repository.MediaRepository
 import com.megamaced.crate.domain.repository.MediaRepository.RefreshResult
 import com.megamaced.crate.domain.repository.SettingsRepository
+import com.megamaced.crate.util.UiText
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -29,6 +31,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -78,6 +81,61 @@ class ItemDetailViewModelTest {
             assertEquals(listOf(7L), media.deletedIds)
         }
 
+    @Test
+    fun `an uncached item that cannot be found stops loading and says so`() =
+        runTest {
+            val vm = newViewModel(FakeMediaRepository(), FakeEnrichmentRepository(), itemId = 7)
+
+            vm.uiState.test {
+                var current = awaitItem()
+                while (current.isLoading) current = awaitItem()
+                assertEquals(null, current.item)
+                assertEquals(UiText.Res(R.string.detail_not_found), current.loadError)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `an uncached item that failed offline can be retried`() =
+        runTest {
+            val media = FakeMediaRepository().apply { refreshOutcomes += ApiResult.NetworkError }
+            val vm = newViewModel(media, FakeEnrichmentRepository(), itemId = 7)
+
+            vm.uiState.test {
+                var current = awaitItem()
+                while (current.loadError == null) current = awaitItem()
+                assertFalse(current.isLoading)
+                assertEquals(UiText.Res(R.string.error_network), current.loadError)
+
+                // Back online, the item arrives and the error goes.
+                media.seed(listOf(item(7)))
+                vm.retry()
+                while (current.item == null || current.loadError != null) current = awaitItem()
+                assertEquals(7L, current.item?.id)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `a cached item stays on screen when its refresh fails`() =
+        runTest {
+            val media =
+                FakeMediaRepository().apply {
+                    seed(listOf(item(7)))
+                    refreshOutcomes += ApiResult.NetworkError
+                }
+            val vm = newViewModel(media, FakeEnrichmentRepository(), itemId = 7)
+            advanceUntilIdle()
+
+            vm.uiState.test {
+                var current = awaitItem()
+                while (current.item == null) current = awaitItem()
+                assertEquals(null, current.loadError)
+                assertFalse(current.isLoading)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
     private fun newViewModel(
         media: MediaRepository,
         enrichment: EnrichmentRepository,
@@ -122,7 +180,11 @@ private class FakeMediaRepository : MediaRepository {
         offset: Int,
     ): ApiResult<RefreshResult> = ApiResult.Success(RefreshResult(0, limit, offset, 0))
 
+    /** Outcomes refreshSingle gives before falling back to the seeded rows, in order. */
+    val refreshOutcomes = ArrayDeque<ApiResult<MediaItem>>()
+
     override suspend fun refreshSingle(id: Long): ApiResult<MediaItem> {
+        refreshOutcomes.removeFirstOrNull()?.let { return it }
         val match = items.value.firstOrNull { it.id == id } ?: return ApiResult.HttpError(404, "missing")
         return ApiResult.Success(match)
     }

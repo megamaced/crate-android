@@ -54,7 +54,21 @@ data class ItemDetailUiState(
     // Delete and re-share stay owner-only regardless (see [isOwner]).
     val canWrite: Boolean = false,
     val sharedByUser: String? = null,
+    // Why the item could not be loaded, when there is no cached copy to show
+    // instead: the screen offers [ItemDetailViewModel.retry] in its place.
+    val loadError: UiText? = null,
 )
+
+/** Where the network fetch of the item stands, apart from what Room holds. */
+private sealed interface ItemFetch {
+    data object Pending : ItemFetch
+
+    data object Done : ItemFetch
+
+    data class Failed(
+        val reason: UiText,
+    ) : ItemFetch
+}
 
 /**
  * The two suggestion rows, kept separate from [ItemDetailUiState] because they
@@ -106,6 +120,11 @@ class ItemDetailViewModel
         // don't rely on this — ownership already grants write.
         private val sharedCanWrite = MutableStateFlow(false)
 
+        // Loading used to be "no Room row yet", which an uncached item whose
+        // fetch failed — offline, or a share revoked to a 404 — stayed in for
+        // good. The fetch's own outcome ends it.
+        private val itemFetch = MutableStateFlow<ItemFetch>(ItemFetch.Pending)
+
         // Login name is read once at construction; it doesn't change without
         // a re-authentication that would tear this ViewModel down anyway.
         private val currentLoginName: String? = currentSession.loginName()
@@ -116,8 +135,8 @@ class ItemDetailViewModel
                 activeAction,
                 errorMessage,
                 deleted,
-                sharedCanWrite,
-            ) { item, action, err, isDeleted, canWriteShare ->
+                combine(sharedCanWrite, itemFetch, ::Pair),
+            ) { item, action, err, isDeleted, (canWriteShare, fetch) ->
                 val itemOwner = item?.userId
                 // Fail closed: an item carries an explicit owner only when it
                 // reached us via a share, so a known owner we can't positively
@@ -136,7 +155,10 @@ class ItemDetailViewModel
                 ItemDetailUiState(
                     itemId = itemId,
                     item = item,
-                    isLoading = item == null && !isDeleted,
+                    isLoading = item == null && !isDeleted && fetch == ItemFetch.Pending,
+                    // A cached copy stays on screen when a refresh fails; the
+                    // reason is only shown when there is nothing else to show.
+                    loadError = (fetch as? ItemFetch.Failed)?.reason?.takeIf { item == null },
                     activeAction = action,
                     errorMessage = err,
                     deleted = isDeleted,
@@ -214,13 +236,41 @@ class ItemDetailViewModel
                 val me = (settingsRepository.getMe() as? ApiResult.Success)?.value
                 me?.marketCurrency?.takeIf { it.isNotBlank() }?.let { marketCurrency.value = it }
                 launch { loadOnlineSuggestions() }
-                val refreshed = mediaRepository.refreshSingle(itemId)
-                // Capture the per-item write permission from the network fetch;
-                // it isn't carried through Room, so this is our only source.
-                val networkCanWrite = (refreshed as? ApiResult.Success)?.value?.canWrite == true
-                sharedCanWrite.value = networkCanWrite
+                val networkCanWrite = fetchItem()
                 if (me != null) runAutoBackgroundFetches(me, networkCanWrite)
             }
+        }
+
+        /** Try the fetch again after it failed with nothing cached to show. */
+        fun retry() {
+            if (itemFetch.value !is ItemFetch.Failed) return
+            itemFetch.value = ItemFetch.Pending
+            viewModelScope.launch { fetchItem() }
+        }
+
+        /**
+         * Refresh the item from the server and record how that went. Returns
+         * the per-item write permission, which comes only from this fetch —
+         * it isn't carried through Room.
+         */
+        private suspend fun fetchItem(): Boolean {
+            val refreshed = mediaRepository.refreshSingle(itemId)
+            itemFetch.value =
+                when (refreshed) {
+                    is ApiResult.Success -> ItemFetch.Done
+
+                    is ApiResult.HttpError -> ItemFetch.Failed(
+                        if (refreshed.code == HTTP_NOT_FOUND) UiText.Res(R.string.detail_not_found) else refreshed.toUiText(),
+                    )
+
+                    ApiResult.NetworkError -> ItemFetch.Failed(UiText.Res(R.string.error_network))
+
+                    // SessionManager signs out; nothing to retry here.
+                    ApiResult.Unauthorised -> ItemFetch.Done
+                }
+            val networkCanWrite = (refreshed as? ApiResult.Success)?.value?.canWrite == true
+            sharedCanWrite.value = networkCanWrite
+            return networkCanWrite
         }
 
         private suspend fun runAutoBackgroundFetches(
@@ -324,6 +374,8 @@ class ItemDetailViewModel
 
 /** Fallback currency, matching the server's own default for the endpoint. */
 private const val DEFAULT_MARKET_CURRENCY = "GBP"
+
+private const val HTTP_NOT_FOUND = 404
 
 private fun MediaItem.toSuggestionEntry(): SuggestionEntry =
     SuggestionEntry(
