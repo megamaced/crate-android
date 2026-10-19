@@ -1,6 +1,8 @@
 package com.megamaced.crate.data.api
 
 import com.megamaced.crate.R
+import com.megamaced.crate.data.auth.StaleSessionException
+import com.megamaced.crate.data.auth.stampedWithSession
 import com.megamaced.crate.util.ExifStripFailedException
 import com.megamaced.crate.util.UiText
 import kotlinx.coroutines.CancellationException
@@ -98,7 +100,14 @@ private fun JsonObject.stringOrNull(key: String): String? =
 
 suspend inline fun <T> apiCall(crossinline block: suspend () -> T): ApiResult<T> =
     try {
-        ApiResult.Success(block())
+        // Whatever the call writes to the cache belongs to the session it
+        // started in; see SessionGeneration.
+        ApiResult.Success(stampedWithSession { block() })
+    } catch (e: StaleSessionException) {
+        // That session ended while the call ran, and its result was dropped
+        // rather than written into the next one's cache.
+        Timber.i(e, "Result discarded: its session has ended")
+        ApiResult.Unauthorised
     } catch (e: HttpException) {
         when (e.code()) {
             401 -> ApiResult.Unauthorised

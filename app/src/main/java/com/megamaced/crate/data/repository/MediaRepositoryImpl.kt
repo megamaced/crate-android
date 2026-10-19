@@ -4,6 +4,7 @@ import com.megamaced.crate.data.api.ApiResult
 import com.megamaced.crate.data.api.CrateApiService
 import com.megamaced.crate.data.api.CrateBinaryService
 import com.megamaced.crate.data.api.apiCall
+import com.megamaced.crate.data.auth.SessionGeneration
 import com.megamaced.crate.data.db.dao.MediaItemDao
 import com.megamaced.crate.data.db.dao.PlaylistDao
 import com.megamaced.crate.data.mapper.MediaItemJsonCodec
@@ -251,7 +252,9 @@ class MediaRepositoryImpl
                         null
                     }
                 ) ?: probe.items.firstOrNull()?.userId
-                if (ownerId != null) accountPrefs.setCurrentUserId(ownerId)
+                // Session-bound like the rows: a sync that outlives its session
+                // must not name the next one's owner.
+                if (ownerId != null) SessionGeneration.write { accountPrefs.setCurrentUserId(ownerId) }
 
                 // If the server has been wiped since our last sync, our local
                 // rows are stale (re-import generates new IDs, so delta sync

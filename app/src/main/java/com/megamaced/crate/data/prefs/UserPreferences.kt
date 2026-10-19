@@ -73,6 +73,21 @@ interface AccountPrefs {
     suspend fun setCurrentUserId(userId: String?)
 }
 
+/**
+ * The server profile mirrored locally from `/me`: who we are, plus the per-user
+ * settings the UI reads synchronously. An interface for the same reason as
+ * [AccountPrefs].
+ */
+interface ProfilePrefs : AccountPrefs {
+    val hiddenCategoriesFlow: Flow<Set<Category>>
+
+    suspend fun setHiddenCategories(categories: Set<Category>)
+
+    val onlineRecommendationsFlow: Flow<Boolean>
+
+    suspend fun setOnlineRecommendations(enabled: Boolean)
+}
+
 data class UserPrefs(
     val currentUserId: String? = null,
     val lastSyncCursor: String? = null,
@@ -93,7 +108,7 @@ class UserPreferences
     constructor(
         @ApplicationContext private val context: Context,
     ) : CollectionPrefs,
-        AccountPrefs {
+        ProfilePrefs {
         private val ds get() = context.dataStore
 
         val flow: Flow<UserPrefs> =
@@ -124,15 +139,15 @@ class UserPreferences
             ds.edit { it.write(Keys.CURRENT_USER_ID, userId) }
         }
 
-        val hiddenCategoriesFlow: Flow<Set<Category>> = flow.map { it.hiddenCategories }
+        override val hiddenCategoriesFlow: Flow<Set<Category>> = flow.map { it.hiddenCategories }
 
-        suspend fun setHiddenCategories(categories: Set<Category>) {
+        override suspend fun setHiddenCategories(categories: Set<Category>) {
             ds.edit { it[Keys.HIDDEN_CATEGORIES] = categories.map { c -> c.apiValue }.toSet() }
         }
 
-        val onlineRecommendationsFlow: Flow<Boolean> = flow.map { it.onlineRecommendations }
+        override val onlineRecommendationsFlow: Flow<Boolean> = flow.map { it.onlineRecommendations }
 
-        suspend fun setOnlineRecommendations(enabled: Boolean) {
+        override suspend fun setOnlineRecommendations(enabled: Boolean) {
             ds.edit { it[Keys.ONLINE_RECOMMENDATIONS] = enabled }
         }
 

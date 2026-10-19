@@ -6,6 +6,7 @@ import com.megamaced.crate.data.api.apiCall
 import com.megamaced.crate.data.api.dto.AddPlaylistItemRequest
 import com.megamaced.crate.data.api.dto.CreatePlaylistRequest
 import com.megamaced.crate.data.api.dto.PlaylistDto
+import com.megamaced.crate.data.auth.stampedWithSession
 import com.megamaced.crate.data.db.dao.MediaItemDao
 import com.megamaced.crate.data.db.dao.PlaylistDao
 import com.megamaced.crate.data.mapper.MediaItemJsonCodec
@@ -88,15 +89,23 @@ class PlaylistRepositoryImpl
                 playlist.toDomain()
             }
 
-        override suspend fun delete(id: Long): ApiResult<Unit> {
-            val result = apiCall { api.deletePlaylist(id) }
-            // A playlist already deleted elsewhere answers 404. The local row is
-            // then the stale copy, and refusing to drop it strands it on the
-            // phone: it can't be opened and can't be deleted. Treat it as done.
-            val gone = result is ApiResult.HttpError && result.code == 404
-            if (result is ApiResult.Success || gone) dao.delete(id)
-            return if (gone) ApiResult.Success(Unit) else result
-        }
+        override suspend fun delete(id: Long): ApiResult<Unit> =
+            // Stamped across both calls, so the local delete belongs to the
+            // session the server delete was made for (see SessionGeneration).
+            stampedWithSession {
+                val result = apiCall { api.deletePlaylist(id) }
+                // A playlist already deleted elsewhere answers 404. The local row
+                // is then the stale copy, and refusing to drop it strands it on
+                // the phone: it can't be opened and can't be deleted. Treat it
+                // as done.
+                val gone = result is ApiResult.HttpError && result.code == 404
+                val dropped = if (result is ApiResult.Success || gone) apiCall { dao.delete(id) } else null
+                when {
+                    dropped is ApiResult.Unauthorised -> dropped
+                    gone -> ApiResult.Success(Unit)
+                    else -> result
+                }
+            }
 
         override suspend fun addItem(
             playlistId: Long,

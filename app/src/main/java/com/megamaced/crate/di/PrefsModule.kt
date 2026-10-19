@@ -2,6 +2,7 @@ package com.megamaced.crate.di
 
 import com.megamaced.crate.data.prefs.AccountPrefs
 import com.megamaced.crate.data.prefs.CollectionPrefs
+import com.megamaced.crate.data.prefs.ProfilePrefs
 import com.megamaced.crate.data.prefs.UserPreferences
 import dagger.Binds
 import dagger.Module
@@ -19,4 +20,8 @@ abstract class PrefsModule {
     @Binds
     @Singleton
     abstract fun bindAccountPrefs(impl: UserPreferences): AccountPrefs
+
+    @Binds
+    @Singleton
+    abstract fun bindProfilePrefs(impl: UserPreferences): ProfilePrefs
 }

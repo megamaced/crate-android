@@ -8,6 +8,8 @@ import com.megamaced.crate.data.db.CrateDatabase
 import com.megamaced.crate.data.db.dao.HomeFeedDao
 import com.megamaced.crate.data.db.dao.MediaItemDao
 import com.megamaced.crate.data.db.dao.PlaylistDao
+import com.megamaced.crate.data.db.dao.SessionGuardedMediaItemDao
+import com.megamaced.crate.data.db.dao.SessionGuardedPlaylistDao
 import com.megamaced.crate.data.prefs.UserPreferences
 import dagger.Module
 import dagger.Provides
@@ -70,11 +72,13 @@ object DatabaseModule {
             ).build()
     }
 
+    // Writes through these refuse a response from a session that has ended;
+    // see SessionGeneration.
     @Provides
-    fun provideMediaItemDao(db: CrateDatabase): MediaItemDao = db.mediaItemDao()
+    fun provideMediaItemDao(db: CrateDatabase): MediaItemDao = SessionGuardedMediaItemDao(db.mediaItemDao())
 
     @Provides
-    fun providePlaylistDao(db: CrateDatabase): PlaylistDao = db.playlistDao()
+    fun providePlaylistDao(db: CrateDatabase): PlaylistDao = SessionGuardedPlaylistDao(db.playlistDao())
 
     @Provides
     fun provideHomeFeedDao(db: CrateDatabase): HomeFeedDao = db.homeFeedDao()

@@ -5,7 +5,10 @@ import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.megamaced.crate.data.api.ApiResult
+import com.megamaced.crate.data.auth.SessionGeneration
+import com.megamaced.crate.data.auth.StaleSessionException
 import com.megamaced.crate.data.auth.TokenStore
+import com.megamaced.crate.data.auth.stampedWithSession
 import com.megamaced.crate.data.prefs.UserPreferences
 import com.megamaced.crate.domain.repository.MediaRepository
 import dagger.assisted.Assisted
@@ -23,7 +26,12 @@ class SyncWorker
         private val userPreferences: UserPreferences,
         private val tokenStore: TokenStore,
     ) : CoroutineWorker(appContext, params) {
-        override suspend fun doWork(): Result {
+        // The whole run belongs to the session current when it starts: its
+        // cache writes, and the cursor it records, are refused once that
+        // session has ended (see SessionGeneration).
+        override suspend fun doWork(): Result = stampedWithSession { syncForCurrentSession() }
+
+        private suspend fun syncForCurrentSession(): Result {
             // Nothing to sync while logged out. Returning success (not retry)
             // matters: the host is unresolvable without credentials, so a retry
             // would spin in backoff until the constraints lapse.
@@ -34,9 +42,15 @@ class SyncWorker
             // Must run before reading the cursor — it clears a stale one.
             // A DataStore read failure is transient, so retry rather than
             // letting the exception escape doWork.
-            val repair = runCatching { userPreferences.consumeSyncRepair() }
-                .getOrElse {
-                    Timber.w(it, "Sync deferred: could not read sync-repair flag")
+            val repair =
+                try {
+                    // It clears the cursor, which belongs to this run's session.
+                    SessionGeneration.write { userPreferences.consumeSyncRepair() }
+                } catch (e: StaleSessionException) {
+                    Timber.i(e, "Sync skipped: its session has ended")
+                    return Result.success()
+                } catch (e: Exception) {
+                    Timber.w(e, "Sync deferred: could not read sync-repair flag")
                     return Result.retry()
                 }
             val prefs = runCatching { userPreferences.flow.first() }
@@ -54,13 +68,20 @@ class SyncWorker
                 is ApiResult.Success -> {
                     val newCursor = result.value.cursor
                     val newWipedAt = result.value.wipedAt
-                    // An unchanged cursor — which is what an incomplete sweep
-                    // deliberately returns — writes nothing.
-                    if (newCursor != null && newCursor != cursor) {
-                        userPreferences.setLastSyncCursor(newCursor)
-                    }
-                    if (newWipedAt != seenWipedAt) {
-                        userPreferences.setLastSeenWipedAt(newWipedAt)
+                    try {
+                        SessionGeneration.write {
+                            // An unchanged cursor — which is what an incomplete
+                            // sweep deliberately returns — writes nothing.
+                            if (newCursor != null && newCursor != cursor) {
+                                userPreferences.setLastSyncCursor(newCursor)
+                            }
+                            if (newWipedAt != seenWipedAt) {
+                                userPreferences.setLastSeenWipedAt(newWipedAt)
+                            }
+                        }
+                    } catch (e: StaleSessionException) {
+                        Timber.i(e, "Sync result dropped: its session has ended")
+                        return Result.success()
                     }
                     Timber.d(
                         "Sync ok (cursor %s -> %s, wipedAt %s -> %s)",

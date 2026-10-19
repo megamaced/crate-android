@@ -7,9 +7,10 @@ import com.megamaced.crate.data.api.dto.HiddenCategoriesRequest
 import com.megamaced.crate.data.api.dto.KeyRequest
 import com.megamaced.crate.data.api.dto.OnlineRecommendationsRequest
 import com.megamaced.crate.data.api.dto.TokenRequest
+import com.megamaced.crate.data.auth.SessionGeneration
 import com.megamaced.crate.data.mapper.toDomain
 import com.megamaced.crate.data.mapper.toDto
-import com.megamaced.crate.data.prefs.UserPreferences
+import com.megamaced.crate.data.prefs.ProfilePrefs
 import com.megamaced.crate.domain.model.Category
 import com.megamaced.crate.domain.model.MarketSettings
 import com.megamaced.crate.domain.model.UserProfile
@@ -23,21 +24,25 @@ class SettingsRepositoryImpl
     @Inject
     constructor(
         private val api: CrateApiService,
-        private val userPreferences: UserPreferences,
+        private val userPreferences: ProfilePrefs,
     ) : SettingsRepository {
-        override suspend fun getMe(): ApiResult<UserProfile> {
-            val result = apiCall { api.getMe().toDomain() }
-            // Mirror server-side hidden_categories into the local DataStore cache
-            // so navigation / home / search can read it synchronously next launch.
-            if (result is ApiResult.Success) {
-                // The user id is what every "my collection" query is scoped by,
-                // so this is the one authoritative place it gets cached.
-                userPreferences.setCurrentUserId(result.value.userId)
-                userPreferences.setHiddenCategories(result.value.hiddenCategories)
-                userPreferences.setOnlineRecommendations(result.value.onlineRecommendations)
+        override suspend fun getMe(): ApiResult<UserProfile> =
+            apiCall {
+                val me = api.getMe().toDomain()
+                // Mirror server-side hidden_categories into the local DataStore
+                // cache so navigation / home / search can read it synchronously
+                // next launch. The user id is what every "my collection" query
+                // is scoped by, so this is the one authoritative place it gets
+                // cached. Inside the call and session-bound: a /me that answers
+                // after its account signed out must not name the next one's
+                // user (see SessionGeneration).
+                SessionGeneration.write {
+                    userPreferences.setCurrentUserId(me.userId)
+                    userPreferences.setHiddenCategories(me.hiddenCategories)
+                    userPreferences.setOnlineRecommendations(me.onlineRecommendations)
+                }
+                me
             }
-            return result
-        }
 
         override suspend fun hasDiscogsToken(): ApiResult<Boolean> = apiCall { api.getDiscogsToken().hasToken }
 
@@ -71,28 +76,17 @@ class SettingsRepositoryImpl
 
         override suspend fun setHiddenCategories(categories: Set<Category>): ApiResult<Unit> {
             val payload = HiddenCategoriesRequest(categories.map { it.apiValue })
-            val result =
-                apiCall {
-                    api.setHiddenCategories(payload)
-                    Unit
-                }
-            if (result is ApiResult.Success) {
-                userPreferences.setHiddenCategories(categories)
+            return apiCall {
+                api.setHiddenCategories(payload)
+                SessionGeneration.write { userPreferences.setHiddenCategories(categories) }
             }
-            return result
         }
 
         override val onlineRecommendationsFlow: Flow<Boolean> = userPreferences.onlineRecommendationsFlow
 
-        override suspend fun setOnlineRecommendations(enabled: Boolean): ApiResult<Unit> {
-            val result =
-                apiCall {
-                    api.setOnlineRecommendations(OnlineRecommendationsRequest(enabled))
-                    Unit
-                }
-            if (result is ApiResult.Success) {
-                userPreferences.setOnlineRecommendations(enabled)
+        override suspend fun setOnlineRecommendations(enabled: Boolean): ApiResult<Unit> =
+            apiCall {
+                api.setOnlineRecommendations(OnlineRecommendationsRequest(enabled))
+                SessionGeneration.write { userPreferences.setOnlineRecommendations(enabled) }
             }
-            return result
-        }
     }
