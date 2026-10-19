@@ -2,6 +2,7 @@ package com.megamaced.crate.ui.screen.addedit
 
 import androidx.lifecycle.SavedStateHandle
 import com.megamaced.crate.data.api.ApiResult
+import com.megamaced.crate.data.prefs.CreateReceipts
 import com.megamaced.crate.data.repository.FakeCrateApiService
 import com.megamaced.crate.domain.model.Category
 import com.megamaced.crate.domain.model.MarketSettings
@@ -16,8 +17,10 @@ import com.megamaced.crate.domain.repository.MediaRepository
 import com.megamaced.crate.domain.repository.SettingsRepository
 import com.megamaced.crate.util.MAX_PICKED_IMAGE_BYTES
 import com.megamaced.crate.util.PickedImageReader
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
@@ -35,6 +38,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import java.io.IOException
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class AddEditViewModelTest {
@@ -403,6 +407,147 @@ class AddEditViewModelTest {
             assertFalse(restored.uiState.value.isSaving)
         }
 
+    @Test
+    fun `a form restored after its item was created updates that item instead of creating another`() =
+        runTest {
+            val handle = SavedStateHandle()
+            val media = RecordingMediaRepository()
+            // The create succeeds, then the process dies while the picked image
+            // is still being read for upload.
+            val first = newViewModel(handle = handle, media = media, imageReader = StuckImageReader())
+            fillRequiredFields(first)
+            first.onArtworkPicked("content://media/1")
+            advanceUntilIdle()
+            first.save()
+            advanceUntilIdle()
+            assertEquals(1, media.createCount)
+
+            val restored = newViewModel(handle = handle, media = media)
+            restored.save()
+            advanceUntilIdle()
+
+            assertEquals(1, media.createCount)
+            assertEquals(listOf(1L), media.updatedIds)
+            // The upload the first attempt never finished goes to that same item.
+            assertEquals(listOf(1L), media.artworkUploads)
+            assertEquals(1L, restored.uiState.value.savedItemId)
+        }
+
+    @Test
+    fun `a create that lands after the form's snapshot was taken is still found when it is restored`() =
+        runTest {
+            val handle = SavedStateHandle()
+            val media = RecordingMediaRepository().apply { createGate = CompletableDeferred() }
+            val receipts = FakeCreateReceipts()
+            val first = newViewModel(handle = handle, media = media, imageReader = StuckImageReader(), receipts = receipts)
+            fillRequiredFields(first)
+            first.onArtworkPicked("content://media/1")
+            advanceUntilIdle()
+            first.save()
+            advanceUntilIdle()
+            // Backgrounded with the create still out: the snapshot Android
+            // keeps is the form as it is now. Nothing the form parks after
+            // this reaches disk, and the process dies during the upload.
+            val snapshot = SavedStateHandle(handle.keys().associateWith { handle.get<Any?>(it) })
+            media.createGate!!.complete(Unit)
+            advanceUntilIdle()
+            assertEquals(1, media.createCount)
+
+            val restored = newViewModel(handle = snapshot, media = media, receipts = receipts)
+            assertNull("the snapshot predates the create", restored.uiState.value.createdItemId)
+            restored.save()
+            advanceUntilIdle()
+
+            assertEquals(1, media.createCount)
+            assertEquals(listOf(1L), media.updatedIds)
+            assertEquals(listOf(1L), media.artworkUploads)
+        }
+
+    @Test
+    fun `a photo removed from a restored form is deleted from the item its first save created`() =
+        runTest {
+            val handle = SavedStateHandle()
+            val media = RecordingMediaRepository()
+            // Photo 1 uploads, then the process dies reading photo 2.
+            val first =
+                newViewModel(handle = handle, media = media, imageReader = StuckImageReader(stuckUris = setOf("content://photo/2")))
+            fillRequiredFields(first)
+            first.onPhotoPicked(1, "content://photo/1")
+            first.onPhotoPicked(2, "content://photo/2")
+            advanceUntilIdle()
+            first.save()
+            advanceUntilIdle()
+            assertEquals(listOf(1L to 1), media.photoUploads)
+
+            val restored = newViewModel(handle = handle, media = media)
+            restored.onRemovePhoto(1)
+            restored.save()
+            advanceUntilIdle()
+
+            assertEquals(listOf(1L), media.updatedIds)
+            assertEquals(listOf(1L to 1), media.deletedPhotos)
+        }
+
+    @Test
+    fun `a receipt that can't be read holds the save rather than creating again`() =
+        runTest {
+            val handle = SavedStateHandle()
+            val media = RecordingMediaRepository().apply { createGate = CompletableDeferred() }
+            val receipts = FakeCreateReceipts()
+            val first = newViewModel(handle = handle, media = media, imageReader = StuckImageReader(), receipts = receipts)
+            fillRequiredFields(first)
+            first.save()
+            advanceUntilIdle()
+            val snapshot = SavedStateHandle(handle.keys().associateWith { handle.get<Any?>(it) })
+            media.createGate!!.complete(Unit)
+            advanceUntilIdle()
+
+            val restored = newViewModel(handle = snapshot, media = media, receipts = receipts)
+            receipts.failingReads = 1
+            restored.save()
+            advanceUntilIdle()
+
+            assertEquals(1, media.createCount)
+            assertEquals(emptyList<Long>(), media.updatedIds)
+            assertNotNull("the user is asked to try again", restored.uiState.value.errorMessage)
+            assertFalse(restored.uiState.value.isSaving)
+
+            restored.dismissError()
+            restored.save()
+            advanceUntilIdle()
+
+            assertEquals(1, media.createCount)
+            assertEquals(listOf(1L), media.updatedIds)
+        }
+
+    @Test
+    fun `a create whose receipt can't be written stops before its images and says so`() =
+        runTest {
+            val media = RecordingMediaRepository()
+            val receipts = FakeCreateReceipts().apply { writesFail = true }
+            val vm = newViewModel(media = media, receipts = receipts)
+            fillRequiredFields(vm)
+            vm.onArtworkPicked("content://media/1")
+            advanceUntilIdle()
+
+            vm.save()
+            advanceUntilIdle()
+
+            assertEquals(1, media.createCount)
+            assertEquals(emptyList<Long>(), media.artworkUploads)
+            assertNotNull(vm.uiState.value.errorMessage)
+            assertNull("the screen stays open", vm.uiState.value.savedItemId)
+
+            vm.dismissError()
+            vm.save()
+            advanceUntilIdle()
+
+            assertEquals(1, media.createCount)
+            assertEquals(listOf(1L), media.updatedIds)
+            assertEquals(listOf(1L), media.artworkUploads)
+            assertEquals(1L, vm.uiState.value.savedItemId)
+        }
+
     // -- Helpers --------------------------------------------------------------
 
     private fun fillRequiredFields(vm: AddEditViewModel) {
@@ -415,6 +560,7 @@ class AddEditViewModelTest {
         handle: SavedStateHandle = SavedStateHandle(),
         media: MediaRepository = RecordingMediaRepository(),
         imageReader: PickedImageReader = FakePickedImageReader(),
+        receipts: CreateReceipts = FakeCreateReceipts(),
     ): AddEditViewModel =
         AddEditViewModel(
             savedStateHandle = handle,
@@ -423,7 +569,38 @@ class AddEditViewModelTest {
             enrichmentRepository = StubEnrichmentRepository(),
             imageReader = imageReader,
             api = FakeCrateApiService(),
+            createReceipts = receipts,
         )
+}
+
+/** Receipts that outlive the ViewModel, as the disk-backed ones outlive the process. */
+private class FakeCreateReceipts : CreateReceipts {
+    private val receipts = mutableMapOf<String, Long>()
+
+    /** How many reads fail before one succeeds. */
+    var failingReads = 0
+
+    var writesFail = false
+
+    override suspend fun record(
+        formId: String,
+        itemId: Long,
+    ) {
+        if (writesFail) throw IOException("disk full")
+        receipts[formId] = itemId
+    }
+
+    override suspend fun find(formId: String): Long? {
+        if (failingReads > 0) {
+            failingReads--
+            throw IOException("read failed")
+        }
+        return receipts[formId]
+    }
+
+    override fun forget(formId: String) {
+        receipts.remove(formId)
+    }
 }
 
 private class FakePickedImageReader(
@@ -442,12 +619,38 @@ private class FakePickedImageReader(
     }
 }
 
+/**
+ * Picked images whose bytes never arrive, as when the process dies mid-read:
+ * those in [stuckUris], or every one when it is null.
+ */
+private class StuckImageReader(
+    private val stuckUris: Set<String>? = null,
+) : PickedImageReader {
+    override suspend fun mimeType(uri: String): String = "image/jpeg"
+
+    override suspend fun length(uri: String): Long? = 1_024
+
+    override suspend fun read(uri: String): PickedImageReader.ReadResult =
+        if (stuckUris == null || uri in stuckUris) {
+            awaitCancellation()
+        } else {
+            PickedImageReader.ReadResult.Success(ByteArray(4) { 1 })
+        }
+}
+
 private class RecordingMediaRepository : MediaRepository {
     private val items = MutableStateFlow<List<MediaItem>>(emptyList())
 
     val created = mutableListOf<MediaItemDraft>()
+    var createCount = 0
+    val updatedIds = mutableListOf<Long>()
     val artworkUploads = mutableListOf<Long>()
+    val photoUploads = mutableListOf<Pair<Long, Int>>()
+    val deletedPhotos = mutableListOf<Pair<Long, Int>>()
     var photoUploadResult: ApiResult<Unit> = ApiResult.Success(Unit)
+
+    /** When set, a create waits for it before answering. */
+    var createGate: CompletableDeferred<Unit>? = null
 
     override fun observeAll(): Flow<List<MediaItem>> = items
 
@@ -468,7 +671,9 @@ private class RecordingMediaRepository : MediaRepository {
     override suspend fun refreshSingle(id: Long): ApiResult<MediaItem> = ApiResult.Success(savedItem(id))
 
     override suspend fun create(draft: MediaItemDraft): ApiResult<MediaItem> {
+        createGate?.await()
         created += draft
+        createCount++
         return ApiResult.Success(savedItem(1))
     }
 
@@ -477,6 +682,7 @@ private class RecordingMediaRepository : MediaRepository {
         draft: MediaItemDraft,
     ): ApiResult<MediaItem> {
         created += draft
+        updatedIds += id
         return ApiResult.Success(savedItem(id))
     }
 
@@ -500,12 +706,18 @@ private class RecordingMediaRepository : MediaRepository {
         slot: Int,
         bytes: ByteArray,
         mimeType: String,
-    ): ApiResult<Unit> = photoUploadResult
+    ): ApiResult<Unit> {
+        photoUploads += id to slot
+        return photoUploadResult
+    }
 
     override suspend fun deletePhoto(
         id: Long,
         slot: Int,
-    ): ApiResult<Unit> = ApiResult.Success(Unit)
+    ): ApiResult<Unit> {
+        deletedPhotos += id to slot
+        return ApiResult.Success(Unit)
+    }
 
     override suspend fun syncDelta(
         updatedSince: String?,

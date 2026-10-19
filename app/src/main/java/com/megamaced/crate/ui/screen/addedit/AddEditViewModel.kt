@@ -9,6 +9,7 @@ import com.megamaced.crate.data.api.CrateApiService
 import com.megamaced.crate.data.api.IMAGE_NOT_SANITISED_CODE
 import com.megamaced.crate.data.api.apiCall
 import com.megamaced.crate.data.api.toUiText
+import com.megamaced.crate.data.prefs.CreateReceipts
 import com.megamaced.crate.domain.model.Category
 import com.megamaced.crate.domain.model.MediaItem
 import com.megamaced.crate.domain.model.MediaItemDraft
@@ -29,7 +30,10 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 import kotlinx.serialization.json.Json
+import timber.log.Timber
+import java.io.IOException
 import java.util.Calendar
+import java.util.UUID
 import javax.inject.Inject
 
 private val CURRENT_YEAR: Int = Calendar.getInstance().get(Calendar.YEAR)
@@ -114,6 +118,21 @@ data class AddEditUiState(
     // Transient because it is in-flight state, not form input: the coroutine
     // that raised it died with the process, and [readSavedForm] drops it anyway.
     @Transient val errorMessage: UiText? = null,
+    /**
+     * The item a create from this form already made on the server, recorded
+     * the moment the create succeeds — before the images and enrichment that
+     * follow it. A later save of the same form, including one restored after
+     * the process died mid-way, updates this item instead of creating another.
+     * Kept apart from [savedItemId], which closes the screen once all of it is
+     * done.
+     */
+    val createdItemId: Long? = null,
+    /**
+     * Names a new-item form's create receipt (see [CreateReceipts]), which
+     * outlasts the copy of [createdItemId] parked with the form. Null on an
+     * edit form, which has its item from the start.
+     */
+    val formId: String? = null,
     val savedItemId: Long? = null,
     /**
      * True when the item saved but at least one photo slot didn't. Reported
@@ -187,6 +206,7 @@ class AddEditViewModel
         private val enrichmentRepository: EnrichmentRepository,
         private val imageReader: PickedImageReader,
         private val api: CrateApiService,
+        private val createReceipts: CreateReceipts,
     ) : ViewModel() {
         private val itemId: Long? = savedStateHandle.get<Long>("itemId")?.takeIf { it > 0L }
         private val initialCategory: Category =
@@ -207,9 +227,13 @@ class AddEditViewModel
         // must not run again and overwrite what the user typed.
         private val restored: AddEditUiState? = readSavedForm()
 
+        // A new-item form needs a name for its create receipt; one restored
+        // from before forms had one gets it now.
+        private val newFormId: String? = if (itemId == null) UUID.randomUUID().toString() else null
+
         private val _uiState =
             MutableStateFlow(
-                restored
+                restored?.let { it.copy(formId = it.formId ?: newFormId) }
                     ?: AddEditUiState(
                         isEditing = itemId != null,
                         editingItemId = itemId,
@@ -217,9 +241,16 @@ class AddEditViewModel
                         categoryLocked = categoryLocked,
                         category = initialCategory,
                         initialLoading = itemId != null,
+                        formId = newFormId,
                     ),
             )
         val uiState: StateFlow<AddEditUiState> = _uiState.asStateFlow()
+
+        // A restored new-item form whose snapshot names no created item: its
+        // create may still have happened after the snapshot was taken, which
+        // only its receipt can say. Cleared once the receipt has been read.
+        private var receiptToCheck: String? =
+            restored?.takeIf { itemId == null && it.createdItemId == null }?.formId
 
         init {
             // The currency allowlist is server state, not user input, so it is
@@ -579,27 +610,93 @@ class AddEditViewModel
                     )
                 }
                 val draft = state.toDraft()
+                // An item this form already created is updated, not created
+                // again. Not knowing whether it did is no reason to create one:
+                // the save waits until the receipt can be read.
+                val existingId =
+                    itemId ?: state.createdItemId ?: try {
+                        createdBeforeRestore()
+                    } catch (e: IOException) {
+                        Timber.w(e, "Couldn't read the form's create receipt")
+                        setError(UiText.Res(R.string.add_edit_receipt_unreadable))
+                        return@launch
+                    }
                 val saveResult =
-                    if (state.isEditing) {
-                        mediaRepository.update(itemId!!, draft)
+                    if (existingId != null) {
+                        mediaRepository.update(existingId, draft)
                     } else {
                         mediaRepository.create(draft)
                     }
                 when (saveResult) {
-                    is ApiResult.Success -> handleSaved(saveResult.value, state)
-                    ApiResult.NetworkError -> setError(UiText.Res(R.string.error_network))
-                    is ApiResult.HttpError -> setError(saveResult.toUiText())
-                    ApiResult.Unauthorised -> update { copy(isSaving = false) }
+                    is ApiResult.Success -> {
+                        // Recorded before the work below, so a process death
+                        // during it can't lead to a second create: parked with
+                        // the form, and on disk, since the parked copy only
+                        // reaches disk if the activity saves its state again.
+                        if (existingId == null && !recordCreated(saveResult.value.id, state.formId)) {
+                            // Created, but with nothing on disk to say so the
+                            // images and enrichment would run unprotected; the
+                            // next Save, by then an update, does them.
+                            setError(UiText.Res(R.string.add_edit_create_unrecorded))
+                            return@launch
+                        }
+                        handleSaved(saveResult.value, state, existed = existingId != null)
+                    }
+
+                    ApiResult.NetworkError -> {
+                        setError(UiText.Res(R.string.error_network))
+                    }
+
+                    is ApiResult.HttpError -> {
+                        setError(saveResult.toUiText())
+                    }
+
+                    ApiResult.Unauthorised -> {
+                        update { copy(isSaving = false) }
+                    }
                 }
             }
         }
 
+        /**
+         * The item this restored form created after its snapshot was taken,
+         * from its receipt; null when it created none.
+         *
+         * @throws IOException when the receipt can't be read
+         */
+        private suspend fun createdBeforeRestore(): Long? {
+            val formId = receiptToCheck ?: return null
+            val found = createReceipts.find(formId)
+            receiptToCheck = null
+            if (found != null) update { copy(createdItemId = found) }
+            return found
+        }
+
+        /** Records the item a create made, in the form and on disk. False if the disk write failed. */
+        private suspend fun recordCreated(
+            id: Long,
+            formId: String?,
+        ): Boolean {
+            update { copy(createdItemId = id) }
+            if (formId == null) return true
+            return try {
+                createReceipts.record(formId, id)
+                true
+            } catch (e: IOException) {
+                Timber.w(e, "Couldn't record the form's create receipt")
+                false
+            }
+        }
+
+        /** [existed] is whether the item was on the server before this save. */
         private suspend fun handleSaved(
             saved: MediaItem,
             beforeState: AddEditUiState,
+            existed: Boolean,
         ) {
             // A picked file always wins. Otherwise, if the user clicked Remove
-            // and the row already existed on the server, wipe the cached image.
+            // and the row already existed on the server — an edit, or a form
+            // whose earlier save created it — wipe the cached image.
             // Enrichment-supplied URLs are sent through MediaItemDraft.artworkPath
             // so the backend caches them server-side — no client upload needed.
             var tooLarge = false
@@ -630,7 +727,7 @@ class AddEditViewModel
                     }
                 }
 
-                beforeState.removeArtwork && beforeState.isEditing -> {
+                beforeState.removeArtwork && existed -> {
                     classify(mediaRepository.deleteArtwork(saved.id))
                 }
 
@@ -641,8 +738,8 @@ class AddEditViewModel
             if (artwork == ImageOutcome.NotSanitised) sanitiseFailed = true
             // Same logic applied to each photo slot. Independent of artwork
             // (different endpoint, different appdata folder server-side).
-            val photo1 = applyPhotoSlot(saved.id, slot = 1, beforeState.pendingPhoto1, beforeState.removePhoto1, beforeState.isEditing)
-            val photo2 = applyPhotoSlot(saved.id, slot = 2, beforeState.pendingPhoto2, beforeState.removePhoto2, beforeState.isEditing)
+            val photo1 = applyPhotoSlot(saved.id, slot = 1, beforeState.pendingPhoto1, beforeState.removePhoto1, existed)
+            val photo2 = applyPhotoSlot(saved.id, slot = 2, beforeState.pendingPhoto2, beforeState.removePhoto2, existed)
             if (photo1 == ImageOutcome.TooLarge || photo2 == ImageOutcome.TooLarge) tooLarge = true
             if (photo1 == ImageOutcome.NotSanitised || photo2 == ImageOutcome.NotSanitised) sanitiseFailed = true
             if (beforeState.autoEnrich) {
@@ -683,7 +780,7 @@ class AddEditViewModel
             slot: Int,
             pending: PendingImage?,
             remove: Boolean,
-            isEditing: Boolean,
+            existed: Boolean,
         ): ImageOutcome {
             val result = when {
                 pending != null -> {
@@ -704,7 +801,7 @@ class AddEditViewModel
                     }
                 }
 
-                remove && isEditing -> {
+                remove && existed -> {
                     mediaRepository.deletePhoto(itemId, slot)
                 }
 
@@ -713,6 +810,12 @@ class AddEditViewModel
                 }
             }
             return classify(result)
+        }
+
+        override fun onCleared() {
+            // Gone for good, not just recreated: nothing can restore this form
+            // now, so nothing will look for its receipt.
+            _uiState.value.formId?.let(createReceipts::forget)
         }
 
         private fun setError(message: UiText) {

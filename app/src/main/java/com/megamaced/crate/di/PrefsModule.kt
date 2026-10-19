@@ -2,6 +2,8 @@ package com.megamaced.crate.di
 
 import com.megamaced.crate.data.prefs.AccountPrefs
 import com.megamaced.crate.data.prefs.CollectionPrefs
+import com.megamaced.crate.data.prefs.CreateReceipts
+import com.megamaced.crate.data.prefs.DataStoreCreateReceipts
 import com.megamaced.crate.data.prefs.FullSweepPrefs
 import com.megamaced.crate.data.prefs.ProfilePrefs
 import com.megamaced.crate.data.prefs.SyncStatePrefs
@@ -34,4 +36,8 @@ abstract class PrefsModule {
     @Binds
     @Singleton
     abstract fun bindSyncStatePrefs(impl: UserPreferences): SyncStatePrefs
+
+    @Binds
+    @Singleton
+    abstract fun bindCreateReceipts(impl: DataStoreCreateReceipts): CreateReceipts
 }

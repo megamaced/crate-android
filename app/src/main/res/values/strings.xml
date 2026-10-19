@@ -248,6 +248,8 @@
     <string name="add_edit_looking_up_isbn">Looking up…</string>
     <string name="add_edit_format_select">Select…</string>
     <string name="add_edit_image_too_large">That image is too large — pick one under 25 MB.</string>
+    <string name="add_edit_receipt_unreadable">Couldn’t check whether this item was already added. Try again.</string>
+    <string name="add_edit_create_unrecorded">Item added, but this device couldn’t note it. Tap Save to finish.</string>
     <string name="add_edit_isbn_not_found">ISBN not found in Open Library</string>
     <string name="settings_bulk_partial_failure">Finished with %1$d of %2$d not updated.</string>
     <string name="format_unrecognised">Not a standard %1$s — pick one from the list.</string>
