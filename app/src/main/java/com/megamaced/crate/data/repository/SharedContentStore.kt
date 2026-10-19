@@ -3,19 +3,23 @@ package com.megamaced.crate.data.repository
 import com.megamaced.crate.R
 import com.megamaced.crate.data.api.ApiResult
 import com.megamaced.crate.data.api.toUiText
-import com.megamaced.crate.data.auth.CurrentSession
+import com.megamaced.crate.data.auth.SessionGeneration
+import com.megamaced.crate.data.auth.SessionStamp
+import com.megamaced.crate.data.auth.StaleSessionException
 import com.megamaced.crate.data.db.dao.MediaItemDao
 import com.megamaced.crate.data.prefs.AccountPrefs
 import com.megamaced.crate.domain.model.SharedWithMe
 import com.megamaced.crate.domain.model.allItems
 import com.megamaced.crate.domain.repository.ShareRepository
 import com.megamaced.crate.util.UiText
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
+import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -33,16 +37,31 @@ class SharedContentStore
         private val shareRepository: ShareRepository,
         private val mediaItemDao: MediaItemDao,
         private val accountPrefs: AccountPrefs,
-        private val currentSession: CurrentSession,
     ) {
         data class State(
             val data: SharedWithMe? = null,
             val isLoading: Boolean = false,
             val error: UiText? = null,
+            // The session this snapshot was fetched for (see SessionGeneration).
+            internal val generation: Int? = null,
         )
 
         private val _state = MutableStateFlow(State())
-        val state: StateFlow<State> = _state.asStateFlow()
+
+        /**
+         * The snapshot, hidden the moment the session it was fetched for
+         * ends: a sign-out or sign-in empties it at once, rather than at the
+         * next [load], so nothing on screen keeps the previous session's
+         * shares while the next one's are fetched.
+         */
+        val state: Flow<State> =
+            combine(_state, SessionGeneration.generations) { snapshot, generation ->
+                if (snapshot.generation == null || snapshot.generation == generation) {
+                    snapshot
+                } else {
+                    State(generation = generation)
+                }
+            }
 
         private val mutex = Mutex()
 
@@ -52,20 +71,15 @@ class SharedContentStore
         // (and their now-invalid Add affordance) until a manual pull-to-refresh.
         private var lastLoadedAtMs: Long = 0L
 
-        // The account the cached snapshot belongs to. The payload carries whole
-        // items — titles, notes, prices — not just counts, so serving it to the
-        // next person to sign in on this device would show them the previous
-        // user's shares. Null before the first fetch.
-        private var snapshotAccount: String? = null
-
         /** Fetch if nothing is cached yet, or the cached snapshot is stale. */
         suspend fun load() {
             mutex.withLock {
-                discardOtherAccountsSnapshot()
+                val generation = SessionGeneration.current()
+                discardOtherSessionsSnapshot(generation)
                 val fresh =
                     _state.value.data != null &&
                         (System.currentTimeMillis() - lastLoadedAtMs) < CACHE_TTL_MS
-                if (!fresh) refreshLocked()
+                if (!fresh) refreshLocked(generation)
             }
         }
 
@@ -76,34 +90,47 @@ class SharedContentStore
 
         suspend fun refresh() {
             mutex.withLock {
-                discardOtherAccountsSnapshot()
-                refreshLocked()
+                val generation = SessionGeneration.current()
+                discardOtherSessionsSnapshot(generation)
+                refreshLocked(generation)
             }
         }
 
-        // Caller must hold [mutex]. A snapshot from another account is dropped
-        // outright rather than left on screen until a refresh returns — which
-        // on a failed refresh would be forever.
-        private fun discardOtherAccountsSnapshot() {
-            val account = currentSession.loginName()
-            if (account != snapshotAccount) {
-                snapshotAccount = account
+        // Caller must hold [mutex]. The payload carries whole items — titles,
+        // notes, prices — not just counts, so a snapshot from another session
+        // is dropped outright rather than left on screen until a refresh
+        // returns, which on a failed refresh would be forever. Keyed by session
+        // rather than login name: the same name on another server is another
+        // account.
+        private fun discardOtherSessionsSnapshot(generation: Int) {
+            if (_state.value.generation != generation) {
                 lastLoadedAtMs = 0L
-                _state.value = State()
+                _state.value = State(generation = generation)
             }
         }
 
         // Caller must hold [mutex]. Keeping the check-and-fetch under one lock
         // acquisition also prevents two concurrent load() callers (landing +
         // subpage on first mount) from both issuing a full fetch.
-        private suspend fun refreshLocked() {
-            _state.update { it.copy(isLoading = true, error = null) }
-            when (val result = shareRepository.sharedWithMe()) {
+        //
+        // [generation] is read once per load() or refresh() and used for every
+        // step: a session that ends part-way through must not have its answer
+        // published as the next one's, nor its cached payload re-labelled as
+        // the next one's while the request is out.
+        private suspend fun refreshLocked(generation: Int) {
+            _state.update { it.refreshingFor(generation) }
+            val result = withContext(SessionStamp(generation)) { shareRepository.sharedWithMe() }
+            if (generation != SessionGeneration.current()) return
+            when (result) {
                 is ApiResult.Success -> {
                     _state.update { it.copy(data = result.value, isLoading = false, error = null) }
                     lastLoadedAtMs = System.currentTimeMillis()
-                    snapshotAccount = currentSession.loginName()
-                    dropRevokedShares(result.value)
+                    try {
+                        withContext(SessionStamp(generation)) { dropRevokedShares(result.value) }
+                    } catch (e: StaleSessionException) {
+                        // Ended during the clean-up; the next session starts over.
+                        Timber.i(e, "Revoked-share clean-up dropped: its session has ended")
+                    }
                 }
 
                 ApiResult.NetworkError -> {
@@ -146,4 +173,16 @@ class SharedContentStore
         companion object {
             private const val CACHE_TTL_MS = 30_000L
         }
+    }
+
+/**
+ * The state a refresh for [generation] starts from. The cached payload stays
+ * on screen only when it is that session's own; any other is dropped, never
+ * re-stamped, since the stamp is what decides who may see it.
+ */
+internal fun SharedContentStore.State.refreshingFor(generation: Int): SharedContentStore.State =
+    if (this.generation == generation) {
+        copy(isLoading = true, error = null)
+    } else {
+        SharedContentStore.State(isLoading = true, generation = generation)
     }

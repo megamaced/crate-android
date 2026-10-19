@@ -1,6 +1,10 @@
 package com.megamaced.crate.data.auth
 
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -28,11 +32,19 @@ import kotlin.coroutines.CoroutineContext
 object SessionGeneration {
     private val generation = AtomicInteger(0)
     private val writes = Mutex()
+    private val latest = MutableStateFlow(0)
 
     fun current(): Int = generation.get()
 
+    /** The generation as it moves, for state that must not outlive its session. */
+    val generations: StateFlow<Int> = latest.asStateFlow()
+
     /** Starts a new session; returns its generation. */
-    fun advance(): Int = generation.incrementAndGet()
+    fun advance(): Int {
+        val next = generation.incrementAndGet()
+        latest.update { maxOf(it, next) }
+        return next
+    }
 
     /** Runs [block] while no [write] is in progress — the account wipe. */
     suspend fun <T> exclusive(block: suspend () -> T): T = writes.withLock { block() }
