@@ -79,7 +79,7 @@ class FakeCrateApiService : CrateApiService {
      * a server changing between requests: (updatedSince, updatedSinceId,
      * limit, offset) to the page served.
      */
-    var getMediaHandler: ((String?, Long?, Int, Int) -> PaginatedMediaDto)? = null
+    var getMediaHandler: (suspend (String?, Long?, Int, Int) -> PaginatedMediaDto)? = null
 
     /** Every (limit, offset) pair getMedia was called with, in call order. */
     val getMediaCalls = mutableListOf<Pair<Int, Int>>()

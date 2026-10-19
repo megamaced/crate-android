@@ -18,8 +18,11 @@ import com.megamaced.crate.domain.repository.MediaRepository
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.IOException
 
 class MediaRepositoryImplTest {
     private val codec = MediaItemJsonCodec(Json)
@@ -28,7 +31,8 @@ class MediaRepositoryImplTest {
     private val binary = NoopBinaryService()
     private val playlistDao = FakePlaylistDao()
     private val accountPrefs = FakeAccountPrefs()
-    private val repo = MediaRepositoryImpl(api, binary, dao, playlistDao, accountPrefs, codec)
+    private val sweepPrefs = FakeFullSweepPrefs()
+    private val repo = MediaRepositoryImpl(api, binary, dao, playlistDao, accountPrefs, sweepPrefs, codec)
 
     init {
         // Every sync asks the server who it is talking to; the fake would
@@ -219,7 +223,7 @@ class MediaRepositoryImplTest {
         runTest {
             // A cursor is supplied, so this would normally be a delta sync. The
             // local count disagrees with the server's, which only a full sweep can
-            // reconcile — so the sweep must run unfiltered.
+            // reconcile — so the sweep must start from the beginning of time.
             dao.seed(
                 listOf(
                     entity(1, "One", category = "music", userId = OWNER),
@@ -236,8 +240,8 @@ class MediaRepositoryImplTest {
 
             repo.syncDelta(updatedSince = "2026-01-01 00:00:00", lastSeenWipedAt = null)
 
-            // Sweep ran with no updatedSince, and the stale row is gone.
-            assertEquals(listOf(null, null), api.getMediaUpdatedSince)
+            // The sweep ignored the stored cursor, and the stale row is gone.
+            assertEquals(listOf(null, "1970-01-01 00:00:00"), api.getMediaUpdatedSince)
             assertEquals(listOf(1L), dao.snapshot().map { it.id })
         }
 
@@ -465,24 +469,208 @@ class MediaRepositoryImplTest {
         }
 
     @Test
-    fun `an incomplete sweep leaves the stored cursor exactly where it was`() =
+    fun `a total that shrinks under offset paging prunes nothing and asks to retry`() =
         runTest {
-            // The server says 500 items; pagination yields one page of 2. The
-            // 498 unseen rows are still unseen, so committing a cursor past
-            // them would make the gap permanent — an edit changes no row count,
-            // so the drift check never escalates to a full sweep either.
+            // A server without the cursor, paging by offset, newest first. Page
+            // one is 401..202 of 401; item 401 is then deleted elsewhere, so page
+            // two (offset 200) starts at 200 and item 201 is never returned.
+            // 400 distinct ids against a final total of 400 looked complete.
+            dao.seed((1L..401L).map { entity(it, "Item $it", category = "music", userId = OWNER) })
+            api.getMediaHandler = { since, _, limit, offset ->
+                when {
+                    since == null -> PaginatedMediaDto(listOf(mediaDto(401, "Item 401", "music", OWNER)), 401, limit, offset)
+                    offset == 0 -> PaginatedMediaDto((401L downTo 202L).map { mediaDto(it, "Item $it", "music", OWNER) }, 401, limit, 0)
+                    offset == 200 -> PaginatedMediaDto((200L downTo 1L).map { mediaDto(it, "Item $it", "music", OWNER) }, 400, limit, 200)
+                    else -> PaginatedMediaDto(emptyList(), 400, limit, offset)
+                }
+            }
+
+            val result = repo.syncDelta(updatedSince = null, lastSeenWipedAt = null)
+
+            val sync = (result as ApiResult.Success).value
+            assertFalse(sync.complete)
+            assertEquals(null, sync.cursor)
+            assertTrue("live item 201 is not pruned", dao.snapshot().any { it.id == 201L })
+        }
+
+    @Test
+    fun `a full sweep by cursor survives a concurrent delete and prunes only what is gone`() =
+        runTest {
+            // Item 201 was deleted on the server before the sweep; item 1 is
+            // deleted after page one returned it. Paged by cursor, page two
+            // still starts after the last row read, so nothing unseen slides
+            // out of reach, and only item 201 is pruned.
+            dao.seed((1L..202L).map { entity(it, "Item $it", category = "music", userId = OWNER) })
+            val stamp = "2026-01-01 12:00:00"
+            api.getMediaHandler = { since, sinceId, limit, offset ->
+                when {
+                    since == null -> {
+                        PaginatedMediaDto(listOf(mediaDto(202, "Item 202", "music", OWNER)), 201, limit, offset)
+                    }
+
+                    sinceId == null -> {
+                        PaginatedMediaDto(
+                            (1L..200L).map { mediaDto(it, "Item $it", "music", OWNER, updatedAt = stamp) },
+                            201,
+                            limit,
+                            offset,
+                            nextCursor = MediaCursorDto(stamp, 200),
+                        )
+                    }
+
+                    else -> {
+                        PaginatedMediaDto(listOf(mediaDto(202, "Item 202", "music", OWNER, updatedAt = stamp)), 1, limit, 0)
+                    }
+                }
+            }
+
+            val result = repo.syncDelta(updatedSince = null, lastSeenWipedAt = null)
+
+            assertTrue((result as ApiResult.Success).value.complete)
+            assertEquals((1L..200L).toList() + 202L, dao.snapshot().map { it.id }.sorted())
+        }
+
+    @Test
+    fun `an incomplete delta leaves the stored cursor exactly where it was`() =
+        runTest {
+            // The counts agree, so this stays a delta. Its offset pages report
+            // a total that changed under them, so rows may have slid past
+            // unseen; committing a cursor past them would make the gap
+            // permanent — an edit changes no row count, so the drift check
+            // never escalates to a full sweep either.
             dao.seed(listOf(entity(1, "One", category = "music", userId = OWNER)))
-            api.pagesByOffset[0] =
-                PaginatedMediaDto(
-                    items = listOf(mediaDto(1, "One", category = "music", userId = OWNER, updatedAt = "2026-06-01 09:00:00")),
-                    total = 500,
-                    limit = 200,
-                    offset = 0,
-                )
+            api.getMediaHandler = { since, _, limit, offset ->
+                when {
+                    since == null -> {
+                        PaginatedMediaDto(listOf(mediaDto(1, "One", "music", OWNER)), 1, limit, offset)
+                    }
+
+                    offset == 0 -> {
+                        PaginatedMediaDto(
+                            (1L..200L).map { mediaDto(it, "Item $it", "music", OWNER, updatedAt = "2026-06-01 09:00:00") },
+                            201,
+                            limit,
+                            0,
+                        )
+                    }
+
+                    else -> {
+                        PaginatedMediaDto(emptyList(), 200, limit, offset)
+                    }
+                }
+            }
 
             val result = repo.syncDelta(updatedSince = "2026-01-01 12:00:00", lastSeenWipedAt = null)
 
-            assertEquals("2026-01-01 12:00:00", (result as ApiResult.Success).value.cursor)
+            val sync = (result as ApiResult.Success).value
+            assertFalse(sync.complete)
+            assertEquals("2026-01-01 12:00:00", sync.cursor)
+        }
+
+    @Test
+    fun `an incomplete full sweep is repeated until one completes, whatever the counts say`() =
+        runTest {
+            // Three rows are missing locally, so the counts drift and a full
+            // sweep starts. Paging by offset, newest first, item 401 is deleted
+            // once page one has been read, so page two starts at 200 and item
+            // 201 is never returned. The sweep leaves 400 rows — 201 missing,
+            // 401 still there — against a server total of 400: equal counts,
+            // and a delta from the old cursor would never reconcile them.
+            dao.seed(
+                (1L..401L)
+                    .filterNot { it in setOf(100L, 101L, 201L) }
+                    .map { entity(it, "Item $it", category = "music", userId = OWNER) },
+            )
+            var deleted = false
+            api.getMediaHandler = { since, _, limit, offset ->
+                val live = if (deleted) 1L..400L else 1L..401L
+                val total = live.count()
+                if (since == null) {
+                    PaginatedMediaDto(listOf(mediaDto(live.last, "Item ${live.last}", "music", OWNER)), total, limit, offset)
+                } else {
+                    val rows =
+                        live
+                            .reversed()
+                            .drop(offset)
+                            .take(limit)
+                            .map { mediaDto(it, "Item $it", "music", OWNER, updatedAt = EDITED) }
+                            .filter { it.updatedAt!! >= since }
+                    if (offset == 0) deleted = true
+                    PaginatedMediaDto(rows, total, limit, offset)
+                }
+            }
+
+            val first = (repo.syncDelta(updatedSince = "2026-01-01 00:00:00", lastSeenWipedAt = null) as ApiResult.Success).value
+            assertFalse(first.complete)
+            assertEquals(
+                "201 still missing, deleted 401 not pruned",
+                (1L..401L).filterNot { it == 201L },
+                dao.snapshot().map { it.id }.sorted(),
+            )
+            assertTrue("the full sweep is still owed", sweepPrefs.owed)
+
+            // The retry, from the cursor the incomplete sweep held — one that
+            // would select a delta.
+            val retry = (repo.syncDelta(updatedSince = first.cursor, lastSeenWipedAt = null) as ApiResult.Success).value
+
+            assertTrue(retry.complete)
+            assertEquals("the cursor never walks back", first.cursor, retry.cursor)
+            assertEquals((1L..400L).toList(), dao.snapshot().map { it.id }.sorted())
+            assertFalse("paid once the collection is reconciled", sweepPrefs.owed)
+        }
+
+    @Test
+    fun `a full sweep cut off by a failure is resumed as one, whatever cursor another sync stores meanwhile`() =
+        runTest {
+            // The same shifting pages, but the connection drops on the last
+            // one, so the failed run stores nothing. Meanwhile a delta that
+            // another worker had already decided on finishes and stores its
+            // own cursor, which would select a delta for the next run too.
+            val stored = "2026-01-01 00:00:00"
+            dao.seed(
+                (1L..401L)
+                    .filterNot { it in setOf(100L, 101L, 201L) }
+                    .map { entity(it, "Item $it", category = "music", userId = OWNER) },
+            )
+            var deleted = false
+            var dropConnection = true
+            api.getMediaHandler = { since, _, limit, offset ->
+                val live = if (deleted) 1L..400L else 1L..401L
+                val total = live.count()
+                when {
+                    since == null -> {
+                        PaginatedMediaDto(listOf(mediaDto(live.last, "Item ${live.last}", "music", OWNER)), total, limit, offset)
+                    }
+
+                    offset >= 400 && dropConnection -> {
+                        dropConnection = false
+                        throw IOException("connection reset")
+                    }
+
+                    else -> {
+                        val rows =
+                            live
+                                .reversed()
+                                .drop(offset)
+                                .take(limit)
+                                .map { mediaDto(it, "Item $it", "music", OWNER, updatedAt = EDITED) }
+                                .filter { it.updatedAt!! >= since }
+                        if (offset == 0) deleted = true
+                        PaginatedMediaDto(rows, total, limit, offset)
+                    }
+                }
+            }
+
+            assertEquals(ApiResult.NetworkError, repo.syncDelta(updatedSince = stored, lastSeenWipedAt = null))
+            assertTrue("the full sweep is still owed", sweepPrefs.owed)
+            val storedByTheOtherWorker = "2026-01-01 00:00:01"
+
+            val retry =
+                (repo.syncDelta(updatedSince = storedByTheOtherWorker, lastSeenWipedAt = null) as ApiResult.Success).value
+
+            assertTrue(retry.complete)
+            assertEquals((1L..400L).toList(), dao.snapshot().map { it.id }.sorted())
+            assertFalse(sweepPrefs.owed)
         }
 
     @Test
@@ -566,6 +754,7 @@ class MediaRepositoryImplTest {
 
     private companion object {
         const val OWNER = "david@macemail.co.uk"
+        const val EDITED = "2025-06-01 00:00:00"
     }
 }
 

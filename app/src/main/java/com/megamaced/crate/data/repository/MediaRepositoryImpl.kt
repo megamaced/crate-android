@@ -12,6 +12,7 @@ import com.megamaced.crate.data.mapper.toDomain
 import com.megamaced.crate.data.mapper.toEntity
 import com.megamaced.crate.data.mapper.toRequest
 import com.megamaced.crate.data.prefs.AccountPrefs
+import com.megamaced.crate.data.prefs.FullSweepPrefs
 import com.megamaced.crate.domain.model.Category
 import com.megamaced.crate.domain.model.MediaItem
 import com.megamaced.crate.domain.model.MediaItemDraft
@@ -47,6 +48,7 @@ class MediaRepositoryImpl
         private val dao: MediaItemDao,
         private val playlistDao: PlaylistDao,
         private val accountPrefs: AccountPrefs,
+        private val sweepPrefs: FullSweepPrefs,
         private val codec: MediaItemJsonCodec,
     ) : MediaRepository {
         // Both collection reads are scoped to the signed-in user. Rows belonging
@@ -280,7 +282,17 @@ class MediaRepositoryImpl
                     )
                 }
 
-                val fullSweep = wiped || drifted || updatedSince == null
+                // Once a full sweep is due, every sync owes one until one
+                // reconciles the collection, whatever stops this one: pages
+                // that shift under it, a failure part-way, or another sync
+                // storing its own cursor meanwhile. The rows it skipped and
+                // the deleted rows it never got to prune can balance out, and
+                // equal counts would then settle for a delta that never
+                // reconciles them. So the debt is recorded before the first
+                // page lands, apart from the cursor, and only paid below.
+                val owed = sweepPrefs.fullSweepOwed()
+                val fullSweep = wiped || drifted || updatedSince == null || owed
+                if (fullSweep && !owed) SessionGeneration.write { sweepPrefs.setFullSweepOwed(true) }
                 // A sweep starts from a timestamp alone, never from the server's
                 // (updatedAt, id) cursor. That pair pages one sweep exactly, but
                 // between sweeps it misses edits: an edit moves a row's
@@ -292,8 +304,15 @@ class MediaRepositoryImpl
                 // covers servers that predate the keyset cursor and filter
                 // strictly-greater. Re-seeing rows costs nothing, because every
                 // write below is an upsert.
+                //
+                // A full sweep is a delta from the beginning of time, so it too
+                // pages by the server's cursor. Offset pages shift under a
+                // concurrent delete — an unseen row slides behind the next
+                // offset and is skipped, then pruned as if deleted — while the
+                // cursor resumes after the last row read, whatever happened to
+                // the rows before it (megamaced/crate#57).
                 var cursor: MediaCursor? =
-                    if (fullSweep) null else MediaCursor(ServerTimestamps.minusOneSecond(updatedSince), null)
+                    MediaCursor(if (fullSweep) FULL_SWEEP_FROM else ServerTimestamps.minusOneSecond(updatedSince), null)
 
                 var offset = 0
                 // Where the next sweep may start: a moment no later than this
@@ -307,13 +326,15 @@ class MediaRepositoryImpl
                 // page was written before the sweep began.
                 val serverWatermark = probe.watermark?.updatedSince
                 var firstPageMax: String? = null
-                var reportedTotal = 0
-                // Offset pagination is only lossless while the server's sort is
-                // total, and while nothing is edited mid-sweep: a row updated
-                // between two pages moves to the end of an updatedAt-ordered
-                // delta, pushing an unseen row back across the page boundary.
-                // Track distinct ids so that failure is loud instead of showing
-                // up months later as a short collection count.
+                // Against a server without the cursor, pages come by offset,
+                // which is only lossless while nothing is added or deleted
+                // mid-sweep. The totals the pages report then have to agree,
+                // and the distinct ids seen have to reach them; otherwise the
+                // sweep is incomplete. Tracked so that failure is loud instead
+                // of showing up months later as a wrong collection.
+                var offsetPaged = false
+                val offsetTotals = mutableSetOf<Int>()
+                var reachedEnd = false
                 val seenIds = mutableSetOf<Long>()
                 while (true) {
                     val page =
@@ -323,8 +344,10 @@ class MediaRepositoryImpl
                             limit = SYNC_PAGE_SIZE,
                             offset = offset,
                         )
-                    if (page.items.isEmpty()) break
-                    reportedTotal = page.total
+                    if (page.items.isEmpty()) {
+                        reachedEnd = true
+                        break
+                    }
                     dao.upsertAll(page.items.map { it.toEntity(codec) })
                     val firstPage = seenIds.isEmpty()
                     page.items.forEach { dto ->
@@ -349,16 +372,27 @@ class MediaRepositoryImpl
                         cursor = MediaCursor(next.updatedSince, next.updatedSinceId)
                         offset = 0
                     } else {
+                        offsetPaged = true
+                        offsetTotals += page.total
                         offset += SYNC_PAGE_SIZE
                     }
-                    if (!more) break
+                    if (!more) {
+                        reachedEnd = true
+                        break
+                    }
                 }
-                val sweptEverything = seenIds.size >= reportedTotal
+                // Paged by cursor to the end, a sweep has seen every row that
+                // still exists: a delete can't hide another row from it. By
+                // offset, only if the server's count held still throughout and
+                // was reached.
+                val sweptEverything =
+                    reachedEnd &&
+                        (!offsetPaged || (offsetTotals.size == 1 && seenIds.size >= offsetTotals.single()))
                 if (!sweptEverything) {
                     Timber.w(
-                        "Sync incomplete: server reported %d items, pagination yielded %d distinct. " +
-                            "Holding the cursor so the next sync re-reads from the same point.",
-                        reportedTotal,
+                        "Sync incomplete: page totals %s, %d distinct items seen. " +
+                            "Holding the cursor and pruning nothing until a sweep completes.",
+                        offsetTotals,
                         seenIds.size,
                     )
                 }
@@ -398,11 +432,14 @@ class MediaRepositoryImpl
                         stale.chunked(DELETE_CHUNK).forEach { dao.deleteByIds(it) }
                         Timber.i("Sync pruned %d items deleted on the server", stale.size)
                     }
+                    // Reconciled: the debt recorded above is paid.
+                    SessionGeneration.write { sweepPrefs.setFullSweepOwed(false) }
                 }
 
                 SyncResult(
                     cursor = committed,
                     wipedAt = serverWipedAt,
+                    complete = sweptEverything,
                 )
             }
 
@@ -418,6 +455,9 @@ class MediaRepositoryImpl
 
         companion object {
             private const val SYNC_PAGE_SIZE = 200
+
+            /** A full sweep's starting point: before any row could have been written. */
+            private const val FULL_SWEEP_FROM = "1970-01-01 00:00:00"
 
             /** Ids per DELETE, kept well under SQLite's bound-variable ceiling. */
             private const val DELETE_CHUNK = 400

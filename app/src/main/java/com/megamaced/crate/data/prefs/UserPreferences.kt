@@ -88,6 +88,33 @@ interface ProfilePrefs : AccountPrefs {
     suspend fun setOnlineRecommendations(enabled: Boolean)
 }
 
+/**
+ * Whether the local collection owes a full sweep. Set the moment one becomes
+ * due, before its first page lands, and cleared only by a full sweep that
+ * reconciled the collection, so neither a sweep cut off part-way nor another
+ * sync storing its own cursor meanwhile can let the next run settle for a
+ * delta. An interface for the same reason as [AccountPrefs].
+ */
+interface FullSweepPrefs {
+    suspend fun fullSweepOwed(): Boolean
+
+    suspend fun setFullSweepOwed(owed: Boolean)
+}
+
+/**
+ * What a sync reads and leaves behind: the sync-repair hook, the cursor and
+ * the wipe marker. An interface for the same reason as [AccountPrefs].
+ */
+interface SyncStatePrefs {
+    val flow: Flow<UserPrefs>
+
+    suspend fun consumeSyncRepair(): Boolean
+
+    suspend fun setLastSyncCursor(cursor: String?)
+
+    suspend fun setLastSeenWipedAt(wipedAt: String?)
+}
+
 data class UserPrefs(
     val currentUserId: String? = null,
     val lastSyncCursor: String? = null,
@@ -108,10 +135,12 @@ class UserPreferences
     constructor(
         @ApplicationContext private val context: Context,
     ) : CollectionPrefs,
-        ProfilePrefs {
+        ProfilePrefs,
+        FullSweepPrefs,
+        SyncStatePrefs {
         private val ds get() = context.dataStore
 
-        val flow: Flow<UserPrefs> =
+        override val flow: Flow<UserPrefs> =
             ds.data.map { prefs ->
                 UserPrefs(
                     currentUserId = prefs[Keys.CURRENT_USER_ID],
@@ -156,14 +185,20 @@ class UserPreferences
          * half earlier versions kept beside it, which no sweep starts from any
          * more (see MediaRepositoryImpl.syncDelta).
          */
-        suspend fun setLastSyncCursor(cursor: String?) {
+        override suspend fun setLastSyncCursor(cursor: String?) {
             ds.edit {
                 it.write(Keys.LAST_SYNC_CURSOR, cursor)
                 it.remove(Keys.LAST_SYNC_CURSOR_ID)
             }
         }
 
-        suspend fun setLastSeenWipedAt(wipedAt: String?) {
+        override suspend fun fullSweepOwed(): Boolean = ds.data.first()[Keys.FULL_SWEEP_OWED] ?: false
+
+        override suspend fun setFullSweepOwed(owed: Boolean) {
+            ds.edit { if (owed) it[Keys.FULL_SWEEP_OWED] = true else it.remove(Keys.FULL_SWEEP_OWED) }
+        }
+
+        override suspend fun setLastSeenWipedAt(wipedAt: String?) {
             ds.edit { it.write(Keys.LAST_SEEN_WIPED_AT, wipedAt) }
         }
 
@@ -187,7 +222,7 @@ class UserPreferences
         /**
          * Forgets everything that belongs to the account being signed out of.
          *
-         * The sync cursor and wipe marker are per-account bookkeeping, and
+         * The sync cursor, wipe marker and owed full sweep are per-account bookkeeping, and
          * hidden categories, the online-recommendations opt-in and the last
          * category are the server-side profile mirrored locally — carrying any
          * of them into the next account shows one user another's choices.
@@ -199,6 +234,7 @@ class UserPreferences
                 prefs.remove(Keys.LAST_SYNC_CURSOR)
                 prefs.remove(Keys.LAST_SYNC_CURSOR_ID)
                 prefs.remove(Keys.LAST_SEEN_WIPED_AT)
+                prefs.remove(Keys.FULL_SWEEP_OWED)
                 prefs.remove(Keys.HIDDEN_CATEGORIES)
                 prefs.remove(Keys.ONLINE_RECOMMENDATIONS)
                 prefs.remove(Keys.LAST_CATEGORY)
@@ -231,7 +267,7 @@ class UserPreferences
          * a full sweep this run". A full sweep only upserts, so it costs one
          * extra pass over the collection and never drops local rows.
          */
-        suspend fun consumeSyncRepair(): Boolean {
+        override suspend fun consumeSyncRepair(): Boolean {
             var repair = false
             ds.edit { prefs ->
                 val done = prefs[Keys.SYNC_REPAIR_VERSION] ?: 0
@@ -265,6 +301,7 @@ class UserPreferences
             // ever removed now.
             val LAST_SYNC_CURSOR_ID = longPreferencesKey("last_sync_cursor_id")
             val LAST_SEEN_WIPED_AT = stringPreferencesKey("last_seen_wiped_at")
+            val FULL_SWEEP_OWED = booleanPreferencesKey("full_sweep_owed")
             val THEME_MODE = stringPreferencesKey("theme_mode")
             val COLLECTION_VIEW_MODE = stringPreferencesKey("collection_view_mode")
             val HIDDEN_CATEGORIES = stringSetPreferencesKey("hidden_categories")

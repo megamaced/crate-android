@@ -9,6 +9,7 @@ import com.megamaced.crate.data.db.entity.PlaylistItemCrossRef
 import com.megamaced.crate.data.db.entity.PlaylistItemWithMedia
 import com.megamaced.crate.data.db.entity.PlaylistWithItems
 import com.megamaced.crate.data.prefs.AccountPrefs
+import com.megamaced.crate.data.prefs.FullSweepPrefs
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
@@ -31,6 +32,17 @@ class FakeAccountPrefs(
 
     override suspend fun setCurrentUserId(userId: String?) {
         this.userId.value = userId
+    }
+}
+
+/** In-memory [FullSweepPrefs]; starts with nothing owed. */
+class FakeFullSweepPrefs(
+    var owed: Boolean = false,
+) : FullSweepPrefs {
+    override suspend fun fullSweepOwed(): Boolean = owed
+
+    override suspend fun setFullSweepOwed(owed: Boolean) {
+        this.owed = owed
     }
 }
 

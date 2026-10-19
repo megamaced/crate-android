@@ -52,6 +52,7 @@ class SessionGuardTest {
             SessionGuardedMediaItemDao(rows),
             SessionGuardedPlaylistDao(playlists),
             FakeAccountPrefs(),
+            FakeFullSweepPrefs(),
             MediaItemJsonCodec(Json),
         )
 

@@ -98,5 +98,11 @@ interface MediaRepository {
     data class SyncResult(
         val cursor: String?,
         val wipedAt: String?,
+        /**
+         * False when the sweep could not establish it had seen everything —
+         * the collection changed under offset paging — so nothing was pruned
+         * and the cursor was not advanced; the caller should try again soon.
+         */
+        val complete: Boolean = true,
     )
 }
