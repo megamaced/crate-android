@@ -509,10 +509,9 @@ private class RecordingMediaRepository : MediaRepository {
 
     override suspend fun syncDelta(
         updatedSince: String?,
-        cursorId: Long?,
         lastSeenWipedAt: String?,
     ): ApiResult<MediaRepository.SyncResult> =
-        ApiResult.Success(MediaRepository.SyncResult(cursor = updatedSince, cursorId = cursorId, wipedAt = lastSeenWipedAt))
+        ApiResult.Success(MediaRepository.SyncResult(cursor = updatedSince, wipedAt = lastSeenWipedAt))
 }
 
 private class StubEnrichmentRepository : EnrichmentRepository {

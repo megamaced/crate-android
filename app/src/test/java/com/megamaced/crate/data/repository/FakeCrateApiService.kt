@@ -68,6 +68,19 @@ class FakeCrateApiService : CrateApiService {
      */
     val pagesByOffset = mutableMapOf<Int, PaginatedMediaDto>()
 
+    /**
+     * Pages served for a keyset request, by its `updatedSinceId`. Takes
+     * precedence over [pagesByOffset]; an id with no entry serves an empty page.
+     */
+    val pagesByCursorId = mutableMapOf<Long, PaginatedMediaDto>()
+
+    /**
+     * Answers getMedia ahead of every other mailbox, for a test that scripts
+     * a server changing between requests: (updatedSince, updatedSinceId,
+     * limit, offset) to the page served.
+     */
+    var getMediaHandler: ((String?, Long?, Int, Int) -> PaginatedMediaDto)? = null
+
     /** Every (limit, offset) pair getMedia was called with, in call order. */
     val getMediaCalls = mutableListOf<Pair<Int, Int>>()
 
@@ -89,6 +102,11 @@ class FakeCrateApiService : CrateApiService {
         getMediaCalls += limit to offset
         getMediaUpdatedSince += updatedSince
         getMediaCursors += updatedSince to updatedSinceId
+        getMediaHandler?.let { return it(updatedSince, updatedSinceId, limit, offset) }
+        if (updatedSinceId != null && pagesByCursorId.isNotEmpty()) {
+            return pagesByCursorId[updatedSinceId]
+                ?: PaginatedMediaDto(items = emptyList(), total = 0, limit = limit, offset = offset)
+        }
         if (pagesByOffset.isNotEmpty()) {
             val total = pagesByOffset.values.sumOf { it.items.size }
             return pagesByOffset[offset]

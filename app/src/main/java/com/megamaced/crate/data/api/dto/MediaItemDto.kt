@@ -135,6 +135,18 @@ data class PaginatedMediaDto(
      * from servers older than the keyset cursor.
      */
     val nextCursor: MediaCursorDto? = null,
+    /**
+     * Where a sweep that begins with this request should leave the next one
+     * to start: the server's clock, a margin before the query ran. Absent from
+     * servers older than it.
+     */
+    val watermark: MediaWatermarkDto? = null,
+)
+
+/** A sweep's starting point: a timestamp, read inclusively by the server. */
+@Serializable
+data class MediaWatermarkDto(
+    val updatedSince: String,
 )
 
 /** The `(updatedSince, updatedSinceId)` pair the server hands back and takes. */

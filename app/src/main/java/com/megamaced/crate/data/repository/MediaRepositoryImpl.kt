@@ -226,7 +226,6 @@ class MediaRepositoryImpl
 
         override suspend fun syncDelta(
             updatedSince: String?,
-            cursorId: Long?,
             lastSeenWipedAt: String?,
         ): ApiResult<SyncResult> =
             apiCall {
@@ -279,39 +278,32 @@ class MediaRepositoryImpl
                 }
 
                 val fullSweep = wiped || drifted || updatedSince == null
-                // What the caller handed us, and the floor the sweep may never
-                // fall below: a cursor is only ever replaced by a later one.
-                val stored = if (updatedSince == null) null else MediaCursor(updatedSince, cursorId)
-                // A delta resumes from the stored cursor. When only its
-                // timestamp is known — the first sync after upgrading, or a
-                // server too old to hand out the id half — ask from one second
-                // earlier: those servers filter strictly-greater against
-                // second-resolution stamps, so a row written in the same second
-                // as one already fetched, but after that page's query ran,
-                // would never be returned again. Re-seeing rows costs nothing,
-                // because every write below is an upsert.
-                var cursor =
-                    when {
-                        fullSweep -> {
-                            null
-                        }
-
-                        cursorId != null -> {
-                            stored
-                        }
-
-                        else -> {
-                            MediaCursor(ServerTimestamps.minusOneSecond(updatedSince), null)
-                        }
-                    }
+                // A sweep starts from a timestamp alone, never from the server's
+                // (updatedAt, id) cursor. That pair pages one sweep exactly, but
+                // between sweeps it misses edits: an edit moves a row's
+                // timestamp and not its id, so a row at or below the stored id
+                // that is edited within the stored second afterwards matches
+                // neither half of the server's predicate and is never returned
+                // again (megamaced/crate#37). From a timestamp alone the server
+                // re-reads the whole boundary second. The extra second before it
+                // covers servers that predate the keyset cursor and filter
+                // strictly-greater. Re-seeing rows costs nothing, because every
+                // write below is an upsert.
+                var cursor: MediaCursor? =
+                    if (fullSweep) null else MediaCursor(ServerTimestamps.minusOneSecond(updatedSince), null)
 
                 var offset = 0
-                // The last resume point the server handed back, and the highest
-                // stamp the sweep saw. The first is exact; the second is the
-                // fallback for a full sweep and for servers predating the
-                // keyset cursor.
-                var keyset: MediaCursor? = null
-                var maxSeen: String? = null
+                // Where the next sweep may start: a moment no later than this
+                // sweep's first read, so every edit made while it pages lands
+                // after it. The server's watermark comes with the probe, the
+                // first request of the sync, and is kept for the whole sweep —
+                // never moved on to a later page, since an edit made mid-sweep
+                // to a row an earlier page returned can be stamped below a
+                // later page's rows. A server that sends none gets the newest
+                // stamp on the sweep's first page instead: everything on that
+                // page was written before the sweep began.
+                val serverWatermark = probe.watermark?.updatedSince
+                var firstPageMax: String? = null
                 var reportedTotal = 0
                 // Offset pagination is only lossless while the server's sort is
                 // total, and while nothing is edited mid-sweep: a row updated
@@ -331,12 +323,16 @@ class MediaRepositoryImpl
                     if (page.items.isEmpty()) break
                     reportedTotal = page.total
                     dao.upsertAll(page.items.map { it.toEntity(codec) })
+                    val firstPage = seenIds.isEmpty()
                     page.items.forEach { dto ->
                         seenIds += dto.id
                         val candidate = dto.updatedAt
-                        val current = maxSeen
-                        if (candidate != null && (current == null || ServerTimestamps.isNewer(candidate, current))) {
-                            maxSeen = candidate
+                        val current = firstPageMax
+                        if (firstPage &&
+                            candidate != null &&
+                            (current == null || ServerTimestamps.isNewer(candidate, current))
+                        ) {
+                            firstPageMax = candidate
                         }
                     }
                     val more = page.items.size >= SYNC_PAGE_SIZE
@@ -347,8 +343,7 @@ class MediaRepositoryImpl
                     // shared second.
                     val next = page.nextCursor
                     if (next != null) {
-                        keyset = MediaCursor(next.updatedSince, next.updatedSinceId)
-                        cursor = keyset
+                        cursor = MediaCursor(next.updatedSince, next.updatedSinceId)
                         offset = 0
                     } else {
                         offset += SYNC_PAGE_SIZE
@@ -369,24 +364,15 @@ class MediaRepositoryImpl
                 // gap permanent: the next delta starts after them, and an edit
                 // changes no row count, so the drift check never escalates to a
                 // full sweep either. An incomplete sweep therefore keeps the
-                // cursor exactly where it was and tries again next time.
+                // cursor exactly where it was and tries again next time. A
+                // cursor only ever moves forward: a delta that re-read the
+                // second before it must not walk it back.
+                val reached = serverWatermark ?: firstPageMax
                 val committed =
                     when {
-                        !sweptEverything -> {
-                            stored
-                        }
-
-                        keyset != null -> {
-                            keyset
-                        }
-
-                        maxSeen != null && (stored == null || ServerTimestamps.isNewer(maxSeen, stored.updatedSince)) -> {
-                            MediaCursor(maxSeen, null)
-                        }
-
-                        else -> {
-                            stored
-                        }
+                        !sweptEverything -> updatedSince
+                        reached != null && (updatedSince == null || ServerTimestamps.isNewer(reached, updatedSince)) -> reached
+                        else -> updatedSince
                     }
 
                 // A full sweep enumerates everything the server holds for us, so
@@ -412,16 +398,15 @@ class MediaRepositoryImpl
                 }
 
                 SyncResult(
-                    cursor = committed?.updatedSince,
-                    cursorId = committed?.id,
+                    cursor = committed,
                     wipedAt = serverWipedAt,
                 )
             }
 
         /**
-         * A delta resume point: the `(updatedAt, id)` of the last row consumed.
-         * [id] is null against a server that predates the keyset cursor, where
-         * only the timestamp half exists.
+         * Where the next page of a sweep resumes: the `(updatedAt, id)` of the
+         * last row consumed. [id] is null at the start of a sweep, and against
+         * a server that predates the keyset cursor.
          */
         private data class MediaCursor(
             val updatedSince: String,
