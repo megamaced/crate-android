@@ -97,6 +97,30 @@ class SettingsViewModel
         private val tokens = MutableStateFlow(TokensState())
         private val profile = MutableStateFlow<ProfileState>(ProfileState())
         private val market = MutableStateFlow(MarketState())
+
+        // Market settings are saved as a whole snapshot, and the server takes
+        // whichever arrives last, so saves go through a SnapshotSaver: one at a
+        // time, newest first. A failure with nothing newer queued puts the
+        // screen back to what the server last accepted.
+        private val marketSaver =
+            SnapshotSaver(
+                scope = viewModelScope,
+                save = settingsRepository::setMarketSettings,
+                onFailure = { result, confirmed ->
+                    confirmed?.let { market.update { state -> state.copy(settings = it) } }
+                    when (result) {
+                        ApiResult.NetworkError -> {
+                            reportError(UiText.Res(R.string.error_network))
+                        }
+
+                        is ApiResult.HttpError -> {
+                            reportError(result.toUiText())
+                        }
+
+                        else -> { /* Unauthorised: SessionManager handles */ }
+                    }
+                },
+            )
         private val refreshProgress = MutableStateFlow<RefreshAllProgress?>(null)
         private val enrichProgress = MutableStateFlow<RefreshAllProgress?>(null)
         private val updateCheck = MutableStateFlow<UpdateCheckState>(UpdateCheckState.Idle)
@@ -203,8 +227,11 @@ class SettingsViewModel
             viewModelScope.launch {
                 val settingsResult = settingsRepository.getMarketSettings()
                 val currenciesResult = settingsRepository.getCurrencies()
-                val settings = (settingsResult as? ApiResult.Success)?.value
+                val loaded = (settingsResult as? ApiResult.Success)?.value
                 val currencies = (currenciesResult as? ApiResult.Success)?.value.orEmpty()
+                if (loaded != null) marketSaver.confirmed = loaded
+                // A choice still being saved is newer than what was just read.
+                val settings = if (marketSaver.isSaving) market.value.settings else loaded
                 market.value = MarketState(settings = settings, currencies = currencies, isLoading = false)
                 if (settingsResult is ApiResult.HttpError) {
                     reportError(settingsResult.toUiText())
@@ -251,23 +278,10 @@ class SettingsViewModel
             updateMarket(current.copy(marketCurrency = currency))
         }
 
+        /** Show [settings] at once and save them (see [marketSaver]). */
         private fun updateMarket(settings: MarketSettings) {
-            viewModelScope.launch {
-                market.update { it.copy(settings = settings) }
-                when (val result = settingsRepository.setMarketSettings(settings)) {
-                    is ApiResult.Success -> { /* persisted */ }
-
-                    ApiResult.NetworkError -> {
-                        reportError(UiText.Res(R.string.error_network))
-                    }
-
-                    is ApiResult.HttpError -> {
-                        reportError(result.toUiText())
-                    }
-
-                    ApiResult.Unauthorised -> { /* SessionManager handles */ }
-                }
-            }
+            market.update { it.copy(settings = settings) }
+            marketSaver.submit(settings)
         }
 
         fun refreshAllMarketRates() {
