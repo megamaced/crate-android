@@ -1,7 +1,9 @@
 package com.megamaced.crate.ui.screen.collection
 
+import com.megamaced.crate.R
 import com.megamaced.crate.domain.model.MediaItem
 import com.megamaced.crate.domain.model.Status
+import com.megamaced.crate.util.UiText
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
@@ -58,8 +60,18 @@ internal fun hasGenre(
     return genreTokens(item).any { it.equals(needle, ignoreCase = true) }
 }
 
+/** The first year of the decade an item files under — 1997 -> 1990 — or null without a year. */
+internal fun decadeStartOf(item: MediaItem): Int? = item.year?.takeIf { it != 0 }?.let { (it / 10) * 10 }
+
+/** The filter value for the decade starting in [start]: 1990 -> "1990s". Not display text: see [decadeLabel]. */
+internal fun decadeKey(start: Int): String = "${start}s"
+
 /** The decade an item files under — 1997 -> "1990s" — or null without a year. */
-internal fun decadeOf(item: MediaItem): String? = item.year?.takeIf { it != 0 }?.let { "${(it / 10) * 10}s" }
+internal fun decadeOf(item: MediaItem): String? = decadeStartOf(item)?.let(::decadeKey)
+
+/** A decade filter value as the user reads it, in their language; anything else shows as it is. */
+internal fun decadeLabel(decade: String): UiText =
+    decade.removeSuffix("s").toIntOrNull()?.let { UiText.Res(R.string.decade_label, listOf(it)) } ?: UiText.Raw(decade)
 
 /** Distinct genres across [items] with counts, alphabetical. */
 internal fun genreBuckets(items: List<MediaItem>): List<FilterBucket> {

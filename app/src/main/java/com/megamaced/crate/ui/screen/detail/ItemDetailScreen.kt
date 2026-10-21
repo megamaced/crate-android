@@ -78,7 +78,8 @@ import com.megamaced.crate.ui.components.PhotoImage
 import com.megamaced.crate.ui.components.RecommendationRow
 import com.megamaced.crate.ui.components.SuggestionTarget
 import com.megamaced.crate.ui.screen.addedit.formatLabel
-import com.megamaced.crate.ui.screen.collection.decadeOf
+import com.megamaced.crate.ui.screen.collection.decadeKey
+import com.megamaced.crate.ui.screen.collection.decadeStartOf
 import com.megamaced.crate.ui.screen.collection.genreTokens
 import com.megamaced.crate.ui.screen.share.ShareSheet
 import com.megamaced.crate.ui.screen.share.ShareTarget
@@ -611,7 +612,7 @@ private fun ChipRow(
     val format = item.format?.takeIf { it.isNotBlank() }
     val year = item.year?.takeIf { it != 0 }?.toString()
     // Read off the same year field as [year], so the two appear together.
-    val decade = decadeOf(item)
+    val decadeStart = decadeStartOf(item)
     val country = item.country?.takeIf { it.isNotBlank() }
     // Anything not explicitly wanted reads as owned, matching the web app and
     // the mapper, which already lands an unknown API status on [Status.Owned].
@@ -629,11 +630,11 @@ private fun ChipRow(
                 onClick = { onFilter(DetailFilterAxis.Format, format) },
             )
         }
-        if (year != null && decade != null) {
+        if (year != null && decadeStart != null) {
             ValueBadge(
                 value = year,
-                a11y = stringResource(R.string.detail_year_filter_a11y, decade),
-                onClick = { onFilter(DetailFilterAxis.Decade, decade) },
+                a11y = stringResource(R.string.detail_decade_filter_a11y, decadeStart),
+                onClick = { onFilter(DetailFilterAxis.Decade, decadeKey(decadeStart)) },
             )
         }
         // A state rather than an axis the collection can be sliced by, so it

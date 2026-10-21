@@ -183,7 +183,7 @@ fun CollectionScreen(
                     val resources = LocalResources.current
                     CollectionEmptyState(
                         status = uiState.status,
-                        filterDescription = activeFilterDescription(uiState, resources::getString),
+                        filterDescription = activeFilterDescription(uiState) { it.resolve(resources) },
                         onClearFilters = viewModel::clearValueFilters,
                         modifier = Modifier.fillMaxSize(),
                     )
@@ -391,15 +391,16 @@ private fun CollectionEmptyState(
 /**
  * The active filters as one phrase — "1990s Rock LP" — for the empty state to
  * read back. Null when nothing is filtered. Decade, genre then format, the
- * order the web app reads them in. Formats show by their display names, which
- * [getString] looks up.
+ * order the web app reads them in. The decade and formats show as display
+ * text, which [resolve] reads in the user's language.
  */
 internal fun activeFilterDescription(
     state: CollectionUiState,
-    getString: (Int) -> String,
+    resolve: (UiText) -> String,
 ): String? {
-    val formats = state.selectedFormats.sorted().map { CategoryFormats.label(it, getString) }
-    return (listOfNotNull(state.selectedDecade, state.selectedGenre) + formats)
+    val decade = state.selectedDecade?.let { resolve(decadeLabel(it)) }
+    val formats = state.selectedFormats.sorted().map { resolve(CategoryFormats.label(it)) }
+    return (listOfNotNull(decade, state.selectedGenre) + formats)
         .takeIf { it.isNotEmpty() }
         ?.joinToString(" ")
 }

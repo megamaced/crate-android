@@ -56,11 +56,12 @@ class CollectionGroupingTest {
             item(4, "D", year = null),
         )
         val groups = groupItemsForSort(items, SortField.Year, today)
+        val nineties = UiText.Res(R.string.decade_label, listOf(1990))
         assertEquals(
-            listOf(UiText.Raw("1990s"), UiText.Raw("2000s"), unknown),
+            listOf(nineties, UiText.Res(R.string.decade_label, listOf(2000)), unknown),
             groups.map { it.header },
         )
-        assertEquals(2, groups.first { it.header == UiText.Raw("1990s") }.items.size)
+        assertEquals(2, groups.first { it.header == nineties }.items.size)
     }
 
     @Test
