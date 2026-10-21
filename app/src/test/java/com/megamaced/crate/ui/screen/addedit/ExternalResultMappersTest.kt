@@ -26,6 +26,24 @@ class ExternalResultMappersTest {
     }
 
     @Test
+    fun `every provider's id links the item to the result picked`() {
+        // Without it the saved item isn't linked, and enrichment searches
+        // again — for a book, by ISBN, which brings back the work's English
+        // title and cover in place of the edition the user picked.
+        assertEquals("603", TmdbSearchResultDto(tmdbId = "603", title = "A").toResult().discogsId)
+        assertEquals("/works/OL27482W", OpenLibraryResultDto(workKey = "/works/OL27482W", title = "A").toResult().discogsId)
+        assertEquals("3498", RawgSearchResultDto(rawgId = "3498", title = "A").toResult().discogsId)
+        assertEquals("4050", ComicVineSearchResultDto(comicVineId = "4050", title = "A").toResult().discogsId)
+        assertEquals("249504", DiscogsSearchResultDto(title = "A", discogsId = "249504").toResult().discogsId)
+    }
+
+    @Test
+    fun `a blank id links nothing`() {
+        assertNull(TmdbSearchResultDto(tmdbId = "", title = "A").toResult().discogsId)
+        assertNull(OpenLibraryResultDto(workKey = " ", title = "A").toResult().discogsId)
+    }
+
+    @Test
     fun `Open Library prefers its full artwork over the thumbnail`() {
         // coverUrl is both the row's thumbnail and the artwork the form hands
         // the server to cache, so the larger image wins where there is one.

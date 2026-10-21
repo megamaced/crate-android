@@ -590,6 +590,7 @@ class AddEditViewModel
                                 year = dto.year,
                                 barcode = dto.barcode ?: isbn,
                                 label = dto.label,
+                                discogsId = dto.workKey.takeIf { it.isNotBlank() },
                                 coverUrl = dto.artworkUrl ?: dto.thumb,
                             ),
                         )

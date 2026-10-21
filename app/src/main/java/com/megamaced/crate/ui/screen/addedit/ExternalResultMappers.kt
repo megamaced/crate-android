@@ -19,6 +19,11 @@ import com.megamaced.crate.data.api.dto.TmdbSearchResultDto
  * `coverUrl` is doing two jobs — the thumbnail on the row, and the artwork the
  * form hands the server to cache — so where a provider offers both sizes the
  * larger one wins.
+ *
+ * Each provider's id lands in `discogsId`, the generic enrichment-id field, as
+ * the web app's form does: it links the saved item to the result picked, so
+ * enrichment reads that film, book or game rather than searching again and
+ * perhaps finding another, or the same book in another language.
  */
 fun DiscogsSearchResultDto.toResult(): ExternalSearchResult =
     ExternalSearchResult(
@@ -37,6 +42,7 @@ fun TmdbSearchResultDto.toResult(): ExternalSearchResult =
     ExternalSearchResult(
         title = title,
         year = year,
+        discogsId = tmdbId.takeIf { it.isNotBlank() },
         coverUrl = thumb,
     )
 
@@ -47,6 +53,7 @@ fun OpenLibraryResultDto.toResult(): ExternalSearchResult =
         year = year,
         barcode = barcode,
         label = label,
+        discogsId = workKey.takeIf { it.isNotBlank() },
         coverUrl = artworkUrl ?: thumb,
     )
 
@@ -61,6 +68,7 @@ fun RawgSearchResultDto.toResult(): ExternalSearchResult =
         // both empties the Platform field and degrades the later enrichment.
         format = format,
         year = year,
+        discogsId = rawgId.takeIf { it.isNotBlank() },
         subtitle = genres,
         coverUrl = thumb,
     )
@@ -70,6 +78,7 @@ fun ComicVineSearchResultDto.toResult(): ExternalSearchResult =
         title = title,
         year = year,
         label = label,
+        discogsId = comicVineId.takeIf { it.isNotBlank() },
         subtitle = genres,
         coverUrl = thumb,
     )

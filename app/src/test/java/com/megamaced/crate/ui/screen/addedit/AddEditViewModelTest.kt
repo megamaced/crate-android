@@ -2,6 +2,7 @@ package com.megamaced.crate.ui.screen.addedit
 
 import androidx.lifecycle.SavedStateHandle
 import com.megamaced.crate.data.api.ApiResult
+import com.megamaced.crate.data.api.dto.OpenLibraryResultDto
 import com.megamaced.crate.data.prefs.CreateReceipts
 import com.megamaced.crate.data.repository.FakeCrateApiService
 import com.megamaced.crate.domain.model.Category
@@ -345,6 +346,52 @@ class AddEditViewModelTest {
             assertTrue(vm.uiState.value.ratingsSupported)
         }
 
+    // -- Picked search results --------------------------------------------------
+
+    @Test
+    fun `a book picked from search is saved linked to its work`() =
+        runTest {
+            val media = RecordingMediaRepository()
+            val vm = newViewModel(media = media)
+            vm.applyExternalResult(
+                OpenLibraryResultDto(
+                    workKey = "/works/OL27482W",
+                    title = "Der Kleine Hobbit",
+                    artist = "J.R.R. Tolkien",
+                    artworkUrl = "https://covers.openlibrary.org/b/id/14626130-L.jpg",
+                ).toResult(),
+            )
+            vm.onFormatChange("Paperback")
+
+            vm.save()
+            advanceUntilIdle()
+
+            val draft = media.created.single()
+            assertEquals("/works/OL27482W", draft.discogsId)
+            assertEquals("Der Kleine Hobbit", draft.title)
+        }
+
+    @Test
+    fun `an ISBN lookup links the item to the work it found`() =
+        runTest {
+            val api =
+                FakeCrateApiService().apply {
+                    isbnResult =
+                        OpenLibraryResultDto(
+                            workKey = "/works/OL27482W",
+                            title = "The Hobbit",
+                            artist = "J.R.R. Tolkien",
+                        )
+                }
+            val vm = newViewModel(api = api)
+            vm.onBarcodeChange("9780261102217")
+
+            vm.lookupIsbn()
+            advanceUntilIdle()
+
+            assertEquals("/works/OL27482W", vm.uiState.value.discogsId)
+        }
+
     // -- Picked images --------------------------------------------------------
 
     @Test
@@ -654,6 +701,7 @@ class AddEditViewModelTest {
         imageReader: PickedImageReader = FakePickedImageReader(),
         receipts: CreateReceipts = FakeCreateReceipts(),
         settings: SettingsRepository = StubSettingsRepository(),
+        api: FakeCrateApiService = FakeCrateApiService(),
     ): AddEditViewModel =
         AddEditViewModel(
             savedStateHandle = handle,
@@ -661,7 +709,7 @@ class AddEditViewModelTest {
             settingsRepository = settings,
             enrichmentRepository = StubEnrichmentRepository(),
             imageReader = imageReader,
-            api = FakeCrateApiService(),
+            api = api,
             createReceipts = receipts,
         )
 }
