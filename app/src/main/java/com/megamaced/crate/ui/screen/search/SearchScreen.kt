@@ -53,6 +53,7 @@ import com.megamaced.crate.ui.components.ArtworkImage
 import com.megamaced.crate.ui.components.CategoryBadge
 import com.megamaced.crate.ui.screen.addedit.ExternalResultRow
 import com.megamaced.crate.ui.screen.addedit.ExternalSearchResult
+import com.megamaced.crate.ui.screen.addedit.formatLabel
 import com.megamaced.crate.ui.screen.addedit.listKey
 import com.megamaced.crate.ui.screen.addedit.providerNameRes
 import com.megamaced.crate.util.resolve
@@ -325,7 +326,7 @@ private fun CollectionRow(
             val sub =
                 listOfNotNull(
                     item.artist?.takeIf { it.isNotBlank() },
-                    item.format?.takeIf { it.isNotBlank() },
+                    item.format?.takeIf { it.isNotBlank() }?.let { formatLabel(it) },
                     item.year?.toString(),
                 ).joinToString(" · ").ifBlank { null }
             if (sub != null) {

@@ -16,6 +16,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.megamaced.crate.domain.model.MediaItem
+import com.megamaced.crate.ui.screen.addedit.formatLabel
 
 /**
  * Collection card. [artistFirst] swaps the two text lines so the artist (or
@@ -59,7 +60,7 @@ fun MediaCard(
                 val artist = item.artist?.takeIf { it.isNotBlank() }
                 val headline = if (artistFirst) artist ?: item.title else item.title
                 val subtitle = if (artistFirst) item.title.takeIf { artist != null } else artist
-                val tail = listOfNotNull(item.format, item.year?.toString()).joinToString(" · ")
+                val tail = listOfNotNull(item.format?.let { formatLabel(it) }, item.year?.toString()).joinToString(" · ")
                 // Each line is pinned to a fixed line count and the two lower
                 // lines are laid out whether or not there is anything to put in
                 // them, so an item missing an artist or a format reserves the

@@ -25,6 +25,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.megamaced.crate.R
+import com.megamaced.crate.ui.screen.addedit.formatLabel
 import com.megamaced.crate.ui.screen.collection.FilterBucket
 
 /**
@@ -90,15 +91,16 @@ fun CollectionFilterBar(
                 modifier = Modifier.semantics { contentDescription = allA11y },
             )
             formats.forEach { bucket ->
+                val name = formatLabel(bucket.value)
                 val label = stringResource(
                     R.string.collection_filter_format_chip,
-                    bucket.value,
+                    name,
                     bucket.count,
                 )
                 val a11y = pluralStringResource(
                     R.plurals.collection_chip_format_a11y,
                     bucket.count,
-                    bucket.value,
+                    name,
                     bucket.count,
                 )
                 FilterChip(

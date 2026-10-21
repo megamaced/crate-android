@@ -77,6 +77,7 @@ import com.megamaced.crate.ui.components.LoadingState
 import com.megamaced.crate.ui.components.PhotoImage
 import com.megamaced.crate.ui.components.RecommendationRow
 import com.megamaced.crate.ui.components.SuggestionTarget
+import com.megamaced.crate.ui.screen.addedit.formatLabel
 import com.megamaced.crate.ui.screen.collection.decadeOf
 import com.megamaced.crate.ui.screen.collection.genreTokens
 import com.megamaced.crate.ui.screen.share.ShareSheet
@@ -623,8 +624,8 @@ private fun ChipRow(
     ) {
         if (format != null) {
             ValueBadge(
-                value = format,
-                a11y = stringResource(R.string.detail_format_filter_a11y, format),
+                value = formatLabel(format),
+                a11y = stringResource(R.string.detail_format_filter_a11y, formatLabel(format)),
                 onClick = { onFilter(DetailFilterAxis.Format, format) },
             )
         }

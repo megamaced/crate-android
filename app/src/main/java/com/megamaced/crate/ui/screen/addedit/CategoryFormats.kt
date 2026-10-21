@@ -1,15 +1,19 @@
 package com.megamaced.crate.ui.screen.addedit
 
 import androidx.annotation.StringRes
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.ui.res.stringResource
 import com.megamaced.crate.R
 import com.megamaced.crate.domain.model.Category
+import com.megamaced.crate.util.UiText
 
 /**
  * Mirror of crate/src/utils/categoryFormats.js — keep these in sync with the
  * Nextcloud app so the dropdowns and validation match across clients.
  *
  * The format values themselves are what the server stores, so they are literals
- * either way; only the group headings above them are shown as prose.
+ * either way. What the user sees is the group headings and [labelRes].
  */
 object CategoryFormats {
     data class Group(
@@ -103,4 +107,58 @@ object CategoryFormats {
         if (value.isBlank()) return false
         return forCategory(category).any { it.equals(value.trim(), ignoreCase = true) }
     }
+
+    /**
+     * The display name of a stored format. The value stored and sent to the
+     * server is always the English name; only formats named with ordinary words
+     * translate. A platform, model or disc-standard name (PS5, VHS, SACD…) is a
+     * product name, and a custom format is the user's own text, so those show
+     * as stored. Mirror of formatLabel() in the web app.
+     */
+    @StringRes
+    fun labelRes(format: String): Int? =
+        when (format) {
+            "Vinyl" -> R.string.format_name_vinyl
+            "7\" Single" -> R.string.format_name_7_inch_single
+            "12\" Single" -> R.string.format_name_12_inch_single
+            "Picture Disc" -> R.string.format_name_picture_disc
+            "Flexi-disc" -> R.string.format_name_flexi_disc
+            "Shellac" -> R.string.format_name_shellac
+            "Lathe Cut" -> R.string.format_name_lathe_cut
+            "Cassette" -> R.string.format_name_cassette
+            "Reel-to-Reel" -> R.string.format_name_reel_to_reel
+            "4-Track Cartridge" -> R.string.format_name_4_track_cartridge
+            "Microcassette" -> R.string.format_name_microcassette
+            "Hardcover" -> R.string.format_name_hardcover
+            "Paperback" -> R.string.format_name_paperback
+            "Mass Market Paperback" -> R.string.format_name_mass_market_paperback
+            "Trade Paperback" -> R.string.format_name_trade_paperback
+            "Graphic Novel" -> R.string.format_name_graphic_novel
+            "Comic" -> R.string.format_name_comic
+            "Audiobook CD" -> R.string.format_name_audiobook_cd
+            "Audiobook Cassette" -> R.string.format_name_audiobook_cassette
+            "Single Issue" -> R.string.format_name_single_issue
+            "Annual" -> R.string.format_name_annual
+            "Special" -> R.string.format_name_special
+            "One-Shot" -> R.string.format_name_one_shot
+            "Mini-Series" -> R.string.format_name_mini_series
+            "Limited Series" -> R.string.format_name_limited_series
+            "Omnibus" -> R.string.format_name_omnibus
+            "Compendium" -> R.string.format_name_compendium
+            else -> null
+        }
+
+    /** [labelRes] as text for a ViewModel, or the stored value when it has none. */
+    fun label(format: String): UiText = labelRes(format)?.let { UiText.Res(it) } ?: UiText.Raw(format)
+
+    /** [labelRes] looked up with [getString], or the stored value when it has none. */
+    fun label(
+        format: String,
+        getString: (Int) -> String,
+    ): String = labelRes(format)?.let(getString) ?: format
 }
+
+/** [CategoryFormats.labelRes] resolved, or the stored value when it has none. */
+@Composable
+@ReadOnlyComposable
+fun formatLabel(format: String): String = CategoryFormats.labelRes(format)?.let { stringResource(it) } ?: format

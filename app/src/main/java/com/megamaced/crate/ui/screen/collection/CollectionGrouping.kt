@@ -5,6 +5,7 @@ import com.megamaced.crate.domain.model.CollectionSort
 import com.megamaced.crate.domain.model.MediaItem
 import com.megamaced.crate.domain.model.SortDirection
 import com.megamaced.crate.domain.model.SortField
+import com.megamaced.crate.ui.screen.addedit.CategoryFormats
 import com.megamaced.crate.util.UiText
 import java.time.LocalDate
 
@@ -49,7 +50,7 @@ internal fun groupKeyFor(
         SortField.Title -> alphaKey(item.title)
         SortField.Year -> decadeOf(item)?.let(UiText::Raw) ?: UNKNOWN_BUCKET
         SortField.CreatedAt -> DateBucket.labelFor(item.createdAt, today)
-        SortField.Format -> item.format?.takeIf { it.isNotBlank() }?.let(UiText::Raw) ?: UNKNOWN_BUCKET
+        SortField.Format -> item.format?.takeIf { it.isNotBlank() }?.let(CategoryFormats::label) ?: UNKNOWN_BUCKET
         SortField.MarketValue -> null
     }
 
