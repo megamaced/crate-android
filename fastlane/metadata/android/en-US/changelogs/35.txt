@@ -1,0 +1,10 @@
+Fixes from a code review of sync, accounts and login.
+
+- Sync no longer misses an item edited while it runs, or removes one
+  it skipped.
+- Switching accounts never shows the previous account's items or
+  shares.
+- Login follows redirects only within the server address you typed.
+- An item that can't load offers Retry instead of spinning.
+- An empty collection shared with you to edit can now be added to.
+- Fixes to the scanner, the add form and market settings.
