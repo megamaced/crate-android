@@ -59,6 +59,9 @@ sealed interface ApiResult<out T> {
 /**
  * The best server-supplied explanation for a failed request.
  *
+ * The server writes it in the Nextcloud account's language, which need not be
+ * the language the app itself is set to on this device.
+ *
  * Crate's controllers answer a validation failure with an OCS envelope
  * carrying the reason in `ocs.data.error` (and sometimes `ocs.meta.message`).
  * The HTTP reason phrase that [HttpException.message] exposes is an empty

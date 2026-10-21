@@ -39,7 +39,7 @@ jobs:
       # shrinking casualty is invisible until a tag is pushed otherwise. The APK
       # built here is unsigned and deliberately not published.
       - name: Build
-        run: ./gradlew --no-daemon ktlintCheck lint testDebugUnitTest assembleDebug assembleRelease
+        run: ./gradlew --no-daemon ktlintCheck lint verifyLocales testDebugUnitTest assembleDebug assembleRelease
 
       - name: Upload debug APK
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
