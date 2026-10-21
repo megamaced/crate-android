@@ -81,6 +81,7 @@
     <string name="field_name">Name</string>
     <string name="field_notes">Notes</string>
     <string name="field_year">Year</string>
+    <string name="field_rating">Rating</string>
     <string name="purchase_price_label">Original price</string>
     <string name="purchase_currency_label">Currency</string>
 
@@ -116,6 +117,10 @@
     <string name="sort_year_newest">Year (Newest)</string>
     <string name="sort_value_highest">Value (Highest)</string>
     <string name="sort_value_lowest">Value (Lowest)</string>
+    <!-- Sort by star rating, most stars first; unrated items come last. -->
+    <string name="sort_rating_highest">Rating (Highest)</string>
+    <!-- Sort by star rating, fewest stars first; unrated items still come last. -->
+    <string name="sort_rating_lowest">Rating (Lowest)</string>
     <string name="sort_noun_format">Format</string>
     <string name="sort_noun_title_music">Album</string>
     <string name="sort_noun_title_films">Film</string>
@@ -127,6 +132,22 @@
 
     <!-- Section headers in a grouped collection list -->
     <string name="group_header_unknown">Unknown</string>
+    <!-- An item with no star rating: a choice on the edit form and a group
+         heading when the collection is sorted by rating. -->
+    <string name="rating_none">Not rated</string>
+    <!-- A star rating: a choice on the edit form, read out by a screen
+         reader, and a group heading when sorted by rating. -->
+    <plurals name="rating_stars">
+        <item quantity="one">%1$d star</item>
+        <item quantity="other">%1$d stars</item>
+    </plurals>
+    <!-- An item's star rating as a screen reader reads it: "4 out of 5 stars".
+         %1$d is the item's stars, %2$d the most an item can have; the plural
+         form follows %2$d. -->
+    <plurals name="rating_summary">
+        <item quantity="one">%1$d out of %2$d star</item>
+        <item quantity="other">%1$d out of %2$d stars</item>
+    </plurals>
     <string name="date_bucket_today">Today</string>
     <string name="date_bucket_yesterday">Yesterday</string>
     <string name="date_bucket_earlier_this_week">Earlier this week</string>

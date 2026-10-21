@@ -41,6 +41,7 @@ object DatabaseModule {
                 CrateDatabase.MIGRATION_1_2,
                 CrateDatabase.MIGRATION_2_3,
                 CrateDatabase.MIGRATION_3_4,
+                CrateDatabase.MIGRATION_4_5,
             ).fallbackToDestructiveMigration(dropAllTables = true)
             .addCallback(
                 object : RoomDatabase.Callback() {

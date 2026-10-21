@@ -19,6 +19,7 @@ data class MediaItemEntity(
     val artist: String? = null,
     val format: String? = null,
     val year: Int? = null,
+    val rating: Int? = null,
     val barcode: String? = null,
     val notes: String? = null,
     val status: String,

@@ -17,7 +17,7 @@ import com.megamaced.crate.data.db.entity.PlaylistItemCrossRef
         PlaylistEntity::class,
         PlaylistItemCrossRef::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = true,
 )
 abstract class CrateDatabase : RoomDatabase() {
@@ -60,6 +60,18 @@ abstract class CrateDatabase : RoomDatabase() {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE media_items ADD COLUMN hasPhoto1 INTEGER NOT NULL DEFAULT 0")
                 db.execSQL("ALTER TABLE media_items ADD COLUMN hasPhoto2 INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
+        /**
+         * Mirrors the Nextcloud-side Version0012 migration: the item's star
+         * rating, nullable while unrated. Rows cached before it read as
+         * unrated until the next full sweep brings their ratings down (see
+         * UserPreferences.CURRENT_SYNC_REPAIR_VERSION).
+         */
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE media_items ADD COLUMN rating INTEGER")
             }
         }
     }

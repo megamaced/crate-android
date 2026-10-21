@@ -12,6 +12,7 @@ enum class SortField(
     Year("year"),
     Format("format"),
     MarketValue("marketValue"),
+    Rating("rating"),
 }
 
 enum class SortDirection(
@@ -128,6 +129,8 @@ fun sortOptionsFor(category: Category): List<SortOption> {
     opts += SortOption(CollectionSort(SortField.Title, SortDirection.Desc), R.string.sort_z_to_a, cfg.titleLabelRes)
     opts += SortOption(CollectionSort(SortField.Year, SortDirection.Asc), R.string.sort_year_oldest)
     opts += SortOption(CollectionSort(SortField.Year, SortDirection.Desc), R.string.sort_year_newest)
+    opts += SortOption(CollectionSort(SortField.Rating, SortDirection.Desc), R.string.sort_rating_highest)
+    opts += SortOption(CollectionSort(SortField.Rating, SortDirection.Asc), R.string.sort_rating_lowest)
     if (cfg.supportsFormat) {
         opts += SortOption(CollectionSort(SortField.Format, SortDirection.Asc), R.string.sort_a_to_z, R.string.sort_noun_format)
         opts += SortOption(CollectionSort(SortField.Format, SortDirection.Desc), R.string.sort_z_to_a, R.string.sort_noun_format)

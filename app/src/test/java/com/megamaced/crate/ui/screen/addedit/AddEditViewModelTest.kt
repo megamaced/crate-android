@@ -265,6 +265,86 @@ class AddEditViewModelTest {
             assertEquals("", media.created.single().country)
         }
 
+    // -- Rating ---------------------------------------------------------------
+
+    @Test
+    fun `an edit that leaves the rating alone sends none, so the server keeps it`() =
+        runTest {
+            val media = RecordingMediaRepository(storedRating = 4)
+            val vm = newViewModel(handle = editing(7L), media = media)
+            advanceUntilIdle()
+            assertEquals(4, vm.uiState.value.rating)
+
+            vm.onTitleChange("OK Computer OKNOTOK")
+            vm.save()
+            advanceUntilIdle()
+
+            assertNull(media.created.single().rating)
+        }
+
+    @Test
+    fun `a rating set on the form goes out as its stars, a cleared one as 0`() =
+        runTest {
+            val media = RecordingMediaRepository(storedRating = 4)
+            val vm = newViewModel(handle = editing(7L), media = media)
+            advanceUntilIdle()
+
+            vm.onRatingChange(5)
+            vm.save()
+            advanceUntilIdle()
+            assertEquals(5, media.created.last().rating)
+
+            vm.onRatingChange(null)
+            vm.save()
+            advanceUntilIdle()
+            assertEquals(0, media.created.last().rating)
+        }
+
+    @Test
+    fun `a form parked by a version without ratings saves without clearing the rating`() =
+        runTest {
+            val media = RecordingMediaRepository(storedRating = 4)
+            // What the form held before ratings existed: no rating fields.
+            val parked = """{"isEditing":true,"editingItemId":7,"title":"OK Computer","artist":"Radiohead","format":"Vinyl"}"""
+            val vm = newViewModel(handle = editing(7L, parked = parked), media = media)
+            advanceUntilIdle()
+
+            vm.save()
+            advanceUntilIdle()
+
+            assertNull(media.created.single().rating)
+        }
+
+    @Test
+    fun `the rating control shows only for a server that keeps ratings`() =
+        runTest {
+            val old = newViewModel(settings = StubSettingsRepository(crateVersion = "1.14.0"))
+            val current = newViewModel(settings = StubSettingsRepository(crateVersion = "1.15.0"))
+            advanceUntilIdle()
+
+            assertFalse(old.uiState.value.ratingsSupported)
+            assertTrue(current.uiState.value.ratingsSupported)
+        }
+
+    @Test
+    fun `a restored form asks the server again whether it keeps ratings`() =
+        runTest {
+            val parked =
+                """{"isEditing":true,"editingItemId":7,"title":"OK Computer","artist":"Radiohead",""" +
+                    """"format":"Vinyl","rating":3,"ratingEdited":true}"""
+            val vm =
+                newViewModel(
+                    handle = editing(7L, parked = parked),
+                    settings = StubSettingsRepository(crateVersion = "1.15.0"),
+                )
+            assertFalse("not taken from the parked form", vm.uiState.value.ratingsSupported)
+            assertEquals(3, vm.uiState.value.rating)
+
+            advanceUntilIdle()
+
+            assertTrue(vm.uiState.value.ratingsSupported)
+        }
+
     // -- Picked images --------------------------------------------------------
 
     @Test
@@ -556,16 +636,29 @@ class AddEditViewModelTest {
         vm.onFormatChange("Vinyl")
     }
 
+    /** Nav args for editing item [id], with [parked] as the form saved across process death. */
+    private fun editing(
+        id: Long,
+        parked: String? = null,
+    ): SavedStateHandle =
+        SavedStateHandle(
+            buildMap {
+                put("itemId", id)
+                if (parked != null) put("add_edit_form", parked)
+            },
+        )
+
     private fun newViewModel(
         handle: SavedStateHandle = SavedStateHandle(),
         media: MediaRepository = RecordingMediaRepository(),
         imageReader: PickedImageReader = FakePickedImageReader(),
         receipts: CreateReceipts = FakeCreateReceipts(),
+        settings: SettingsRepository = StubSettingsRepository(),
     ): AddEditViewModel =
         AddEditViewModel(
             savedStateHandle = handle,
             mediaRepository = media,
-            settingsRepository = StubSettingsRepository(),
+            settingsRepository = settings,
             enrichmentRepository = StubEnrichmentRepository(),
             imageReader = imageReader,
             api = FakeCrateApiService(),
@@ -638,7 +731,10 @@ private class StuckImageReader(
         }
 }
 
-private class RecordingMediaRepository : MediaRepository {
+private class RecordingMediaRepository(
+    /** The rating the server holds for the item being edited. */
+    private val storedRating: Int? = null,
+) : MediaRepository {
     private val items = MutableStateFlow<List<MediaItem>>(emptyList())
 
     val created = mutableListOf<MediaItemDraft>()
@@ -668,7 +764,7 @@ private class RecordingMediaRepository : MediaRepository {
         offset: Int,
     ): ApiResult<MediaRepository.RefreshResult> = ApiResult.Success(MediaRepository.RefreshResult(0, limit, offset, 0))
 
-    override suspend fun refreshSingle(id: Long): ApiResult<MediaItem> = ApiResult.Success(savedItem(id))
+    override suspend fun refreshSingle(id: Long): ApiResult<MediaItem> = ApiResult.Success(savedItem(id, storedRating))
 
     override suspend fun create(draft: MediaItemDraft): ApiResult<MediaItem> {
         createGate?.await()
@@ -741,7 +837,9 @@ private class StubEnrichmentRepository : EnrichmentRepository {
     override suspend fun listUnenrichedItems(): ApiResult<List<Long>> = ApiResult.Success(emptyList())
 }
 
-private class StubSettingsRepository : SettingsRepository {
+private class StubSettingsRepository(
+    private val crateVersion: String? = "0.4.2",
+) : SettingsRepository {
     override suspend fun getMe(): ApiResult<UserProfile> =
         ApiResult.Success(
             UserProfile(
@@ -755,7 +853,7 @@ private class StubSettingsRepository : SettingsRepository {
                 autoEnrichOnImport = false,
                 hiddenCategories = emptySet(),
                 onlineRecommendations = false,
-                crateVersion = "0.4.2",
+                crateVersion = crateVersion,
             ),
         )
 
@@ -794,30 +892,33 @@ private class StubSettingsRepository : SettingsRepository {
     override suspend fun setOnlineRecommendations(enabled: Boolean) = ApiResult.Success(Unit)
 }
 
-private fun savedItem(id: Long) =
-    MediaItem(
-        id = id,
-        userId = null,
-        title = "OK Computer",
-        artist = "Radiohead",
-        format = "Vinyl",
-        year = 1997,
-        barcode = null,
-        notes = null,
-        status = Status.Owned,
-        category = Category.Music,
-        discogsId = null,
-        artworkPath = null,
-        label = null,
-        country = null,
-        genres = null,
-        tracklist = emptyList(),
-        pressingNotes = null,
-        discogsArtistId = null,
-        artistBio = null,
-        artistMembers = emptyList(),
-        marketValue = MarketValue(null, null, null, null, null),
-        purchasePrice = PurchasePrice(null, null),
-        createdAt = null,
-        updatedAt = null,
-    )
+private fun savedItem(
+    id: Long,
+    rating: Int? = null,
+) = MediaItem(
+    id = id,
+    userId = null,
+    title = "OK Computer",
+    artist = "Radiohead",
+    format = "Vinyl",
+    year = 1997,
+    barcode = null,
+    notes = null,
+    status = Status.Owned,
+    category = Category.Music,
+    discogsId = null,
+    artworkPath = null,
+    label = null,
+    country = null,
+    genres = null,
+    tracklist = emptyList(),
+    pressingNotes = null,
+    discogsArtistId = null,
+    artistBio = null,
+    artistMembers = emptyList(),
+    marketValue = MarketValue(null, null, null, null, null),
+    purchasePrice = PurchasePrice(null, null),
+    createdAt = null,
+    updatedAt = null,
+    rating = rating,
+)

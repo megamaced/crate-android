@@ -11,6 +11,7 @@ import com.megamaced.crate.data.api.apiCall
 import com.megamaced.crate.data.api.toUiText
 import com.megamaced.crate.data.prefs.CreateReceipts
 import com.megamaced.crate.domain.model.Category
+import com.megamaced.crate.domain.model.MAX_RATING
 import com.megamaced.crate.domain.model.MediaItem
 import com.megamaced.crate.domain.model.MediaItemDraft
 import com.megamaced.crate.domain.model.Status
@@ -21,6 +22,7 @@ import com.megamaced.crate.domain.repository.SettingsRepository
 import com.megamaced.crate.util.MAX_PICKED_IMAGE_BYTES
 import com.megamaced.crate.util.PickedImageReader
 import com.megamaced.crate.util.UiText
+import com.megamaced.crate.util.serverSupportsRatings
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -79,6 +81,20 @@ data class AddEditUiState(
     val artist: String = "",
     val format: String = "",
     val year: String = "",
+    /** Whole stars, or null while unrated. */
+    val rating: Int? = null,
+    /**
+     * True once the user has set or cleared the rating on this form. Only then
+     * does the save send one: a form parked by a version that predates ratings
+     * restores with none, and sending that would clear the stored rating.
+     */
+    val ratingEdited: Boolean = false,
+    /**
+     * Whether the server keeps ratings, from its version. Server state rather
+     * than form input, so it isn't parked with the form and is fetched again
+     * when one is restored.
+     */
+    @Transient val ratingsSupported: Boolean = false,
     val barcode: String = "",
     val label: String = "",
     val country: String = "",
@@ -256,8 +272,11 @@ class AddEditViewModel
             // The currency allowlist is server state, not user input, so it is
             // always re-fetched.
             loadCurrencyOptions()
+            // The profile also says which server features exist, which a
+            // restored form needs as much as a new one; its defaults apply
+            // only to a form that isn't restored.
+            loadProfile(applyDefaults = restored == null)
             if (restored == null) {
-                loadProfileDefaults()
                 if (itemId != null) loadExisting(itemId)
                 // Before the prefill, so an existing item's own status still wins.
                 if (itemId == null && savedStateHandle.get<Boolean>("defaultWanted") == true) {
@@ -317,14 +336,15 @@ class AddEditViewModel
                 ?.let(::applyExternalResult)
         }
 
-        private fun loadProfileDefaults() {
+        private fun loadProfile(applyDefaults: Boolean) {
             viewModelScope.launch {
                 when (val result = settingsRepository.getMe()) {
                     is ApiResult.Success -> {
-                        applyProfile(result.value)
+                        update { copy(ratingsSupported = serverSupportsRatings(result.value.crateVersion)) }
+                        if (applyDefaults) applyProfile(result.value)
                     }
 
-                    else -> { /* Ignore — toggle simply stays off. */ }
+                    else -> { /* Ignore — toggle and rating simply stay off. */ }
                 }
             }
         }
@@ -382,6 +402,8 @@ class AddEditViewModel
                     artist = item.artist.orEmpty(),
                     format = item.format.orEmpty(),
                     year = item.year?.toString().orEmpty(),
+                    rating = item.rating,
+                    ratingEdited = false,
                     barcode = item.barcode.orEmpty(),
                     label = item.label.orEmpty(),
                     country = item.country.orEmpty(),
@@ -412,6 +434,9 @@ class AddEditViewModel
         fun onFormatChange(value: String) = update { copy(format = value) }
 
         fun onYearChange(value: String) = update { copy(year = value.filter(Char::isDigit).take(4)) }
+
+        /** [value] is whole stars, or null to leave the item unrated. */
+        fun onRatingChange(value: Int?) = update { copy(rating = value?.takeIf { it in 1..MAX_RATING }, ratingEdited = true) }
 
         fun onBarcodeChange(value: String) = update { copy(barcode = value) }
 
@@ -839,6 +864,9 @@ private fun AddEditUiState.toDraft(): MediaItemDraft {
         artist = artist.trim(),
         format = format.trim(),
         year = year.toIntOrNull(),
+        // Untouched goes out as null, which the request omits and the server
+        // reads as "leave it"; cleared goes out as 0.
+        rating = if (ratingEdited) rating ?: 0 else null,
         barcode = barcode.trim().takeIf { it.isNotBlank() },
         notes = notes.trim().takeIf { it.isNotBlank() },
         status = status,

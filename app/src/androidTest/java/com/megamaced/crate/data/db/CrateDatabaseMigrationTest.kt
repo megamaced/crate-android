@@ -6,6 +6,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.megamaced.crate.data.db.CrateDatabase.Companion.MIGRATION_1_2
 import com.megamaced.crate.data.db.CrateDatabase.Companion.MIGRATION_2_3
 import com.megamaced.crate.data.db.CrateDatabase.Companion.MIGRATION_3_4
+import com.megamaced.crate.data.db.CrateDatabase.Companion.MIGRATION_4_5
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -95,7 +96,27 @@ class CrateDatabaseMigrationTest {
     }
 
     @Test
-    fun migrateAll1To4_chainedMigrations() {
+    fun migrate4To5_addsRatingColumn() {
+        helper.createDatabase(testDb, 4).use { db ->
+            db.execSQL(
+                """
+                INSERT INTO media_items (id, title, artist, format, status, category)
+                VALUES (1, 'Amnesiac', 'Radiohead', 'LP', 'owned', 'music')
+                """.trimIndent(),
+            )
+        }
+
+        helper.runMigrationsAndValidate(testDb, 5, true, MIGRATION_4_5).use { db ->
+            db.query("SELECT rating FROM media_items WHERE id = 1").use { c ->
+                assertEquals(true, c.moveToFirst())
+                // Pre-existing rows read as unrated until a sync brings their rating.
+                assertEquals(true, c.isNull(0))
+            }
+        }
+    }
+
+    @Test
+    fun migrateAll1To5_chainedMigrations() {
         helper.createDatabase(testDb, 1).use { db ->
             db.execSQL(
                 """
@@ -107,15 +128,16 @@ class CrateDatabaseMigrationTest {
 
         val migrated = helper.runMigrationsAndValidate(
             testDb,
-            4,
+            5,
             true,
             MIGRATION_1_2,
             MIGRATION_2_3,
             MIGRATION_3_4,
+            MIGRATION_4_5,
         )
         migrated.use { db ->
             val cursor = db.query(
-                "SELECT purchasePrice, purchasePriceCurrency, hasPhoto1, hasPhoto2 FROM media_items WHERE id = 1",
+                "SELECT purchasePrice, purchasePriceCurrency, hasPhoto1, hasPhoto2, rating FROM media_items WHERE id = 1",
             )
             cursor.use { c ->
                 assertEquals(true, c.moveToFirst())
@@ -123,6 +145,7 @@ class CrateDatabaseMigrationTest {
                 assertEquals(true, c.isNull(1))
                 assertEquals(0, c.getInt(2))
                 assertEquals(0, c.getInt(3))
+                assertEquals(true, c.isNull(4))
             }
         }
     }
