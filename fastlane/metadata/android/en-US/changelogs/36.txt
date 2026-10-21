@@ -1,0 +1,8 @@
+Star ratings, and items stay linked to the search result you picked.
+
+- Rate items from one to five stars, then sort and group your
+  collection by rating. Setting a rating needs Crate 1.15.0 or later
+  on your server.
+- An item added from search stays linked to the result you picked, so
+  enriching it no longer looks it up again and lands on another one.
+- The first sync after updating is a full one, to fetch ratings.

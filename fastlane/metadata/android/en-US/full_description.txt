@@ -15,6 +15,7 @@ Features:
 * Add up to two extra user photos per item — receipts, sleevenotes,
   disc shots — separate from the cover artwork
 * Wishlist — track what you want next
+* Rate items from one to five stars, and sort your collection by rating
 * Barcode scanning to add new items quickly
 * Enrich items automatically from Discogs, TMDB, Open Library, RAWG or
   ComicVine (you provide your own API keys)
