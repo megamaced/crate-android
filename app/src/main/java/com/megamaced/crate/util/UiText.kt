@@ -1,5 +1,6 @@
 package com.megamaced.crate.util
 
+import android.content.res.Resources
 import androidx.annotation.PluralsRes
 import androidx.annotation.StringRes
 import androidx.compose.runtime.Composable
@@ -47,6 +48,26 @@ fun UiText.resolve(): String =
 
         is UiText.Plural -> {
             pluralStringResource(id, count, count)
+        }
+
+        is UiText.Raw -> {
+            value
+        }
+    }
+
+/** [resolve] for code outside composition, given the [Resources] to read. */
+fun UiText.resolve(resources: Resources): String =
+    when (this) {
+        is UiText.Res -> {
+            if (args.isEmpty()) {
+                resources.getString(id)
+            } else {
+                resources.getString(id, *args.toTypedArray())
+            }
+        }
+
+        is UiText.Plural -> {
+            resources.getQuantityString(id, count, count)
         }
 
         is UiText.Raw -> {

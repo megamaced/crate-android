@@ -184,6 +184,8 @@
     <string name="collection_filter_any_year_count">Any year (%1$d)</string>
     <string name="collection_filter_any_genre_count">Any genre (%1$d)</string>
     <string name="collection_filter_value_option">%1$s (%2$d)</string>
+    <!-- A decade, as a filter value or a group heading: "1990s". %1$d is its first year. -->
+    <string name="decade_label">%1$ds</string>
 
     <!-- Item detail -->
     <string name="detail_not_found">Item not found</string>
@@ -216,7 +218,8 @@
     <string name="detail_photo_a11y">Photo %1$d</string>
     <string name="detail_genre_filter_a11y">Show all %1$s items</string>
     <string name="detail_format_filter_a11y">Show all %1$s items</string>
-    <string name="detail_year_filter_a11y">Show all items from the %1$s</string>
+    <!-- Read out for the year on an item; %1$d is the first year of its decade, as in "the 1970s". -->
+    <string name="detail_decade_filter_a11y">Show all items from the %1$ds</string>
     <string name="recommendation_via_source">via %1$s</string>
 
     <!-- Photo slots -->
@@ -227,13 +230,16 @@
     <string name="artwork_upload_failed">Couldn’t upload artwork</string>
 
     <!-- Add / edit form -->
-    <string name="add_edit_title_add">Add %1$s</string>
-    <string name="add_edit_title_edit">Edit %1$s</string>
-    <string name="add_edit_noun_music">album</string>
-    <string name="add_edit_noun_films">film</string>
-    <string name="add_edit_noun_books">book</string>
-    <string name="add_edit_noun_games">game</string>
-    <string name="add_edit_noun_comics">comic</string>
+    <string name="add_edit_title_add_music">Add album</string>
+    <string name="add_edit_title_add_films">Add film</string>
+    <string name="add_edit_title_add_books">Add book</string>
+    <string name="add_edit_title_add_games">Add game</string>
+    <string name="add_edit_title_add_comics">Add comic</string>
+    <string name="add_edit_title_edit_music">Edit album</string>
+    <string name="add_edit_title_edit_films">Edit film</string>
+    <string name="add_edit_title_edit_books">Edit book</string>
+    <string name="add_edit_title_edit_games">Edit game</string>
+    <string name="add_edit_title_edit_comics">Edit comic</string>
     <string name="add_edit_saving">Saving…</string>
     <string name="add_edit_adding_to_collection">Adding to %1$s\'s collection</string>
     <!-- Quoted: the leading gap separates the label from the button's icon. -->
@@ -369,6 +375,7 @@
     <string name="shared_empty_subtitle">Ask a Nextcloud user to share something from their collection.</string>
     <string name="shared_section_categories">Categories</string>
     <string name="shared_section_playlists">Playlists</string>
+    <!-- After the item count on a category someone shared with you, as in "12 items · from Alice". %1$s is that person's display name. -->
     <string name="shared_from_owner">from %1$s</string>
     <string name="shared_by_owner">Shared by %1$s</string>
     <!-- Only reached for two owners or more: one owner is named instead. -->

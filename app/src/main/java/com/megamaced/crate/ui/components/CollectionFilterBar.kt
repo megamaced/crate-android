@@ -27,6 +27,8 @@ import androidx.compose.ui.unit.dp
 import com.megamaced.crate.R
 import com.megamaced.crate.ui.screen.addedit.formatLabel
 import com.megamaced.crate.ui.screen.collection.FilterBucket
+import com.megamaced.crate.ui.screen.collection.decadeLabel
+import com.megamaced.crate.util.resolve
 
 /**
  * Every collection filter on one scrolling row: year (by decade) and genre as
@@ -65,11 +67,13 @@ fun CollectionFilterBar(
     ) {
         if (showDecades) {
             FilterDropdown(
-                label = selectedDecade ?: stringResource(R.string.collection_filter_any_year),
+                label = selectedDecade?.let { decadeLabel(it).resolve() }
+                    ?: stringResource(R.string.collection_filter_any_year),
                 selected = selectedDecade != null,
                 anyLabel = stringResource(R.string.collection_filter_any_year_count, totalCount),
                 options = decades,
                 onSelected = onDecadeSelected,
+                optionLabel = { decadeLabel(it).resolve() },
             )
         }
         if (showGenres) {
@@ -121,6 +125,7 @@ private fun FilterDropdown(
     anyLabel: String,
     options: List<FilterBucket>,
     onSelected: (String?) -> Unit,
+    optionLabel: @Composable (String) -> String = { it },
 ) {
     var expanded by remember { mutableStateOf(false) }
     Box {
@@ -152,7 +157,7 @@ private fun FilterDropdown(
                         Text(
                             stringResource(
                                 R.string.collection_filter_value_option,
-                                bucket.value,
+                                optionLabel(bucket.value),
                                 bucket.count,
                             ),
                         )

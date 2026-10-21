@@ -2,6 +2,7 @@ package com.megamaced.crate.ui.screen.collection
 
 import com.megamaced.crate.R
 import com.megamaced.crate.domain.model.Category
+import com.megamaced.crate.util.UiText
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -11,10 +12,18 @@ class ActiveFilterDescriptionTest {
         mapOf(
             R.string.format_name_hardcover to "Relié",
             R.string.format_name_paperback to "Broché",
+            R.string.decade_label to "Années %1\$d",
         )
 
+    private fun resolve(text: UiText): String =
+        when (text) {
+            is UiText.Res -> french.getValue(text.id).format(*text.args.toTypedArray())
+            is UiText.Raw -> text.value
+            is UiText.Plural -> error("no plural in a filter description")
+        }
+
     @Test
-    fun `formats read back by their display names`() {
+    fun `the decade and formats read back as display text`() {
         val state =
             CollectionUiState(
                 category = Category.Books,
@@ -23,18 +32,18 @@ class ActiveFilterDescriptionTest {
                 selectedFormats = setOf("Paperback", "Hardcover"),
             )
 
-        assertEquals("1990s Fantasy Relié Broché", activeFilterDescription(state, french::getValue))
+        assertEquals("Années 1990 Fantasy Relié Broché", activeFilterDescription(state, ::resolve))
     }
 
     @Test
     fun `a product name reads back as it is`() {
         val state = CollectionUiState(category = Category.Games, selectedFormats = setOf("PS5"))
 
-        assertEquals("PS5", activeFilterDescription(state, french::getValue))
+        assertEquals("PS5", activeFilterDescription(state, ::resolve))
     }
 
     @Test
     fun `nothing filtered reads back nothing`() {
-        assertNull(activeFilterDescription(CollectionUiState(), french::getValue))
+        assertNull(activeFilterDescription(CollectionUiState(), ::resolve))
     }
 }

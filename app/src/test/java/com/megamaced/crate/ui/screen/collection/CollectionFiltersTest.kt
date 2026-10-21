@@ -1,12 +1,15 @@
 package com.megamaced.crate.ui.screen.collection
 
+import com.megamaced.crate.R
 import com.megamaced.crate.domain.model.Category
 import com.megamaced.crate.domain.model.MarketValue
 import com.megamaced.crate.domain.model.MediaItem
 import com.megamaced.crate.domain.model.PurchasePrice
 import com.megamaced.crate.domain.model.Status
+import com.megamaced.crate.util.UiText
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -114,6 +117,17 @@ class CollectionFiltersTest {
         assertEquals(listOf(1L, 2L), applyValueFilters(items, "Rock", null).map { it.id })
         // Blank selections pass everything through.
         assertEquals(3, applyValueFilters(items, "", "").size)
+    }
+
+    @Test
+    fun `a decade filters by an English key and reads as its first year`() {
+        val item = item(1, year = 1997)
+        assertEquals(1990, decadeStartOf(item))
+        assertEquals("1990s", decadeOf(item))
+        assertEquals(decadeOf(item), decadeKey(1990))
+        assertEquals(UiText.Res(R.string.decade_label, listOf(1990)), decadeLabel("1990s"))
+        assertEquals(UiText.Raw("Unknown"), decadeLabel("Unknown"))
+        assertNull(decadeStartOf(item(2, year = 0)))
     }
 
     private fun item(

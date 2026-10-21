@@ -16,8 +16,8 @@ import java.time.LocalDate
 //                     leading article ("The Beatles" files under B) for the key
 //                     only, never for display.
 //   Year            → decade ("1990s"), or "Unknown" when absent. The decade
-//                     comes from [decadeOf], so a header and its filter chip
-//                     can never disagree.
+//                     comes from [decadeOf] and reads through [decadeLabel], so
+//                     a header and its filter chip can never disagree.
 //   CreatedAt       → relative date bucket (Today / Last week / 2023 …) via
 //                     [DateBucket].
 //   Format          → the format name, or "Unknown".
@@ -48,7 +48,7 @@ internal fun groupKeyFor(
     when (axis) {
         SortField.Artist -> alphaKey(stripArticle(item.artist.orEmpty()))
         SortField.Title -> alphaKey(item.title)
-        SortField.Year -> decadeOf(item)?.let(UiText::Raw) ?: UNKNOWN_BUCKET
+        SortField.Year -> decadeOf(item)?.let(::decadeLabel) ?: UNKNOWN_BUCKET
         SortField.CreatedAt -> DateBucket.labelFor(item.createdAt, today)
         SortField.Format -> item.format?.takeIf { it.isNotBlank() }?.let(CategoryFormats::label) ?: UNKNOWN_BUCKET
         SortField.MarketValue -> null
