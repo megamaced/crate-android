@@ -189,7 +189,10 @@ class FakeCrateApiService : CrateApiService {
 
     override suspend fun openLibrarySearch(query: String): List<OpenLibraryResultDto> = unsupported()
 
-    override suspend fun openLibraryIsbn(isbn: String): OpenLibraryResultDto = unsupported()
+    /** What an ISBN lookup returns; unset, the lookup is unsupported. */
+    var isbnResult: OpenLibraryResultDto? = null
+
+    override suspend fun openLibraryIsbn(isbn: String): OpenLibraryResultDto = isbnResult ?: unsupported()
 
     override suspend fun rawgSearch(query: String): List<RawgSearchResultDto> = unsupported()
 
