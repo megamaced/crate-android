@@ -76,6 +76,24 @@ android {
         buildConfig = true
     }
 
+    androidResources {
+        // The languages the app ships: the publication gate. A catalogue
+        // Weblate adds (values-<lang>) stays out of the APK, and out of Android
+        // 13+'s per-app language setting, until its language is added here.
+        // Dependencies' translations are kept to the same languages, so a
+        // screen is never half in one language. verifyLocales checks this list
+        // against the catalogues and the generated language list.
+        localeFilters += listOf("en")
+        generateLocaleConfig = true
+    }
+
+    lint {
+        // Weblate adds a language before every string in it is translated, and
+        // an untranslated string falls back to English. Format-argument and
+        // plural checks stay errors.
+        informational += "MissingTranslation"
+    }
+
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
@@ -133,6 +151,29 @@ ksp {
 tasks.configureEach {
     if (name.contains("ArtProfile")) {
         enabled = false
+    }
+}
+
+// The per-app language list Android shows (generated from localeFilters) must
+// name only languages Crate has strings for, and every language it ships must
+// have them: each localeFilters entry needs its own values-<lang>/strings.xml,
+// and the generated list is exactly English plus those.
+val verifyLocales by tasks.registering {
+    val shipped = android.androidResources.localeFilters.toSet() - "en"
+    val catalogues = shipped.associateWith { layout.projectDirectory.file("src/main/res/values-$it/strings.xml").asFile }
+    val generated = layout.buildDirectory.file("generated/res/localeConfig/debug/xml/_generated_res_locale_config.xml")
+    dependsOn("generateDebugLocaleConfig")
+    inputs.file(generated)
+    doLast {
+        val missing = catalogues.filterValues { !it.isFile }.keys
+        check(missing.isEmpty()) { "localeFilters ships $missing, which have no strings.xml" }
+        val listed =
+            Regex("""android:name="([^"]+)"""")
+                .findAll(generated.get().asFile.readText())
+                .map { it.groupValues[1] }
+                .toSet()
+        val expected = setOf("en-US") + shipped.map { it.replace("-r", "-") }
+        check(listed == expected) { "The generated locale list is $listed, expected $expected" }
     }
 }
 

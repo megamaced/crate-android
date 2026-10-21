@@ -19,6 +19,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -73,7 +74,8 @@ internal fun ExternalResultRow(
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
-            val sub = result.subtitle ?: buildSubtitle(result)
+            val resources = LocalResources.current
+            val sub = result.subtitle ?: buildSubtitle(result, resources::getString)
             if (!sub.isNullOrBlank()) {
                 Text(
                     text = sub,
@@ -119,10 +121,18 @@ internal fun providerNameRes(category: Category): Int =
         Category.Comics -> R.string.provider_comics
     }
 
-private fun buildSubtitle(result: ExternalSearchResult): String? =
+/**
+ * The line under a result's title. A format shows by its display name, which
+ * [getString] looks up; the result keeps the stored value, which is what
+ * picking it copies.
+ */
+internal fun buildSubtitle(
+    result: ExternalSearchResult,
+    getString: (Int) -> String,
+): String? =
     listOfNotNull(
         result.artist?.takeIf { it.isNotBlank() },
         result.year?.toString(),
-        result.format?.takeIf { it.isNotBlank() },
+        result.format?.takeIf { it.isNotBlank() }?.let { CategoryFormats.label(it, getString) },
         result.label?.takeIf { it.isNotBlank() },
     ).joinToString(" · ").ifBlank { null }

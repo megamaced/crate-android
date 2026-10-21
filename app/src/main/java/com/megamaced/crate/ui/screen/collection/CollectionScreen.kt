@@ -54,6 +54,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -76,6 +77,8 @@ import com.megamaced.crate.ui.components.MediaCard
 import com.megamaced.crate.ui.components.SortMenuButton
 import com.megamaced.crate.ui.components.categoryIcon
 import com.megamaced.crate.ui.network.LocalIsOnline
+import com.megamaced.crate.ui.screen.addedit.CategoryFormats
+import com.megamaced.crate.ui.screen.addedit.formatLabel
 import com.megamaced.crate.ui.screen.share.ShareSheet
 import com.megamaced.crate.ui.screen.share.ShareTarget
 import com.megamaced.crate.util.UiText
@@ -177,9 +180,10 @@ fun CollectionScreen(
                 // the list: what to say depends on the status and on whether a
                 // filter emptied it, and neither of those reaches them.
                 if (uiState.groups.all { it.items.isEmpty() }) {
+                    val resources = LocalResources.current
                     CollectionEmptyState(
                         status = uiState.status,
-                        filterDescription = activeFilterDescription(uiState),
+                        filterDescription = activeFilterDescription(uiState, resources::getString),
                         onClearFilters = viewModel::clearValueFilters,
                         modifier = Modifier.fillMaxSize(),
                     )
@@ -387,12 +391,18 @@ private fun CollectionEmptyState(
 /**
  * The active filters as one phrase — "1990s Rock LP" — for the empty state to
  * read back. Null when nothing is filtered. Decade, genre then format, the
- * order the web app reads them in.
+ * order the web app reads them in. Formats show by their display names, which
+ * [getString] looks up.
  */
-private fun activeFilterDescription(state: CollectionUiState): String? =
-    (listOfNotNull(state.selectedDecade, state.selectedGenre) + state.selectedFormats.sorted())
+internal fun activeFilterDescription(
+    state: CollectionUiState,
+    getString: (Int) -> String,
+): String? {
+    val formats = state.selectedFormats.sorted().map { CategoryFormats.label(it, getString) }
+    return (listOfNotNull(state.selectedDecade, state.selectedGenre) + formats)
         .takeIf { it.isNotEmpty() }
         ?.joinToString(" ")
+}
 
 @Composable
 internal fun ViewModeToggle(
@@ -582,7 +592,7 @@ private fun CollectionListRow(
                 )
             }
             val meta = listOfNotNull(
-                item.format?.takeIf { it.isNotBlank() },
+                item.format?.takeIf { it.isNotBlank() }?.let { formatLabel(it) },
                 item.year?.toString(),
                 item.label?.takeIf { it.isNotBlank() },
             ).joinToString(" · ").takeIf { it.isNotBlank() }

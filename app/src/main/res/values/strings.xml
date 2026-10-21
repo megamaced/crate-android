@@ -264,6 +264,37 @@
     <string name="format_group_audio">Audio</string>
     <string name="format_group_single_issues">Single Issues</string>
     <string name="format_group_collected">Collected</string>
+    <!-- Display names of stored formats (see CategoryFormats.labelRes). The value stored is
+         always the English name; platform and disc-standard names are not translated. -->
+    <string name="format_name_vinyl">Vinyl</string>
+    <string name="format_name_7_inch_single">7\" Single</string>
+    <string name="format_name_12_inch_single">12\" Single</string>
+    <string name="format_name_picture_disc">Picture Disc</string>
+    <string name="format_name_flexi_disc">Flexi-disc</string>
+    <string name="format_name_shellac">Shellac</string>
+    <string name="format_name_lathe_cut">Lathe Cut</string>
+    <string name="format_name_cassette">Cassette</string>
+    <string name="format_name_reel_to_reel">Reel-to-Reel</string>
+    <string name="format_name_4_track_cartridge">4-Track Cartridge</string>
+    <string name="format_name_microcassette">Microcassette</string>
+    <string name="format_name_hardcover">Hardcover</string>
+    <string name="format_name_paperback">Paperback</string>
+    <string name="format_name_mass_market_paperback">Mass Market Paperback</string>
+    <string name="format_name_trade_paperback">Trade Paperback</string>
+    <string name="format_name_graphic_novel">Graphic Novel</string>
+    <string name="format_name_comic">Comic</string>
+    <string name="format_name_audiobook_cd">Audiobook CD</string>
+    <string name="format_name_audiobook_cassette">Audiobook Cassette</string>
+    <string name="format_name_single_issue">Single Issue</string>
+    <!-- A comic published once a year alongside the regular series -->
+    <string name="format_name_annual">Annual</string>
+    <!-- A one-off special comic issue -->
+    <string name="format_name_special">Special</string>
+    <string name="format_name_one_shot">One-Shot</string>
+    <string name="format_name_mini_series">Mini-Series</string>
+    <string name="format_name_limited_series">Limited Series</string>
+    <string name="format_name_omnibus">Omnibus</string>
+    <string name="format_name_compendium">Compendium</string>
     <string name="format_group_sony" translatable="false">Sony</string>
     <string name="format_group_microsoft" translatable="false">Microsoft</string>
     <string name="format_group_nintendo" translatable="false">Nintendo</string>

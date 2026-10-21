@@ -1,5 +1,6 @@
 package com.megamaced.crate.ui.screen.addedit
 
+import com.megamaced.crate.R
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Test
@@ -38,5 +39,15 @@ class ExternalResultRowTest {
 
         assertEquals("12345", result.identityKey())
         assertEquals("0-12345", result.listKey(0))
+    }
+
+    @Test
+    fun `the subtitle shows a format by its display name`() {
+        val german = mapOf(R.string.format_name_cassette to "Kassette")
+        val result =
+            ExternalSearchResult(title = "Low-Life", artist = "New Order", format = "Cassette", year = 1985, label = "Factory")
+
+        assertEquals("New Order · 1985 · Kassette · Factory", buildSubtitle(result, german::getValue))
+        assertEquals("CD", buildSubtitle(ExternalSearchResult(title = "Low-Life", format = "CD"), german::getValue))
     }
 }

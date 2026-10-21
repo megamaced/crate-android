@@ -50,6 +50,7 @@ import com.megamaced.crate.ui.components.ArtworkSize
 import com.megamaced.crate.ui.components.EmptyState
 import com.megamaced.crate.ui.components.LoadingState
 import com.megamaced.crate.ui.components.MediaCard
+import com.megamaced.crate.ui.screen.addedit.formatLabel
 import com.megamaced.crate.util.resolve
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -208,7 +209,7 @@ private fun HeroItemOfTheDay(
                             overflow = TextOverflow.Ellipsis,
                         )
                     }
-                    val tail = listOfNotNull(item.format, item.year?.toString())
+                    val tail = listOfNotNull(item.format?.let { formatLabel(it) }, item.year?.toString())
                         .joinToString(" · ")
                         .takeIf { it.isNotBlank() }
                     if (tail != null) {

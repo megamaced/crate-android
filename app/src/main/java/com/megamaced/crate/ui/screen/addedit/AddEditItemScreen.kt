@@ -619,7 +619,7 @@ private fun FormatPickerSheet(
                 items(group.formats, key = { "${group.labelRes}-$it" }) { fmt ->
                     val selected = fmt.equals(currentValue, ignoreCase = true)
                     Text(
-                        text = if (selected) stringResource(R.string.sort_option_selected, fmt) else fmt,
+                        text = if (selected) stringResource(R.string.sort_option_selected, formatLabel(fmt)) else formatLabel(fmt),
                         style = MaterialTheme.typography.bodyLarge,
                         modifier = Modifier
                             .fillMaxWidth()

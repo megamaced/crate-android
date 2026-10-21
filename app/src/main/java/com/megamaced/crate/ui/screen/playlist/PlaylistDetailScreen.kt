@@ -57,6 +57,7 @@ import com.megamaced.crate.ui.components.ArtworkImage
 import com.megamaced.crate.ui.components.CategoryBadge
 import com.megamaced.crate.ui.components.EmptyState
 import com.megamaced.crate.ui.components.LoadingState
+import com.megamaced.crate.ui.screen.addedit.formatLabel
 import com.megamaced.crate.ui.screen.share.ShareSheet
 import com.megamaced.crate.ui.screen.share.ShareTarget
 import com.megamaced.crate.util.resolve
@@ -262,7 +263,7 @@ private fun PlaylistItemRow(
             val sub =
                 listOfNotNull(
                     item.artist?.takeIf { it.isNotBlank() },
-                    item.format?.takeIf { it.isNotBlank() },
+                    item.format?.takeIf { it.isNotBlank() }?.let { formatLabel(it) },
                     item.year?.toString(),
                 ).joinToString(" · ").ifBlank { null }
             if (sub != null) {
@@ -389,7 +390,7 @@ private fun CandidateRow(
             val sub =
                 listOfNotNull(
                     item.artist?.takeIf { it.isNotBlank() },
-                    item.format?.takeIf { it.isNotBlank() },
+                    item.format?.takeIf { it.isNotBlank() }?.let { formatLabel(it) },
                     item.year?.toString(),
                 ).joinToString(" · ").ifBlank { null }
             if (sub != null) {
