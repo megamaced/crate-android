@@ -64,6 +64,7 @@ import com.megamaced.crate.ui.components.ArtworkImage
 import com.megamaced.crate.ui.components.ArtworkSize
 import com.megamaced.crate.ui.components.LoadingState
 import com.megamaced.crate.ui.components.PhotoImage
+import com.megamaced.crate.ui.components.RatingInput
 import com.megamaced.crate.ui.navigation.CategorySegmentedRow
 import com.megamaced.crate.util.resolve
 import kotlinx.serialization.json.Json
@@ -405,6 +406,15 @@ private fun FormContent(
             onPriceChange = viewModel::onPurchasePriceChange,
             onCurrencyChange = viewModel::onPurchasePriceCurrencyChange,
         )
+
+        // Hidden until the server is known to keep ratings: an older one
+        // ignores the field, and the next sync would blank what was set.
+        if (state.ratingsSupported) {
+            RatingInput(
+                rating = state.rating,
+                onRatingChange = viewModel::onRatingChange,
+            )
+        }
 
         // Extra photo slots (disc shots, receipts, sleevenotes etc.). Each
         // slot tracks its own pending file + remove flag; uploads happen

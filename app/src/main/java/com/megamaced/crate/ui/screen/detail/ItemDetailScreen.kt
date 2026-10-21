@@ -75,6 +75,7 @@ import com.megamaced.crate.ui.components.ArtworkImage
 import com.megamaced.crate.ui.components.ArtworkSize
 import com.megamaced.crate.ui.components.LoadingState
 import com.megamaced.crate.ui.components.PhotoImage
+import com.megamaced.crate.ui.components.RatingStars
 import com.megamaced.crate.ui.components.RecommendationRow
 import com.megamaced.crate.ui.components.SuggestionTarget
 import com.megamaced.crate.ui.screen.addedit.formatLabel
@@ -453,6 +454,8 @@ private fun ItemDetailContent(
                 }
 
                 ChipRow(item = item, onFilter = onFilter)
+
+                item.rating?.takeIf { it > 0 }?.let { RatingStars(rating = it) }
 
                 if (item.purchasePrice.isPresent) {
                     PurchasePriceRow(item)

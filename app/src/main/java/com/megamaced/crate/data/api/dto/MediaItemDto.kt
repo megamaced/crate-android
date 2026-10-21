@@ -21,6 +21,8 @@ data class MediaItemDto(
     val artist: String? = null,
     val format: String? = null,
     val year: Int? = null,
+    // Whole stars 1–5; null while unrated (or from a server that predates ratings).
+    val rating: Int? = null,
     val barcode: String? = null,
     val notes: String? = null,
     val status: String,
@@ -163,6 +165,9 @@ data class CreateMediaItemRequest(
     // Nextcloud OCS reserves `format` for response-format selection; send as `mediaFormat`.
     val mediaFormat: String,
     val year: Int? = null,
+    // The server reads a missing rating as "leave it", 0 as "clear" and 1–5 as
+    // the stars. Null is left out of the request (explicitNulls = false).
+    val rating: Int? = null,
     val barcode: String? = null,
     val notes: String? = null,
     val status: String? = null,

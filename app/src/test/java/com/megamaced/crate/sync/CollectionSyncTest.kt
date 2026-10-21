@@ -4,6 +4,7 @@ import com.megamaced.crate.data.api.CrateBinaryService
 import com.megamaced.crate.data.api.dto.MediaItemDto
 import com.megamaced.crate.data.api.dto.MediaWatermarkDto
 import com.megamaced.crate.data.api.dto.PaginatedMediaDto
+import com.megamaced.crate.data.db.entity.MediaItemEntity
 import com.megamaced.crate.data.mapper.MediaItemJsonCodec
 import com.megamaced.crate.data.prefs.SyncStatePrefs
 import com.megamaced.crate.data.prefs.UserPrefs
@@ -27,6 +28,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 /**
@@ -98,17 +100,72 @@ class CollectionSyncTest {
             assertEquals(WATERMARK, prefs.state.value.lastSyncCursor)
         }
 
-    private fun item(id: Long) =
-        MediaItemDto(
-            id = id,
-            userId = OWNER,
-            title = "Item $id",
-            artist = "test",
-            format = "LP",
-            status = Status.Owned.apiValue,
-            category = "music",
-            updatedAt = "2026-10-02 10:00:00",
+    @Test
+    fun `the sync repair brings down a rating the delta cursor has already passed`() =
+        runTest {
+            seedRatedOnServerUnratedHere()
+            prefs.repairPending = true
+
+            assertEquals(CollectionSync.Outcome.Done, sync.run())
+
+            assertEquals(4, dao.snapshot().single().rating)
+        }
+
+    @Test
+    fun `without the repair a delta sync never revisits that row`() =
+        runTest {
+            seedRatedOnServerUnratedHere()
+
+            assertEquals(CollectionSync.Outcome.Done, sync.run())
+
+            assertNull(dao.snapshot().single().rating)
+        }
+
+    /**
+     * A row cached unrated by a version that ignored the field, which the
+     * server has at 4 stars, set before the stored cursor.
+     */
+    private fun seedRatedOnServerUnratedHere() {
+        dao.seed(
+            listOf(
+                MediaItemEntity(
+                    id = 1,
+                    userId = OWNER,
+                    title = "Item 1",
+                    artist = "test",
+                    format = "LP",
+                    status = Status.Owned.apiValue,
+                    category = "music",
+                ),
+            ),
         )
+        prefs.state.value = UserPrefs(lastSyncCursor = WATERMARK, lastSeenWipedAt = WIPED)
+        api.getMediaHandler = { since, _, limit, offset ->
+            PaginatedMediaDto(
+                items = listOf(item(1, rating = 4)).filter { since == null || it.updatedAt!! >= since },
+                total = 1,
+                limit = limit,
+                offset = offset,
+                wipedAt = WIPED,
+                watermark = MediaWatermarkDto(WATERMARK),
+            )
+        }
+    }
+
+    private fun item(
+        id: Long,
+        rating: Int? = null,
+    ) = MediaItemDto(
+        id = id,
+        userId = OWNER,
+        title = "Item $id",
+        artist = "test",
+        format = "LP",
+        status = Status.Owned.apiValue,
+        category = "music",
+        updatedAt = "2026-10-02 10:00:00",
+        rating = rating,
+    )
 
     private companion object {
         const val OWNER = "owner"
@@ -122,7 +179,15 @@ private class FakeSyncStatePrefs : SyncStatePrefs {
 
     override val flow: Flow<UserPrefs> = state
 
-    override suspend fun consumeSyncRepair(): Boolean = false
+    /** Set to make the next run a repair, as raising the repair version does. */
+    var repairPending = false
+
+    override suspend fun consumeSyncRepair(): Boolean {
+        if (!repairPending) return false
+        repairPending = false
+        state.update { it.copy(lastSyncCursor = null) }
+        return true
+    }
 
     override suspend fun setLastSyncCursor(cursor: String?) {
         state.update { it.copy(lastSyncCursor = cursor) }

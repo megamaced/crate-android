@@ -66,6 +66,9 @@ data class PurchasePrice(
     val isPresent: Boolean get() = amount != null
 }
 
+/** Most stars an item can have; the server stores the same range. */
+const val MAX_RATING = 5
+
 data class MediaItem(
     val id: Long,
     val userId: String?,
@@ -93,6 +96,8 @@ data class MediaItem(
     val hasPhoto2: Boolean = false,
     val createdAt: String?,
     val updatedAt: String?,
+    /** Whole stars from 1 to [MAX_RATING]; null while the item is unrated. */
+    val rating: Int? = null,
     // Set when the item is visible via a read/write share; null/false for
     // own-collection items (where ownership already grants write). Not
     // persisted to Room — carried straight from the network response.
@@ -109,6 +114,8 @@ data class MediaItemDraft(
     val artist: String,
     val format: String,
     val year: Int? = null,
+    // Null leaves the stored rating alone, 0 clears it, 1–5 sets it.
+    val rating: Int? = null,
     val barcode: String? = null,
     val notes: String? = null,
     val status: Status? = null,

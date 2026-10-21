@@ -264,8 +264,10 @@ class UserPreferences
          * the same edit so a crash mid-sync retries rather than skips it.
          *
          * Callers should treat a true return as "ignore the stored cursor and do
-         * a full sweep this run". A full sweep only upserts, so it costs one
-         * extra pass over the collection and never drops local rows.
+         * a full sweep this run". That is the ordinary full sweep: it upserts
+         * every row the server lists, and prunes local rows the server no longer
+         * has only once the sweep completes authoritatively, so the repair costs
+         * one extra pass over the collection.
          */
         override suspend fun consumeSyncRepair(): Boolean {
             var repair = false
@@ -315,13 +317,18 @@ class UserPreferences
         companion object {
             /**
              * Raise this to force every existing install into one full resync on
-             * the next sync. Currently 1: the server paginated on `created_at`
-             * alone, which is not unique — bulk imports stamp hundreds of rows
-             * with the same second — so LIMIT/OFFSET silently skipped rows that
-             * the local DB then never learned about. The delta cursor had already
-             * advanced past them, so no amount of pull-to-refresh recovered them.
+             * the next sync, when rows the delta cursor has already passed need
+             * fetching again. Each step it has taken:
+             *
+             * 1. The server paginated on `created_at` alone, which is not unique —
+             *    bulk imports stamp hundreds of rows with the same second — so
+             *    LIMIT/OFFSET silently skipped rows that the local DB then never
+             *    learned about.
+             * 2. Items gained a star rating. A version that didn't know the field
+             *    stored every row it synced as unrated, including rows rated on
+             *    the server, and the delta cursor has since moved past them.
              */
-            const val CURRENT_SYNC_REPAIR_VERSION = 1
+            const val CURRENT_SYNC_REPAIR_VERSION = 2
         }
     }
 

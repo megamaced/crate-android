@@ -23,6 +23,7 @@ import java.time.LocalDate
 //   Format          → the format name, or "Unknown".
 //   MarketValue     → ungrouped: the web UI shows no header for value sorts, so
 //                     we emit a single header-less group.
+//   Rating          → the star count ("4 stars"), or "Not rated".
 
 private val ARTICLE_REGEX = Regex("^(the |a |an )\\s*", RegexOption.IGNORE_CASE)
 
@@ -35,6 +36,9 @@ private fun alphaKey(value: String): UiText {
 
 /** Header for items the active axis can't place — no year, no format, no date. */
 internal val UNKNOWN_BUCKET = UiText.Res(R.string.group_header_unknown)
+
+/** Header for the items a rating sort finds unrated. */
+internal val UNRATED_BUCKET = UiText.Res(R.string.rating_none)
 
 /**
  * The header label [item] falls under for the active [axis], or null when the
@@ -52,6 +56,7 @@ internal fun groupKeyFor(
         SortField.CreatedAt -> DateBucket.labelFor(item.createdAt, today)
         SortField.Format -> item.format?.takeIf { it.isNotBlank() }?.let(CategoryFormats::label) ?: UNKNOWN_BUCKET
         SortField.MarketValue -> null
+        SortField.Rating -> ratingKey(item)?.let { UiText.Plural(R.plurals.rating_stars, it) } ?: UNRATED_BUCKET
     }
 
 /**
@@ -130,12 +135,19 @@ private fun yearKey(item: MediaItem): Int = item.year?.takeIf { it != 0 } ?: Int
 
 private fun valueKey(item: MediaItem): Double = item.marketValue.main ?: Double.NEGATIVE_INFINITY
 
+/** Whole stars, or null while the item is unrated. */
+private fun ratingKey(item: MediaItem): Int? = item.rating?.takeIf { it > 0 }
+
 private val ByArtist: Comparator<MediaItem> = compareBy(String.CASE_INSENSITIVE_ORDER) { artistKey(it) }
 private val ByTitle: Comparator<MediaItem> = compareBy(String.CASE_INSENSITIVE_ORDER) { titleKey(it) }
 private val ByFormat: Comparator<MediaItem> = compareBy(String.CASE_INSENSITIVE_ORDER) { formatKey(it) }
 private val ByYear: Comparator<MediaItem> = compareBy { yearKey(it) }
 private val ByCreatedAt: Comparator<MediaItem> = compareBy { it.createdAt.orEmpty() }
 private val ByValue: Comparator<MediaItem> = compareBy { valueKey(it) }
+private val ByRating: Comparator<MediaItem> = compareBy { ratingKey(it) ?: 0 }
+
+/** Rated items ahead of unrated ones, whichever way the stars count. */
+private val RatedFirst: Comparator<MediaItem> = compareBy { if (ratingKey(it) == null) 1 else 0 }
 
 // Final tiebreak. Every key above can tie — a bulk import stamps one createdAt
 // across hundreds of rows, and two pressings of one album share artist, title
@@ -151,6 +163,7 @@ private fun primaryFor(axis: SortField): Comparator<MediaItem> =
         SortField.CreatedAt -> ByCreatedAt
         SortField.Format -> ByFormat
         SortField.MarketValue -> ByValue
+        SortField.Rating -> ByRating
     }
 
 /**
@@ -169,7 +182,19 @@ private fun tiebreaksFor(axis: SortField): Comparator<MediaItem> =
         SortField.CreatedAt -> ByArtist.then(ByTitle).then(ByYear)
         SortField.Format -> ByArtist.then(ByTitle).then(ByYear)
         SortField.MarketValue -> ByArtist.then(ByTitle).then(ByYear)
+        SortField.Rating -> ByArtist.then(ByTitle).then(ByYear)
     }.then(ById)
+
+/**
+ * Ordering applied ahead of the directional primary for axes whose unset value
+ * goes last either way: an unrated item follows the rated ones whether they
+ * count up or down. Mirrors LAST_WHEN_UNSET in sortItems.js.
+ */
+private fun lastWhenUnset(axis: SortField): Comparator<MediaItem>? =
+    when (axis) {
+        SortField.Rating -> RatedFirst
+        else -> null
+    }
 
 /**
  * Comparator for the active [sort], matching CollectionView.vue's sort order.
@@ -181,5 +206,6 @@ private fun tiebreaksFor(axis: SortField): Comparator<MediaItem> =
 internal fun comparatorForSort(sort: CollectionSort): Comparator<MediaItem> {
     val primary = primaryFor(sort.axis)
     val directed = if (sort.direction == SortDirection.Desc) primary.reversed() else primary
-    return directed.then(tiebreaksFor(sort.axis))
+    val ordered = lastWhenUnset(sort.axis)?.then(directed) ?: directed
+    return ordered.then(tiebreaksFor(sort.axis))
 }

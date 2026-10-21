@@ -209,6 +209,44 @@ class CollectionGroupingTest {
         assertEquals(listOf("NoYear", "ZeroYear", "Known"), sorted.map { it.title })
     }
 
+    // Mirrors the rating cases in crate's tests/js/sortItems.test.js.
+    private val rated =
+        listOf(
+            item(1, "Tago Mago", artist = "Can", rating = 3),
+            item(2, "Neu!", artist = "Neu!", rating = null),
+            item(3, "IV", artist = "Faust", rating = 5),
+            item(4, "Ege Bamyasi", artist = "Can", rating = 3),
+            item(5, "Zuckerzeit", artist = "Cluster", rating = null),
+            item(6, "Musik von Harmonia", artist = "Harmonia", rating = 1),
+        )
+
+    @Test
+    fun `rating highest first counts down and ends with the unrated`() {
+        val sorted = rated.sortedWith(comparatorForSort(CollectionSort(SortField.Rating, SortDirection.Desc)))
+        assertEquals(listOf(3L, 4L, 1L, 6L, 5L, 2L), sorted.map { it.id })
+    }
+
+    @Test
+    fun `rating lowest first counts up and still ends with the unrated`() {
+        val sorted = rated.sortedWith(comparatorForSort(CollectionSort(SortField.Rating, SortDirection.Asc)))
+        assertEquals(listOf(6L, 4L, 1L, 3L, 5L, 2L), sorted.map { it.id })
+    }
+
+    @Test
+    fun `rating groups by star count with the unrated last`() {
+        val sorted = rated.sortedWith(comparatorForSort(CollectionSort(SortField.Rating, SortDirection.Desc)))
+        val headers = groupItemsForSort(sorted, SortField.Rating, today).map { it.header }
+        assertEquals(
+            listOf(
+                UiText.Plural(R.plurals.rating_stars, 5),
+                UiText.Plural(R.plurals.rating_stars, 3),
+                UiText.Plural(R.plurals.rating_stars, 1),
+                UiText.Res(R.string.rating_none),
+            ),
+            headers,
+        )
+    }
+
     private fun item(
         id: Long,
         title: String,
@@ -216,6 +254,7 @@ class CollectionGroupingTest {
         format: String? = "LP",
         year: Int? = 2000,
         createdAt: String? = "2025-01-01 00:00:00",
+        rating: Int? = null,
     ) = MediaItem(
         id = id,
         userId = null,
@@ -241,5 +280,6 @@ class CollectionGroupingTest {
         purchasePrice = PurchasePrice(null, null),
         createdAt = createdAt,
         updatedAt = createdAt,
+        rating = rating,
     )
 }
