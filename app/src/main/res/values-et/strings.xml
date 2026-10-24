@@ -1,0 +1,472 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- App identity -->
+    <string name="app_name" translatable="false"></string>
+    <!-- Errors shared across screens -->
+    <string name="error_network"></string>
+    <string name="error_server"></string>
+    <string name="error_unexpected_response"></string>
+    <string name="error_provider_token_missing"></string>
+    <string name="error_image_not_sanitised"></string>
+    <!-- Actions and icon labels reused across screens -->
+    <string name="action_add_item"></string>
+    <string name="action_back"></string>
+    <string name="action_cancel"></string>
+    <string name="action_close"></string>
+    <string name="action_create"></string>
+    <string name="action_delete"></string>
+    <string name="action_dismiss"></string>
+    <string name="action_edit"></string>
+    <string name="action_hide"></string>
+    <string name="action_more"></string>
+    <string name="action_remove"></string>
+    <string name="action_rename"></string>
+    <string name="action_replace"></string>
+    <string name="action_save"></string>
+    <string name="action_scan_barcode"></string>
+    <string name="action_search"></string>
+    <string name="action_share"></string>
+    <string name="action_show"></string>
+    <string name="action_sort"></string>
+    <string name="action_upload"></string>
+    <!-- Bottom bar / navigation rail destinations -->
+    <string name="nav_home"></string>
+    <string name="nav_collection"></string>
+    <string name="nav_playlists"></string>
+    <string name="nav_search"></string>
+    <string name="nav_settings"></string>
+    <!-- Categories and ownership status -->
+    <string name="category_books"></string>
+    <string name="category_comics"></string>
+    <string name="category_films"></string>
+    <string name="category_games"></string>
+    <string name="category_music"></string>
+    <string name="status_owned"></string>
+    <string name="status_wanted"></string>
+    <!-- Enrichment providers backing each category's external search -->
+    <string name="provider_music" translatable="false"></string>
+    <string name="provider_films" translatable="false"></string>
+    <string name="provider_books" translatable="false"></string>
+    <string name="provider_games" translatable="false"></string>
+    <string name="provider_comics" translatable="false"></string>
+    <!-- Item field names. Per-category because the same field is a director for
+         a film and an artist for a record; the detail view and the add/edit form
+         both read these so the two can never disagree. -->
+    <string name="field_artist_music"></string>
+    <string name="field_artist_films"></string>
+    <string name="field_artist_books"></string>
+    <string name="field_artist_games"></string>
+    <string name="field_artist_comics"></string>
+    <string name="field_title_music"></string>
+    <string name="field_title_films"></string>
+    <string name="field_title_books"></string>
+    <string name="field_title_games"></string>
+    <string name="field_title_comics"></string>
+    <string name="field_label_music"></string>
+    <string name="field_label_films"></string>
+    <string name="field_label_books"></string>
+    <string name="field_label_games"></string>
+    <string name="field_label_comics"></string>
+    <string name="field_format"></string>
+    <string name="field_platform"></string>
+    <string name="field_barcode"></string>
+    <string name="field_isbn"></string>
+    <string name="field_country"></string>
+    <string name="field_name"></string>
+    <string name="field_notes"></string>
+    <string name="field_year"></string>
+    <string name="field_rating"></string>
+    <string name="purchase_price_label"></string>
+    <string name="purchase_currency_label"></string>
+    <!-- Example values shown in empty form fields -->
+    <string name="hint_artist_music"></string>
+    <string name="hint_artist_films"></string>
+    <string name="hint_artist_books"></string>
+    <string name="hint_artist_games"></string>
+    <string name="hint_artist_comics"></string>
+    <string name="hint_title_music"></string>
+    <string name="hint_title_films"></string>
+    <string name="hint_title_books"></string>
+    <string name="hint_title_games"></string>
+    <string name="hint_title_comics"></string>
+    <string name="hint_label_music"></string>
+    <string name="hint_label_films"></string>
+    <string name="hint_label_books"></string>
+    <string name="hint_label_games"></string>
+    <string name="hint_label_comics"></string>
+    <string name="hint_barcode_music"></string>
+    <!-- The separators in an ISBN are hyphens, not en dashes. -->
+    <string name="hint_barcode_books" tools:ignore="TypographyDashes"></string>
+    <string name="hint_year"></string>
+    <string name="hint_purchase_price"></string>
+    <!-- Sort menu. The axis noun is a resource of its own so the direction and
+         the noun can be ordered however the language needs. -->
+    <string name="sort_newest_first"></string>
+    <string name="sort_oldest_first"></string>
+    <string name="sort_a_to_z"></string>
+    <string name="sort_z_to_a"></string>
+    <string name="sort_year_oldest"></string>
+    <string name="sort_year_newest"></string>
+    <string name="sort_value_highest"></string>
+    <string name="sort_value_lowest"></string>
+    <!-- Sort by star rating, most stars first; unrated items come last. -->
+    <string name="sort_rating_highest"></string>
+    <!-- Sort by star rating, fewest stars first; unrated items still come last. -->
+    <string name="sort_rating_lowest"></string>
+    <string name="sort_noun_format"></string>
+    <string name="sort_noun_title_music"></string>
+    <string name="sort_noun_title_films"></string>
+    <string name="sort_noun_title_books"></string>
+    <string name="sort_noun_title_games"></string>
+    <string name="sort_noun_title_comics"></string>
+    <!-- Marks the active option in a picker; quoted so the gap survives. -->
+    <string name="sort_option_selected"></string>
+    <!-- Section headers in a grouped collection list -->
+    <string name="group_header_unknown"></string>
+    <!-- An item with no star rating: a choice on the edit form and a group
+         heading when the collection is sorted by rating. -->
+    <string name="rating_none"></string>
+    <!-- A star rating: a choice on the edit form, read out by a screen
+         reader, and a group heading when sorted by rating. -->
+    <plurals name="rating_stars">
+    </plurals>
+    <!-- An item's star rating as a screen reader reads it: "4 out of 5 stars".
+         %1$d is the item's stars, %2$d the most an item can have; the plural
+         form follows %2$d. -->
+    <plurals name="rating_summary">
+    </plurals>
+    <string name="date_bucket_today"></string>
+    <string name="date_bucket_yesterday"></string>
+    <string name="date_bucket_earlier_this_week"></string>
+    <string name="date_bucket_last_week"></string>
+    <string name="date_bucket_earlier_this_month"></string>
+    <string name="date_bucket_last_month"></string>
+    <string name="date_bucket_earlier_this_year"></string>
+    <string name="date_bucket_last_year"></string>
+    <!-- Counted quantities -->
+    <plurals name="item_count">
+    </plurals>
+    <!-- Offline banner -->
+    <string name="offline_banner"></string>
+    <!-- Home -->
+    <string name="home_empty_title"></string>
+    <string name="home_empty_subtitle"></string>
+    <string name="home_item_of_the_day"></string>
+    <string name="home_recently_added"></string>
+    <string name="home_category_recent"></string>
+    <string name="home_most_valuable"></string>
+    <!-- Collection -->
+    <string name="collection_empty_title"></string>
+    <string name="collection_empty_subtitle"></string>
+    <string name="collection_empty_wanted_title"></string>
+    <string name="collection_empty_wanted_subtitle"></string>
+    <string name="collection_empty_filtered_collection"></string>
+    <string name="collection_empty_filtered_wanted"></string>
+    <string name="collection_clear_filters"></string>
+    <string name="collection_category_button"></string>
+    <string name="collection_status_owned_a11y"></string>
+    <string name="collection_status_wanted_a11y"></string>
+    <string name="category_option_selected"></string>
+    <string name="collection_share_category"></string>
+    <string name="collection_share_library"></string>
+    <string name="collection_view_switch_to_list"></string>
+    <string name="collection_view_switch_to_card"></string>
+    <string name="collection_filter_all_chip"></string>
+    <string name="collection_filter_format_chip"></string>
+    <string name="collection_chip_all_a11y"></string>
+    <plurals name="collection_chip_format_a11y">
+    </plurals>
+    <string name="collection_row_a11y"></string>
+    <!-- Collection year (decade) + genre filters -->
+    <string name="collection_filter_any_year"></string>
+    <string name="collection_filter_any_genre"></string>
+    <string name="collection_filter_any_year_count"></string>
+    <string name="collection_filter_any_genre_count"></string>
+    <string name="collection_filter_value_option"></string>
+    <!-- A decade, as a filter value or a group heading: "1990s". %1$d is its first year. -->
+    <string name="decade_label"></string>
+    <!-- Item detail -->
+    <string name="detail_not_found"></string>
+    <string name="action_retry"></string>
+    <string name="detail_delete_title"></string>
+    <string name="detail_delete_message"></string>
+    <string name="detail_menu_enrich"></string>
+    <string name="detail_menu_re_enrich"></string>
+    <string name="detail_menu_remove_enrichment"></string>
+    <string name="detail_menu_fetch_market_rate"></string>
+    <string name="detail_shared_by"></string>
+    <string name="detail_share_can_edit"></string>
+    <string name="detail_share_read_only"></string>
+    <string name="detail_tracklist"></string>
+    <string name="detail_genres"></string>
+    <string name="detail_pressing_notes"></string>
+    <string name="detail_notes"></string>
+    <string name="detail_about_artist"></string>
+    <string name="detail_about_director"></string>
+    <string name="detail_about_author"></string>
+    <string name="detail_about_developer"></string>
+    <string name="detail_about_publisher"></string>
+    <string name="detail_market_value"></string>
+    <string name="detail_market_loose"></string>
+    <string name="detail_market_new"></string>
+    <string name="detail_market_fetched"></string>
+    <string name="detail_currencies_differ"></string>
+    <string name="detail_more_from_your_crate"></string>
+    <string name="detail_if_you_like_this"></string>
+    <string name="detail_photo_a11y"></string>
+    <string name="detail_genre_filter_a11y"></string>
+    <string name="detail_format_filter_a11y"></string>
+    <!-- Read out for the year on an item; %1$d is the first year of its decade, as in "the 1970s". -->
+    <string name="detail_decade_filter_a11y"></string>
+    <string name="recommendation_via_source"></string>
+    <!-- Photo slots -->
+    <string name="photos_section"></string>
+    <string name="additional_photos_section"></string>
+    <string name="photo_slot_label"></string>
+    <string name="photo_upload_failed"></string>
+    <string name="artwork_upload_failed"></string>
+    <!-- Add / edit form -->
+    <string name="add_edit_title_add_music"></string>
+    <string name="add_edit_title_add_films"></string>
+    <string name="add_edit_title_add_books"></string>
+    <string name="add_edit_title_add_games"></string>
+    <string name="add_edit_title_add_comics"></string>
+    <string name="add_edit_title_edit_music"></string>
+    <string name="add_edit_title_edit_films"></string>
+    <string name="add_edit_title_edit_books"></string>
+    <string name="add_edit_title_edit_games"></string>
+    <string name="add_edit_title_edit_comics"></string>
+    <string name="add_edit_saving"></string>
+    <string name="add_edit_adding_to_collection"></string>
+    <!-- Quoted: the leading gap separates the label from the button's icon. -->
+    <string name="add_edit_search_provider"></string>
+    <string name="add_edit_pick_artwork"></string>
+    <string name="add_edit_replace_artwork"></string>
+    <string name="add_edit_remove_artwork"></string>
+    <string name="add_edit_selected_artwork_a11y"></string>
+    <string name="add_edit_tap_to_pick_artwork"></string>
+    <string name="add_edit_year_error"></string>
+    <string name="add_edit_look_up_isbn"></string>
+    <string name="add_edit_looking_up_isbn"></string>
+    <string name="add_edit_format_select"></string>
+    <string name="add_edit_image_too_large"></string>
+    <string name="add_edit_receipt_unreadable"></string>
+    <string name="add_edit_create_unrecorded"></string>
+    <string name="add_edit_isbn_not_found"></string>
+    <string name="settings_bulk_partial_failure"></string>
+    <string name="format_unrecognised"></string>
+    <!-- Headings in the format picker. The format values under them are what the
+         server stores, so they stay as they are. -->
+    <string name="format_group_vinyl"></string>
+    <string name="format_group_tape"></string>
+    <string name="format_group_disc"></string>
+    <string name="format_group_physical"></string>
+    <string name="format_group_print"></string>
+    <string name="format_group_audio"></string>
+    <string name="format_group_single_issues"></string>
+    <string name="format_group_collected"></string>
+    <!-- Display names of stored formats (see CategoryFormats.labelRes). The value stored is
+         always the English name; platform and disc-standard names are not translated. -->
+    <string name="format_name_vinyl"></string>
+    <string name="format_name_7_inch_single"></string>
+    <string name="format_name_12_inch_single"></string>
+    <string name="format_name_picture_disc"></string>
+    <string name="format_name_flexi_disc"></string>
+    <string name="format_name_shellac"></string>
+    <string name="format_name_lathe_cut"></string>
+    <string name="format_name_cassette"></string>
+    <string name="format_name_reel_to_reel"></string>
+    <string name="format_name_4_track_cartridge"></string>
+    <string name="format_name_microcassette"></string>
+    <string name="format_name_hardcover"></string>
+    <string name="format_name_paperback"></string>
+    <string name="format_name_mass_market_paperback"></string>
+    <string name="format_name_trade_paperback"></string>
+    <string name="format_name_graphic_novel"></string>
+    <string name="format_name_comic"></string>
+    <string name="format_name_audiobook_cd"></string>
+    <string name="format_name_audiobook_cassette"></string>
+    <string name="format_name_single_issue"></string>
+    <!-- A comic published once a year alongside the regular series -->
+    <string name="format_name_annual"></string>
+    <!-- A one-off special comic issue -->
+    <string name="format_name_special"></string>
+    <string name="format_name_one_shot"></string>
+    <string name="format_name_mini_series"></string>
+    <string name="format_name_limited_series"></string>
+    <string name="format_name_omnibus"></string>
+    <string name="format_name_compendium"></string>
+    <string name="format_group_sony" translatable="false"></string>
+    <string name="format_group_microsoft" translatable="false"></string>
+    <string name="format_group_nintendo" translatable="false"></string>
+    <string name="format_group_sega" translatable="false"></string>
+    <string name="format_group_atari" translatable="false"></string>
+    <string name="format_group_snk" translatable="false"></string>
+    <!-- Provider search sheet -->
+    <string name="external_search_title"></string>
+    <string name="external_search_query_label"></string>
+    <string name="external_search_no_results"></string>
+    <string name="external_search_prompt"></string>
+    <string name="external_result_untitled"></string>
+    <!-- Search -->
+    <string name="search_field_label"></string>
+    <string name="search_tab_collection"></string>
+    <string name="search_tab_external"></string>
+    <string name="search_hint_filter_collection"></string>
+    <string name="search_hint_no_local_matches"></string>
+    <string name="search_hint_type_then_search"></string>
+    <string name="search_hint_no_provider_results"></string>
+    <string name="search_hint_tap_search"></string>
+    <!-- Barcode scanner -->
+    <string name="scan_status_hint"></string>
+    <string name="scan_permission_required"></string>
+    <string name="scan_grant_access"></string>
+    <string name="scan_barcode_value"></string>
+    <string name="scan_scanning"></string>
+    <string name="scan_no_matches"></string>
+    <string name="scan_no_candidates"></string>
+    <string name="scan_use_raw_barcode"></string>
+    <string name="scan_keep_scanning"></string>
+    <!-- Playlists -->
+    <string name="playlist_empty_title"></string>
+    <string name="playlist_empty_subtitle"></string>
+    <string name="playlist_new"></string>
+    <string name="playlist_rename"></string>
+    <string name="playlist_delete_title"></string>
+    <string name="playlist_delete_message"></string>
+    <string name="playlist_not_found"></string>
+    <string name="playlist_empty_items_title"></string>
+    <string name="playlist_empty_items_subtitle"></string>
+    <string name="playlist_add_items"></string>
+    <string name="playlist_add_to"></string>
+    <string name="playlist_filter_collection"></string>
+    <string name="playlist_collection_empty"></string>
+    <string name="playlist_no_matches"></string>
+    <string name="playlist_remove_item"></string>
+    <!-- Share sheet -->
+    <string name="share_item_title"></string>
+    <string name="share_playlist_title"></string>
+    <string name="share_library_title"></string>
+    <string name="share_category_title"></string>
+    <string name="share_allow_editing"></string>
+    <string name="share_permission_write"></string>
+    <string name="share_permission_read"></string>
+    <string name="share_find_user_label"></string>
+    <string name="share_find_user_hint"></string>
+    <string name="share_already_shared"></string>
+    <string name="share_no_one_yet"></string>
+    <string name="share_can_edit"></string>
+    <string name="share_read_only"></string>
+    <string name="share_revoke"></string>
+    <!-- Shared with me -->
+    <string name="shared_with_me_title"></string>
+    <string name="shared_empty_title"></string>
+    <string name="shared_empty_subtitle"></string>
+    <string name="shared_section_categories"></string>
+    <string name="shared_section_playlists"></string>
+    <!-- After the item count on a category someone shared with you, as in "12 items · from Alice". %1$s is that person's display name. -->
+    <string name="shared_from_owner"></string>
+    <string name="shared_by_owner"></string>
+    <!-- Only reached for two owners or more: one owner is named instead. -->
+    <plurals name="shared_from_owner_count">
+    </plurals>
+    <plurals name="shared_by_owner_count">
+    </plurals>
+    <!-- Login -->
+    <string name="login_subtitle"></string>
+    <string name="login_server_url_label"></string>
+    <string name="login_server_url_hint" translatable="false"></string>
+    <string name="login_action"></string>
+    <string name="login_waiting"></string>
+    <string name="login_error_enter_url"></string>
+    <string name="login_error_invalid_address"></string>
+    <string name="login_error_server_returned"></string>
+    <string name="login_error_empty_response"></string>
+    <string name="login_error_foreign_login_url"></string>
+    <string name="login_error_foreign_credentials"></string>
+    <string name="login_error_connect_failed"></string>
+    <string name="login_error_untrusted_certificate"></string>
+    <string name="login_error_certificate_hostname"></string>
+    <string name="login_error_connection_failed"></string>
+    <string name="login_error_timed_out"></string>
+    <string name="login_error_unusable_address"></string>
+    <!-- Settings: section headers -->
+    <string name="settings_section_appearance"></string>
+    <string name="settings_section_categories"></string>
+    <string name="settings_section_enrichment"></string>
+    <string name="settings_section_recommendations"></string>
+    <string name="settings_section_market"></string>
+    <string name="settings_section_tokens"></string>
+    <string name="settings_section_account"></string>
+    <string name="settings_section_danger_zone"></string>
+    <string name="settings_section_about"></string>
+    <!-- Settings: profile and appearance -->
+    <string name="settings_unknown_user"></string>
+    <string name="settings_theme_label"></string>
+    <string name="theme_mode_system"></string>
+    <string name="theme_mode_light"></string>
+    <string name="theme_mode_dark"></string>
+    <string name="settings_categories_body"></string>
+    <!-- Settings: enrichment -->
+    <string name="settings_enrichment_needs_token"></string>
+    <string name="settings_auto_enrich_title"></string>
+    <string name="settings_auto_enrich_body"></string>
+    <string name="settings_enrich_all_title"></string>
+    <string name="settings_enrich_all_body"></string>
+    <string name="settings_enriched_progress"></string>
+    <string name="settings_enrich_all_a11y"></string>
+    <!-- Settings: recommendations -->
+    <string name="settings_local_recommendations_body"></string>
+    <string name="settings_online_recommendations_title"></string>
+    <string name="settings_online_recommendations_body"></string>
+    <string name="settings_recommendations_needs_token"></string>
+    <string name="settings_recommendations_save_failed"></string>
+    <!-- Settings: market values -->
+    <string name="settings_market_needs_token"></string>
+    <string name="settings_currency_label"></string>
+    <string name="settings_no_currencies"></string>
+    <string name="settings_auto_fetch_market_title"></string>
+    <string name="settings_auto_fetch_market_body"></string>
+    <string name="settings_refresh_all_title"></string>
+    <string name="settings_refresh_all_body"></string>
+    <string name="settings_refreshed_progress"></string>
+    <string name="settings_refresh_all_a11y"></string>
+    <!-- Settings: provider tokens -->
+    <string name="settings_token_discogs"></string>
+    <string name="settings_token_tmdb"></string>
+    <string name="settings_token_rawg"></string>
+    <string name="settings_token_comicvine"></string>
+    <string name="settings_token_pricecharting"></string>
+    <string name="settings_token_hint_personal_access"></string>
+    <string name="settings_token_hint_bearer"></string>
+    <string name="settings_token_hint_api"></string>
+    <string name="settings_token_loading"></string>
+    <string name="settings_token_configured"></string>
+    <string name="settings_token_not_set"></string>
+    <!-- Settings: account and danger zone -->
+    <string name="settings_log_out"></string>
+    <string name="settings_log_out_title"></string>
+    <string name="settings_log_out_message"></string>
+    <string name="settings_wipe_title"></string>
+    <string name="settings_wipe_body"></string>
+    <string name="settings_wipe_action"></string>
+    <string name="settings_wipe_dialog_title"></string>
+    <string name="settings_wipe_dialog_message"></string>
+    <string name="settings_wipe_confirm"></string>
+    <!-- Settings: about and update check -->
+    <string name="settings_app_version"></string>
+    <string name="settings_server_version"></string>
+    <string name="settings_version_unknown" translatable="false"></string>
+    <string name="settings_check_updates"></string>
+    <string name="settings_check"></string>
+    <string name="settings_open_release"></string>
+    <string name="settings_up_to_date"></string>
+    <string name="settings_update_check_failed"></string>
+    <string name="settings_update_available"></string>
+    <!-- Update notification -->
+    <string name="update_channel_name"></string>
+    <string name="update_channel_description"></string>
+    <string name="update_available_title"></string>
+    <string name="update_available_text"></string>
+    <string name="update_available_big_text"></string>
+</resources>
