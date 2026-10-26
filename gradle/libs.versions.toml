@@ -20,7 +20,7 @@ securityCrypto = "1.1.0"
 # security-crypto 1.1.0 is the terminal release of a deprecated library and
 # pins Tink at 1.8.0. Declared directly so the credential store at rest gets
 # Tink's later hardening.
-tink = "1.23.0"
+tink = "1.24.0"
 exifInterface = "1.4.2"
 
 # DI
