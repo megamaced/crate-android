@@ -1,3 +1,5 @@
+import groovy.json.JsonSlurper
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -21,6 +23,9 @@ val hasReleaseSigningConfig =
         releaseKeyAlias != null &&
         releaseKeyPassword != null &&
         file(releaseKeystoreFile).exists()
+
+val translationPolicy = JsonSlurper().parse(file("translation-policy.json")) as Map<*, *>
+val publishedLocales = (translationPolicy["enabledLocales"] as List<*>).map { it as String }
 
 android {
     namespace = "com.megamaced.crate"
@@ -77,13 +82,10 @@ android {
     }
 
     androidResources {
-        // The languages the app ships: the publication gate. A catalogue
-        // Weblate adds (values-<lang>) stays out of the APK, and out of Android
-        // 13+'s per-app language setting, until its language is added here.
-        // Dependencies' translations are kept to the same languages, so a
-        // screen is never half in one language. verifyLocales checks this list
-        // against the catalogues and the generated language list.
-        localeFilters += listOf("en")
+        // Explicitly enabled languages from the release policy. Coverage is
+        // reported in CI; it never changes this list automatically. See
+        // docs/TRANSLATIONS.md for the first-release criteria.
+        localeFilters += publishedLocales
         generateLocaleConfig = true
     }
 
@@ -161,19 +163,28 @@ tasks.configureEach {
 val verifyLocales by tasks.registering {
     val shipped = android.androidResources.localeFilters.toSet() - "en"
     val catalogues = shipped.associateWith { layout.projectDirectory.file("src/main/res/values-$it/strings.xml").asFile }
-    val generated = layout.buildDirectory.file("generated/res/localeConfig/debug/xml/_generated_res_locale_config.xml")
-    dependsOn("generateDebugLocaleConfig")
-    inputs.file(generated)
+    val generated =
+        listOf("debug", "release").map {
+            layout.buildDirectory.file("generated/res/localeConfig/$it/xml/_generated_res_locale_config.xml")
+        }
+    dependsOn("generateDebugLocaleConfig", "generateReleaseLocaleConfig")
+    inputs.file("translation-policy.json")
+    generated.forEach { inputs.file(it) }
     doLast {
         val missing = catalogues.filterValues { !it.isFile }.keys
         check(missing.isEmpty()) { "localeFilters ships $missing, which have no strings.xml" }
-        val listed =
-            Regex("""android:name="([^"]+)"""")
-                .findAll(generated.get().asFile.readText())
-                .map { it.groupValues[1] }
-                .toSet()
-        val expected = setOf("en-US") + shipped.map { it.replace("-r", "-") }
-        check(listed == expected) { "The generated locale list is $listed, expected $expected" }
+        val expected =
+            setOf("en-US") +
+                shipped.map { if (it.startsWith("b+")) it.removePrefix("b+").replace('+', '-') else it.replace("-r", "-") }
+        generated.forEach { config ->
+            val file = config.get().asFile
+            val listed =
+                Regex("""android:name="([^"]+)"""")
+                    .findAll(file.readText())
+                    .map { it.groupValues[1] }
+                    .toSet()
+            check(listed == expected) { "$file lists $listed, expected $expected" }
+        }
     }
 }
 
