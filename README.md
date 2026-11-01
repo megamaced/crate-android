@@ -87,6 +87,8 @@ Crate uses [Weblate](https://weblate.org/) for community translations. Thank you
 
 [Help translate the Android app](https://hosted.weblate.org/projects/crate/android-app/) in your browser.
 
+New languages need 80% translation coverage, all core screens translated and a fluent-speaker review before being enabled for release. CI reports progress and flags languages ready for review. See the [translation policy and readiness report](docs/TRANSLATIONS.md).
+
 ## Building
 
 ```

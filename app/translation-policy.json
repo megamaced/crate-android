@@ -1,0 +1,11 @@
+{
+  "minimumCompletionPercent": 80,
+  "enabledLocales": ["en"],
+  "criticalResourcePatterns": {
+    "Sign-in": ["login_*"],
+    "Navigation": ["nav_*", "category_*", "status_*"],
+    "Add and edit": ["action_*", "field_*", "purchase_*", "add_edit_*"],
+    "Settings": ["settings_*", "theme_mode_*"],
+    "Shared errors": ["error_*"]
+  }
+}
