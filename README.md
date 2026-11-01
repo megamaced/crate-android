@@ -79,6 +79,14 @@ Subsequent updates install in place over the existing app. Use *Settings → Abo
 - WorkManager for background delta sync
 - DataStore Preferences for app-side settings
 
+## Translations
+
+Crate uses [Weblate](https://weblate.org/) for community translations. Thank you to Weblate for providing free hosting through its Libre plan.
+
+[![Translation status on Weblate](https://hosted.weblate.org/widget/crate/svg-badge.svg)](https://hosted.weblate.org/projects/crate/)
+
+[Help translate the Android app](https://hosted.weblate.org/projects/crate/android-app/) in your browser.
+
 ## Building
 
 ```
