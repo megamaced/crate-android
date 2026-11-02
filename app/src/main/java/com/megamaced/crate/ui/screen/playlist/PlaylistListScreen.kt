@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -52,8 +53,11 @@ import com.megamaced.crate.R
 import com.megamaced.crate.domain.model.Playlist
 import com.megamaced.crate.ui.components.ArtworkImage
 import com.megamaced.crate.ui.components.EmptyState
+import com.megamaced.crate.ui.components.ScrollToTopEffect
 import com.megamaced.crate.ui.network.LocalIsOnline
 import com.megamaced.crate.util.resolve
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -61,6 +65,7 @@ fun PlaylistListScreen(
     onPlaylistClick: (Long) -> Unit,
     onOpenSharedWithMe: () -> Unit,
     modifier: Modifier = Modifier,
+    scrollToTopRequests: Flow<Unit> = emptyFlow(),
     viewModel: PlaylistListViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -115,8 +120,11 @@ fun PlaylistListScreen(
                     subtitle = stringResource(R.string.playlist_empty_subtitle),
                 )
             } else {
+                val listState = rememberLazyListState()
+                ScrollToTopEffect(scrollToTopRequests) { listState.animateScrollToItem(0) }
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
+                    state = listState,
                     contentPadding = PaddingValues(vertical = 8.dp),
                 ) {
                     items(state.playlists, key = { it.id }) { playlist ->

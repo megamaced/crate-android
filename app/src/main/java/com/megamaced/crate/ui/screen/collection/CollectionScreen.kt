@@ -16,8 +16,10 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ViewList
@@ -74,6 +76,7 @@ import com.megamaced.crate.ui.components.ArtworkImage
 import com.megamaced.crate.ui.components.CollectionFilterBar
 import com.megamaced.crate.ui.components.EmptyState
 import com.megamaced.crate.ui.components.MediaCard
+import com.megamaced.crate.ui.components.ScrollToTopEffect
 import com.megamaced.crate.ui.components.SortMenuButton
 import com.megamaced.crate.ui.components.categoryIcon
 import com.megamaced.crate.ui.network.LocalIsOnline
@@ -83,6 +86,8 @@ import com.megamaced.crate.ui.screen.share.ShareSheet
 import com.megamaced.crate.ui.screen.share.ShareTarget
 import com.megamaced.crate.util.UiText
 import com.megamaced.crate.util.resolve
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -91,6 +96,7 @@ fun CollectionScreen(
     onAddItem: (Category) -> Unit,
     widthSizeClass: WindowWidthSizeClass,
     modifier: Modifier = Modifier,
+    scrollToTopRequests: Flow<Unit> = emptyFlow(),
     viewModel: CollectionViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -195,6 +201,7 @@ fun CollectionScreen(
                             widthSizeClass = widthSizeClass,
                             modifier = Modifier.fillMaxSize(),
                             artistFirst = artistFirst,
+                            scrollToTopRequests = scrollToTopRequests,
                         )
 
                         CollectionViewMode.List -> CollectionList(
@@ -202,6 +209,7 @@ fun CollectionScreen(
                             onItemClick = onItemClick,
                             modifier = Modifier.fillMaxSize(),
                             artistFirst = artistFirst,
+                            scrollToTopRequests = scrollToTopRequests,
                         )
                     }
                 }
@@ -431,6 +439,7 @@ internal fun CollectionGrid(
     widthSizeClass: WindowWidthSizeClass,
     modifier: Modifier = Modifier,
     artistFirst: Boolean = false,
+    scrollToTopRequests: Flow<Unit> = emptyFlow(),
 ) {
     if (groups.all { it.items.isEmpty() }) {
         EmptyCollection(modifier)
@@ -443,8 +452,11 @@ internal fun CollectionGrid(
         else -> 5
     }
 
+    val gridState = rememberLazyGridState()
+    ScrollToTopEffect(scrollToTopRequests) { gridState.animateScrollToItem(0) }
     LazyVerticalGrid(
         columns = GridCells.Fixed(columns),
+        state = gridState,
         modifier = modifier.padding(horizontal = 12.dp),
         contentPadding = PaddingValues(vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -481,14 +493,18 @@ internal fun CollectionList(
     onItemClick: (Long) -> Unit,
     modifier: Modifier = Modifier,
     artistFirst: Boolean = false,
+    scrollToTopRequests: Flow<Unit> = emptyFlow(),
 ) {
     if (groups.all { it.items.isEmpty() }) {
         EmptyCollection(modifier)
         return
     }
 
+    val listState = rememberLazyListState()
+    ScrollToTopEffect(scrollToTopRequests) { listState.animateScrollToItem(0) }
     LazyColumn(
         modifier = modifier,
+        state = listState,
         contentPadding = PaddingValues(vertical = 4.dp),
     ) {
         for (group in groups) {

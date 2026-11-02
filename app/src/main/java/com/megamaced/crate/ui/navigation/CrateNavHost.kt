@@ -4,6 +4,7 @@ import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.Lifecycle
 import androidx.navigation.NavHostController
@@ -27,12 +28,21 @@ import com.megamaced.crate.ui.screen.search.SearchScreen
 import com.megamaced.crate.ui.screen.settings.SettingsScreen
 import com.megamaced.crate.ui.screen.shared.SharedCategoryScreen
 import com.megamaced.crate.ui.screen.shared.SharedWithMeScreen
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.map
 import kotlinx.serialization.json.Json
+import kotlin.reflect.KClass
 
+/**
+ * [tabReselections] emits a tab's destination when that tab is re-selected
+ * while its root screen is showing; the root screen scrolls back to its top.
+ */
 @Composable
 fun CrateNavHost(
     navController: NavHostController,
     widthSizeClass: WindowWidthSizeClass,
+    tabReselections: Flow<Destination>,
     modifier: Modifier = Modifier,
 ) {
     NavHost(
@@ -43,6 +53,7 @@ fun CrateNavHost(
         composable<Destination.Home> {
             HomeScreen(
                 onItemClick = { id -> navController.navigateOnce(Destination.Detail(id)) },
+                scrollToTopRequests = tabReselections.of(Destination.Home::class),
             )
         }
         composable<Destination.Collection> {
@@ -52,12 +63,14 @@ fun CrateNavHost(
                     navController.navigateOnce(Destination.AddEdit(category = category.apiValue))
                 },
                 widthSizeClass = widthSizeClass,
+                scrollToTopRequests = tabReselections.of(Destination.Collection::class),
             )
         }
         composable<Destination.Playlists> {
             PlaylistListScreen(
                 onPlaylistClick = { id -> navController.navigateOnce(Destination.PlaylistDetail(id)) },
                 onOpenSharedWithMe = { navController.navigateOnce(Destination.SharedWithMe) },
+                scrollToTopRequests = tabReselections.of(Destination.Playlists::class),
             )
         }
         composable<Destination.Search> {
@@ -69,11 +82,13 @@ fun CrateNavHost(
                         Destination.AddEdit(category = category.apiValue, prefillJson = prefill),
                     )
                 },
+                scrollToTopRequests = tabReselections.of(Destination.Search::class),
             )
         }
         composable<Destination.Settings> {
             SettingsScreen(
                 onOpenSharedWithMe = { navController.navigateOnce(Destination.SharedWithMe) },
+                scrollToTopRequests = tabReselections.of(Destination.Settings::class),
             )
         }
         composable<Destination.Login> {
@@ -197,6 +212,13 @@ fun CrateNavHost(
         }
     }
 }
+
+/** The re-selections of [tab] alone, as the scroll-to-top requests its screen takes. */
+@Composable
+private fun Flow<Destination>.of(tab: KClass<out Destination>): Flow<Unit> =
+    remember(this, tab) {
+        filter { tab.isInstance(it) }.map { }
+    }
 
 /**
  * Push [destination] only while the current entry is RESUMED.

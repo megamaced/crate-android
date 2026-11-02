@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -51,12 +52,15 @@ import com.megamaced.crate.domain.model.Category
 import com.megamaced.crate.domain.model.MediaItem
 import com.megamaced.crate.ui.components.ArtworkImage
 import com.megamaced.crate.ui.components.CategoryBadge
+import com.megamaced.crate.ui.components.ScrollToTopEffect
 import com.megamaced.crate.ui.screen.addedit.ExternalResultRow
 import com.megamaced.crate.ui.screen.addedit.ExternalSearchResult
 import com.megamaced.crate.ui.screen.addedit.formatLabel
 import com.megamaced.crate.ui.screen.addedit.listKey
 import com.megamaced.crate.ui.screen.addedit.providerNameRes
 import com.megamaced.crate.util.resolve
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -64,6 +68,7 @@ fun SearchScreen(
     onItemClick: (Long) -> Unit,
     onAddFromExternal: (Category, ExternalSearchResult) -> Unit,
     modifier: Modifier = Modifier,
+    scrollToTopRequests: Flow<Unit> = emptyFlow(),
     viewModel: SearchViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -101,6 +106,7 @@ fun SearchScreen(
                         query = state.query,
                         results = state.collectionResults,
                         onItemClick = onItemClick,
+                        scrollToTopRequests = scrollToTopRequests,
                     )
                 }
 
@@ -110,6 +116,7 @@ fun SearchScreen(
                         onCategorySelected = viewModel::selectCategory,
                         onSearch = viewModel::runExternalSearch,
                         onPick = { result -> onAddFromExternal(state.externalCategory, result) },
+                        scrollToTopRequests = scrollToTopRequests,
                     )
                 }
             }
@@ -179,6 +186,7 @@ private fun CollectionResults(
     query: String,
     results: List<MediaItem>,
     onItemClick: (Long) -> Unit,
+    scrollToTopRequests: Flow<Unit>,
 ) {
     when {
         query.isBlank() -> {
@@ -190,8 +198,11 @@ private fun CollectionResults(
         }
 
         else -> {
+            val listState = rememberLazyListState()
+            ScrollToTopEffect(scrollToTopRequests) { listState.animateScrollToItem(0) }
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
+                state = listState,
                 contentPadding = PaddingValues(vertical = 8.dp),
             ) {
                 items(results, key = { it.id }) { item ->
@@ -210,6 +221,7 @@ private fun ExternalResults(
     onCategorySelected: (Category) -> Unit,
     onSearch: () -> Unit,
     onPick: (ExternalSearchResult) -> Unit,
+    scrollToTopRequests: Flow<Unit>,
 ) {
     val provider = stringResource(providerNameRes(state.externalCategory))
     Column(modifier = Modifier.fillMaxSize()) {
@@ -243,8 +255,11 @@ private fun ExternalResults(
                 }
 
                 else -> {
+                    val listState = rememberLazyListState()
+                    ScrollToTopEffect(scrollToTopRequests) { listState.animateScrollToItem(0) }
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
+                        state = listState,
                         contentPadding = PaddingValues(vertical = 8.dp),
                     ) {
                         itemsIndexed(
