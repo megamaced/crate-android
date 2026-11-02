@@ -1,0 +1,7 @@
+Navigation follows Material conventions more closely.
+
+- Search moves to the middle of the bottom bar.
+- A screen opened from a tab keeps that tab highlighted.
+- Tapping the tab you're in takes you back to its first screen, and
+  tapping it again there scrolls back to the top.
+- The bar hides while you add or edit an item, or scan a barcode.
