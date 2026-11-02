@@ -66,13 +66,17 @@ import com.megamaced.crate.data.prefs.ThemeMode
 import com.megamaced.crate.domain.model.Category
 import com.megamaced.crate.domain.model.UserProfile
 import com.megamaced.crate.domain.repository.MediaRepository
+import com.megamaced.crate.ui.components.ScrollToTopEffect
 import com.megamaced.crate.util.resolve
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     onOpenSharedWithMe: () -> Unit,
     modifier: Modifier = Modifier,
+    scrollToTopRequests: Flow<Unit> = emptyFlow(),
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -92,11 +96,13 @@ fun SettingsScreen(
         topBar = { TopAppBar(title = { Text(stringResource(R.string.nav_settings)) }) },
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { innerPadding ->
+        val scrollState = rememberScrollState()
+        ScrollToTopEffect(scrollToTopRequests) { scrollState.animateScrollTo(0) }
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(scrollState)
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {

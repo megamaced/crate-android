@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -50,14 +51,18 @@ import com.megamaced.crate.ui.components.ArtworkSize
 import com.megamaced.crate.ui.components.EmptyState
 import com.megamaced.crate.ui.components.LoadingState
 import com.megamaced.crate.ui.components.MediaCard
+import com.megamaced.crate.ui.components.ScrollToTopEffect
 import com.megamaced.crate.ui.screen.addedit.formatLabel
 import com.megamaced.crate.util.resolve
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     onItemClick: (Long) -> Unit,
     modifier: Modifier = Modifier,
+    scrollToTopRequests: Flow<Unit> = emptyFlow(),
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -96,7 +101,11 @@ fun HomeScreen(
                 }
 
                 else -> {
-                    HomeContent(feed = uiState.feed!!, onItemClick = onItemClick)
+                    HomeContent(
+                        feed = uiState.feed!!,
+                        onItemClick = onItemClick,
+                        scrollToTopRequests = scrollToTopRequests,
+                    )
                 }
             }
         }
@@ -107,9 +116,13 @@ fun HomeScreen(
 private fun HomeContent(
     feed: HomeFeed,
     onItemClick: (Long) -> Unit,
+    scrollToTopRequests: Flow<Unit>,
 ) {
+    val listState = rememberLazyListState()
+    ScrollToTopEffect(scrollToTopRequests) { listState.animateScrollToItem(0) }
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
+        state = listState,
         contentPadding = PaddingValues(vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(24.dp),
     ) {
