@@ -58,4 +58,18 @@
     <string name="field_name">Name</string>
     <string name="field_notes">Notizen</string>
     <string name="field_year">Jahr</string>
+    <string name="action_add_item">Objekt hinzufügen</string>
+    <string name="nav_home">Startseite</string>
+    <string name="field_rating">Beurteilung</string>
+    <string name="purchase_price_label">Originalpreis</string>
+    <string name="purchase_currency_label">Währung</string>
+    <string name="hint_artist_music">z.B. Beatles</string>
+    <string name="hint_artist_films">z.B. Wim Wenders</string>
+    <string name="hint_artist_books">z.B. Günter Grass</string>
+    <string name="hint_artist_games">z.B. Playstation</string>
+    <string name="hint_artist_comics">z.B. Herge</string>
+    <string name="hint_title_music">z.B. Das weisse Album</string>
+    <string name="hint_title_films">z.B. Nosferatu</string>
+    <string name="hint_title_books">z.B. Der Butt</string>
+    <string name="hint_title_games">z.B. Donkey Kong</string>
 </resources>
