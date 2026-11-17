@@ -83,4 +83,26 @@
         <item quantity="one">%1$dStern</item>
         <item quantity="other">%1$dSterne</item>
     </plurals>
+    <string name="hint_label_games">z. B. Nintendo</string>
+    <string name="hint_label_comics">z. B. DC Comics</string>
+    <string name="hint_barcode_music">z. B. 5099902987521</string>
+    <string name="hint_barcode_books" tools:ignore="TypographyDashes">z. B. 978-0451524935</string>
+    <string name="hint_year">z. B. 1973</string>
+    <string name="hint_purchase_price">z. B. 24,99</string>
+    <string name="sort_newest_first">Neueste zuerst</string>
+    <string name="sort_oldest_first">Älteste zuerst</string>
+    <string name="sort_a_to_z">%1$s A–Z</string>
+    <string name="sort_z_to_a">%1$s Z–A</string>
+    <string name="sort_year_oldest">Jahr (älteste zuerst)</string>
+    <string name="sort_year_newest">Jahr (neueste zuerst)</string>
+    <string name="sort_value_highest">Wert (höchster zuerst)</string>
+    <string name="sort_value_lowest">Wert (niedrigster zuerst)</string>
+    <string name="sort_noun_format">Format</string>
+    <string name="sort_noun_title_music">Album</string>
+    <string name="sort_noun_title_films">Film</string>
+    <string name="sort_noun_title_books">Titel</string>
+    <string name="sort_noun_title_games">Spiel</string>
+    <string name="sort_noun_title_comics">Serie</string>
+    <string name="sort_option_selected">"%1$s  ✓"</string>
+    <string name="group_header_unknown">Unbekannt</string>
 </resources>
