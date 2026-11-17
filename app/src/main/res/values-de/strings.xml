@@ -71,5 +71,8 @@
     <string name="hint_title_music">z.B. Das weisse Album</string>
     <string name="hint_title_films">z.B. Nosferatu</string>
     <string name="hint_title_books">z.B. Der Butt</string>
-    <string name="hint_title_games">z.B. Donkey Kong</string>
+    <string name="hint_title_games">z. B. Super Mario Bros.</string>
+    <string name="hint_label_music">z. B. EMI</string>
+    <string name="hint_label_films">z. B. Warner Bros.</string>
+    <string name="hint_label_books">z. B. Penguin</string>
 </resources>
