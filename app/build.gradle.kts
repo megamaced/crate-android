@@ -34,7 +34,7 @@ android {
     defaultConfig {
         applicationId = "com.megamaced.crate"
         minSdk = 29
-        targetSdk = 36
+        targetSdk = 37
         versionCode = 37
         versionName = "1.23.0"
 
