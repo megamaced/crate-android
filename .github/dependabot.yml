@@ -13,16 +13,6 @@ updates:
     groups:
       androidx:
         patterns: ['androidx.*']
-    # Kotlin is held at 2.3.x by KSP, not by AGP: KSP has no 2.4.x release
-    # (latest is 2.3.12, built against Kotlin 2.3.20) and both Room and Hilt
-    # compile through KSP. Lift this once KSP ships a 2.4 line — check
-    # https://repo1.maven.org/maven2/com/google/devtools/ksp/symbol-processing-gradle-plugin/maven-metadata.xml
-    # rather than the Kotlin release notes, which say nothing about KSP.
-    ignore:
-      - dependency-name: 'org.jetbrains.kotlin:*'
-        versions: ['>=2.4.0']
-      - dependency-name: 'org.jetbrains.kotlin.*'
-        versions: ['>=2.4.0']
 
   # Also keeps the commit-SHA pins in .github/workflows up to date, which is
   # what makes pinning to a SHA maintainable rather than a one-off.
