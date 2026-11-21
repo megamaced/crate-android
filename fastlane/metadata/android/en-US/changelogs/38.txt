@@ -1,0 +1,3 @@
+Crate now targets Android 17. If your Nextcloud server is on your
+local network, you can allow access when signing in or in Crate's
+Settings. Granting access in Settings starts a sync.
