@@ -428,6 +428,12 @@
     <string name="login_error_timed_out">Login timed out</string>
     <string name="login_error_unusable_address">The server returned an address Crate can\'t use.</string>
 
+    <!-- Local network access is available on the sign-in screen and in Settings. -->
+    <string name="local_network_access_note">If your Nextcloud server is on your local network, allow Crate to reach it.</string>
+    <string name="local_network_allow">Allow local network access</string>
+    <string name="local_network_settings_note">You can also allow access under Permissions in Android settings.</string>
+    <string name="local_network_open_settings">Open Android settings</string>
+
     <!-- Settings: section headers -->
     <string name="settings_section_appearance">Appearance</string>
     <string name="settings_section_categories">Categories</string>

@@ -66,6 +66,7 @@ import com.megamaced.crate.data.prefs.ThemeMode
 import com.megamaced.crate.domain.model.Category
 import com.megamaced.crate.domain.model.UserProfile
 import com.megamaced.crate.domain.repository.MediaRepository
+import com.megamaced.crate.ui.components.LocalNetworkAccess
 import com.megamaced.crate.ui.components.ScrollToTopEffect
 import com.megamaced.crate.util.resolve
 import kotlinx.coroutines.flow.Flow
@@ -186,6 +187,7 @@ fun SettingsScreen(
             )
 
             SectionHeader(stringResource(R.string.settings_section_account))
+            LocalNetworkAccess(onAccessGranted = viewModel::onLocalNetworkAccessGranted)
             Button(
                 onClick = { confirmLogout = true },
                 modifier = Modifier.fillMaxWidth(),

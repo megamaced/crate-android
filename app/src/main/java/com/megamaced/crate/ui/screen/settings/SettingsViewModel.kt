@@ -14,6 +14,7 @@ import com.megamaced.crate.domain.model.UserProfile
 import com.megamaced.crate.domain.repository.EnrichmentRepository
 import com.megamaced.crate.domain.repository.MediaRepository
 import com.megamaced.crate.domain.repository.SettingsRepository
+import com.megamaced.crate.sync.SyncScheduler
 import com.megamaced.crate.util.UiText
 import com.megamaced.crate.util.UpdateChecker
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -92,6 +93,7 @@ class SettingsViewModel
         private val mediaRepository: MediaRepository,
         private val userPreferences: UserPreferences,
         private val sessionManager: SessionManager,
+        private val syncScheduler: SyncScheduler,
         private val updateChecker: UpdateChecker,
     ) : ViewModel() {
         private val tokens = MutableStateFlow(TokensState())
@@ -177,6 +179,10 @@ class SettingsViewModel
             loadProfile()
             loadTokens()
             loadMarket()
+        }
+
+        fun onLocalNetworkAccessGranted() {
+            syncScheduler.syncNow()
         }
 
         private fun loadProfile() {
